@@ -1,59 +1,109 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+# CAIRO Inventory Management System
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+The **CAIRO Inventory Management System** is a professional-grade asset lifecycle platform designed to automate the tracking of **RM 7.5 million** in high-value research assets for the Centre for Artificial Intelligence and Robotics (CAIRO), UTM.
 
-## About Laravel
+The system implements a strict multi-stage government asset lifecycle, transforming raw delivery data (**KEW.PA-1**) into permanent Capital Asset registers (**KEW.PA-3**) through an automated "Promotion" workflow.
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+---
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+## 🚀 Key Features
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+* **Automated Lifecycle Bridge**: Seamlessly "promotes" pending deliveries to registered assets via a secure acceptance modal that captures unit prices and locations.
 
-## Learning Laravel
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework. You can also check out [Laravel Learn](https://laravel.com/learn), where you will be guided through building a modern Laravel application.
+* **Government Standard Reporting**: Generates pixel-perfect, print-ready PDF documents for:
+* **KEW.PA-1**: Borang Penerimaan Aset Alih.
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains thousands of video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
 
-## Laravel Sponsors
+* **KEW.PA-2**: Borang Penolakan Aset Alih (Rejection Form).
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the [Laravel Partners program](https://partners.laravel.com).
 
-### Premium Partners
+* **KEW.PA-3**: Daftar Harta Modal (Parts A & B).
 
-- **[Vehikl](https://vehikl.com)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel)**
-- **[DevSquad](https://devsquad.com/hire-laravel-developers)**
-- **[Redberry](https://redberry.international/laravel-development)**
-- **[Active Logic](https://activelogic.com)**
 
-## Contributing
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
 
-## Code of Conduct
+* **Dynamic Dashboard**: Real-time visualization of the **RM 1.57M+** current baseline dataset, including portfolio value tracking and category distribution.
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
 
-## Security Vulnerabilities
+* **Enterprise Security**: Robust Role-Based Access Control (RBAC) for Asset Officers and Directors, integrated with Google OAuth.
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
 
-## License
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+---
+
+## 🛠️ Technical Stack
+
+### **Core Environment**
+
+* **Framework**: Laravel 11 (PHP 8.4).
+
+
+* **Frontend**: React with Inertia.js and Tailwind CSS.
+
+
+* **Database**: Amazon RDS PostgreSQL for high data integrity.
+
+
+
+### **Production Libraries**
+
+* **PDF Engine**: Spatie Laravel PDF (Headless Chromium/Browsershot).
+
+
+* **Media Management**: Spatie Media Library with Amazon S3 storage for durable research asset photos.
+
+
+* **Data Handling**: TanStack Table for high-volume filtering and sorting.
+
+
+
+---
+
+## ☁️ Cloud Architecture & Strategy
+
+The system is deployed on a robust **AWS Cloud Architecture** optimized for high availability:
+
+* **Hosting**: AWS Elastic Beanstalk (Amazon Linux 2023).
+
+
+* **Networking**: Nginx with custom `.platform` routing to handle Inertia.js single-point entry.
+
+
+* **Security**: Implementation of "Least Privilege" IAM policies and strict environment isolation.
+
+
+
+---
+
+## 🔧 Installation & Deployment Notes
+
+### **Infrastructure Prerequisites**
+
+To enable the PDF reporting engine on a headless AWS Linux environment, ensure the following system binaries are provisioned:
+
+1. **Node.js & Puppeteer**: Required to drive the headless Chromium browser.
+
+
+2. **Chromium Configuration**: Browsershot must be configured with `--no-sandbox` and dynamic executable paths to run within the restricted permissions of the `webapp` user.
+
+
+
+### **Environment Setup**
+
+Ensure the following variables are configured in your AWS Environment Properties (not a local `.env` file) to prevent credential leaks:
+
+* `DB_CONNECTION=pgsql`
+* `FILESYSTEM_DISK=s3`
+* `AWS_BUCKET=your-cairo-inventory-bucket`
+
+---
+
+## 📅 Project Timeline & Milestones
+
+* **March 9, 2026**: Fully operational prototype completed; **RM 1,574,476** verified baseline established.
+
+
+* **March 10, 2026**: Successful migration to AWS; resolved complex Nginx routing and RDS connectivity issues.
+
+
