@@ -1,157 +1,457 @@
-import { useState } from 'react'; 
+import { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
-
+ 
+// ─── UTM brand palette ────────────────────────────────────────────────────────
+const UTM = {
+    maroon : '#5C001F',
+    gold   : '#F8A617',
+    goldDark:'#C9840A',
+    sand   : '#FFF5AB',
+    white  : '#FFFFFF',
+    gray50 : '#F9F7F5',
+    gray100: '#EDE9E4',
+    gray500: '#8A8480',
+    gray700: '#4A4540',
+    gray900: '#1E1B18',
+};
+ 
+function StatusBadge({ status }) {
+    const map = {
+        pending : { bg: '#FEF3D6', color: UTM.goldDark, border: '#F5D890', label: 'Menunggu' },
+        accepted: { bg: '#E6F4EC', color: '#1A7A3C',    border: '#B2DFC2', label: 'Diterima' },
+        rejected: { bg: '#F3E0E5', color: UTM.maroon,   border: '#E8C0CB', label: 'Ditolak'  },
+    };
+    const s = map[status] || map.pending;
+    return (
+        <span style={{
+            display      : 'inline-block',
+            padding      : '3px 10px',
+            borderRadius : '999px',
+            fontSize     : '11px',
+            fontWeight   : 700,
+            background   : s.bg,
+            color        : s.color,
+            border       : `1px solid ${s.border}`,
+        }}>
+            {s.label}
+        </span>
+    );
+}
+ 
+const inputStyle = {
+    width       : '100%',
+    padding     : '9px 12px',
+    borderRadius: 8,
+    border      : `1.5px solid ${UTM.gray100}`,
+    fontSize    : '13px',
+    color       : UTM.gray900,
+    background  : UTM.white,
+    outline     : 'none',
+    boxSizing   : 'border-box',
+};
+ 
+const labelStyle = {
+    display      : 'block',
+    fontSize     : '11px',
+    fontWeight   : 700,
+    textTransform: 'uppercase',
+    letterSpacing: '0.07em',
+    color        : UTM.gray500,
+    marginBottom : 5,
+};
+ 
 export default function ReceivingIndex({ receivings }) {
     const [selectedItem, setSelectedItem] = useState(null);
-    
+ 
     const { data, setData, post, processing, reset } = useForm({
-        unit_price: '',
-        category: '',
-        location: '',
+        unit_price : '',
+        category   : '',
+        location   : '',
+        asset_type : 'fixed_asset',
+        campus     : 'utm_jb',
+        warranty_expiry : '',
     });
-
+ 
     const handleAcceptClick = (item) => {
         setSelectedItem(item);
         reset();
     };
-
+ 
     const handleAcceptSubmit = (e) => {
         e.preventDefault();
         post(route('receivings.accept', selectedItem.id), {
             onSuccess: () => setSelectedItem(null),
         });
     };
-
+ 
+    const thStyle = {
+        padding      : '12px 20px',
+        fontSize     : '11px',
+        fontWeight   : 700,
+        letterSpacing: '0.07em',
+        textTransform: 'uppercase',
+        color        : UTM.gray500,
+        textAlign    : 'left',
+        borderBottom : `2px solid ${UTM.gray100}`,
+        background   : UTM.gray50,
+    };
+ 
     return (
         <AuthenticatedLayout
             header={
-                <div className="flex justify-between items-center">
-                    <h2 className="font-semibold text-xl text-gray-800 leading-tight">Pengurusan Penerimaan (KEW.PA-1)</h2>
-                    <Link 
-                        href={route('receivings.create')} 
-                        className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow-sm hover:bg-indigo-700"
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 4, height: 24, background: UTM.gold, borderRadius: 2 }} />
+                        <h2 style={{ fontSize: '18px', fontWeight: 700, color: UTM.maroon, margin: 0 }}>
+                            Pengurusan Penerimaan (KEW.PA-1)
+                        </h2>
+                    </div>
+                    <Link
+                        href={route('receivings.create')}
+                        style={{
+                            background    : UTM.maroon,
+                            color         : UTM.white,
+                            padding       : '9px 18px',
+                            borderRadius  : 8,
+                            fontSize      : '13px',
+                            fontWeight    : 700,
+                            textDecoration: 'none',
+                            boxShadow     : '0 2px 6px rgba(92,0,31,0.2)',
+                        }}
                     >
                         + Daftar Penerimaan Baru
                     </Link>
                 </div>
             }
         >
-            <Head title="Receiving Inventory" />
-
-            <div className="py-12">
-                <div className="max-w-7xl mx-auto sm:px-6 lg:px-8">
-                    <div className="bg-white overflow-hidden shadow-sm sm:rounded-lg p-6">
-                        <table className="min-w-full divide-y divide-gray-200">
-                            <thead className="bg-gray-50">
-                                <tr className="text-xs font-bold text-gray-500 uppercase">
-                                    <th className="px-6 py-3 text-left">No. Penerimaan</th>
-                                    <th className="px-6 py-3 text-left">Pembekal</th>
-                                    <th className="px-6 py-3 text-left">Item</th>
-                                    <th className="px-6 py-3 text-left">Status</th>
-                                    <th className="px-6 py-3 text-right">Tindakan</th>
+            <Head title="Senarai Penerimaan" />
+ 
+            <div style={{ background: UTM.gray50, minHeight: '100vh', padding: '28px 24px' }}>
+                <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+ 
+                    <div style={{ background: UTM.white, borderRadius: 12,
+                                  boxShadow: '0 1px 4px rgba(92,0,31,0.07)', overflow: 'hidden' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                            <thead>
+                                <tr>
+                                    <th style={thStyle}>No. Penerimaan</th>
+                                    <th style={thStyle}>Pembekal</th>
+                                    <th style={thStyle}>Item</th>
+                                    <th style={thStyle}>Qty Dipesan</th>
+                                    <th style={thStyle}>Qty Diterima</th>
+                                    <th style={thStyle}>Status</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
                                 </tr>
                             </thead>
-                            <tbody className="divide-y divide-gray-200">
-                                {receivings.map((item) => (
-                                    <tr key={item.id} className="hover:bg-gray-50">
-                                        <td className="px-6 py-4 font-mono text-sm">{item.receive_no}</td>
-                                        <td className="px-6 py-4 text-sm">{item.supplier_name}</td>
-                                        <td className="px-6 py-4 text-sm font-medium">{item.item_description}</td>
-                                        <td className="px-6 py-4">
-                                            <span className={`px-2 py-1 text-xs font-bold rounded-full ${
-                                                item.status === 'accepted' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'
-                                            }`}>
-                                                {item.status}
-                                            </span>
+                            <tbody>
+                                {receivings.map((item, idx) => (
+                                    <tr key={item.id}
+                                        style={{ background: idx % 2 === 0 ? UTM.white : UTM.gray50 }}
+                                        onMouseEnter={e => e.currentTarget.style.background = '#FFF5E8'}
+                                        onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? UTM.white : UTM.gray50}
+                                    >
+                                        <td style={{ padding: '14px 20px', fontFamily: 'monospace',
+                                                     fontSize: '12px', fontWeight: 700, color: UTM.maroon }}>
+                                            {item.receive_no}
                                         </td>
-                                        <td className="px-6 py-4 text-right space-x-3">
-                                            <Link 
+                                        <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>
+                                            {item.supplier_name}
+                                        </td>
+                                        <td style={{ padding: '14px 20px', fontSize: '13px',
+                                                     fontWeight: 600, color: UTM.gray900 }}>
+                                            {item.item_description}
+                                        </td>
+                                        <td style={{ padding: '14px 20px', fontSize: '13px',
+                                                     color: UTM.gray700, textAlign: 'center' }}>
+                                            {item.quantity_ordered}
+                                        </td>
+                                        <td style={{ padding: '14px 20px', fontSize: '13px',
+                                                     color: UTM.gray700, textAlign: 'center' }}>
+                                            {item.quantity_received}
+                                        </td>
+                                        <td style={{ padding: '14px 20px' }}>
+                                            <StatusBadge status={item.status} />
+                                        </td>
+                                        <td style={{ padding: '14px 20px', textAlign: 'right',
+                                                     whiteSpace: 'nowrap' }}>
+                                            <Link
                                                 href={route('receivings.kewpa1', item.id)}
-                                                className="text-indigo-600 hover:underline text-sm font-medium"
+                                                style={{
+                                                    display       : 'inline-block',
+                                                    padding       : '5px 12px',
+                                                    borderRadius  : 6,
+                                                    fontSize      : '12px',
+                                                    fontWeight    : 700,
+                                                    color         : UTM.maroon,
+                                                    background    : '#F3E0E5',
+                                                    textDecoration: 'none',
+                                                    marginRight   : 8,
+                                                }}
                                             >
-                                                Lihat KEW.PA-1
+                                                KEW.PA-1
                                             </Link>
-                                            
+ 
                                             {item.status === 'pending' && (
-                                                <button 
+                                                <button
                                                     onClick={() => handleAcceptClick(item)}
-                                                    className="bg-green-600 text-white px-3 py-1.5 rounded-md text-sm font-bold hover:bg-green-700 transition"
+                                                    style={{
+                                                        padding     : '5px 12px',
+                                                        borderRadius: 6,
+                                                        fontSize    : '12px',
+                                                        fontWeight  : 700,
+                                                        background  : '#1A7A3C',
+                                                        color       : UTM.white,
+                                                        border      : 'none',
+                                                        cursor      : 'pointer',
+                                                    }}
                                                 >
-                                                    Terima & Daftar Aset
+                                                    Terima & Daftar
                                                 </button>
                                             )}
                                         </td>
                                     </tr>
                                 ))}
+                                {receivings.length === 0 && (
+                                    <tr>
+                                        <td colSpan={7} style={{ padding: '48px', textAlign: 'center',
+                                                                  color: UTM.gray500, fontSize: '14px' }}>
+                                            Tiada rekod penerimaan.
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
+ 
+                        <div style={{ padding: '12px 20px', borderTop: `1px solid ${UTM.gray100}`,
+                                      background: UTM.gray50, fontSize: '12px', color: UTM.gray500 }}>
+                            <strong style={{ color: UTM.maroon }}>{receivings.length}</strong> rekod penerimaan
+                        </div>
                     </div>
+ 
                 </div>
             </div>
-
-            {/* Acceptance Modal (KEW.PA-3 Precursor) */}
+ 
+            {/* ── Acceptance modal ── */}
             {selectedItem && (
-                <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50 p-4">
-                    <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-8">
-                        <h3 className="text-lg font-bold text-gray-900 mb-2">Sahkan Penerimaan</h3>
-                        <p className="text-sm text-gray-500 mb-6">Sila lengkapkan butiran perolehan untuk menjana <span className="font-bold text-indigo-600">KEW.PA-3</span>.</p>
-                        
-                        <form onSubmit={handleAcceptSubmit} className="space-y-4">
-                            <div>
-                                <label className="block text-xs font-black uppercase text-gray-400 mb-1">Harga Seunit (RM)</label>
-                                <input 
-                                    type="number" 
-                                    required
-                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500"
-                                    value={data.unit_price}
-                                    onChange={e => setData('unit_price', e.target.value)}
-                                    placeholder="e.g. 50000"
-                                />
+                <div style={{
+                    position      : 'fixed',
+                    inset         : 0,
+                    background    : 'rgba(0,0,0,0.45)',
+                    display       : 'flex',
+                    alignItems    : 'center',
+                    justifyContent: 'center',
+                    zIndex        : 50,
+                    padding       : 16,
+                }}>
+                    <div style={{
+                        background  : UTM.white,
+                        borderRadius: 16,
+                        boxShadow   : '0 8px 40px rgba(92,0,31,0.2)',
+                        maxWidth    : 480,
+                        width       : '100%',
+                        overflow    : 'hidden',
+                    }}>
+                        {/* Modal header */}
+                        <div style={{ background: UTM.maroon, padding: '20px 24px' }}>
+                            <p style={{ fontSize: '16px', fontWeight: 800, color: UTM.white, marginBottom: 4 }}>
+                                Sahkan Penerimaan Aset
+                            </p>
+                            <p style={{ fontSize: '12px', color: UTM.sand }}>
+                                {selectedItem.item_description}
+                            </p>
+                        </div>
+ 
+                        {/* Modal body */}
+                        <form onSubmit={handleAcceptSubmit} style={{ padding: '24px' }}>
+                            <p style={{ fontSize: '12px', color: UTM.gray500, marginBottom: 20 }}>
+                                Lengkapkan butiran untuk menjana{' '}
+                                <strong style={{ color: UTM.maroon }}>KEW.PA-3</strong> dan mendaftarkan aset.
+                            </p>
+
+                            {/* Asset type — Auto-calculated visual indicator */}
+                            <div style={{ marginBottom: 16 }}>
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 5 }}>
+                                    <label style={{...labelStyle, marginBottom: 0}}>Jenis Aset *</label>
+                                    <span style={{ fontSize: '10px', color: UTM.goldDark, fontWeight: 700, fontStyle: 'italic' }}>
+                                        *Ditetapkan secara automatik
+                                    </span>
+                                </div>
+        
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                    {[
+                                        { value: 'fixed_asset', label: 'Aset Tetap', desc: 'Modal > RM1,000, tempoh guna > 1 tahun' },
+                                        { value: 'inventory',   label: 'Inventori', desc: 'Habis guna / nilai rendah' },
+                                    ].map(opt => (
+                                        <div 
+                                            key={opt.value}
+                                            style={{
+                                                padding     : '12px 14px',
+                                                borderRadius: 8,
+                                                border      : `2px solid ${data.asset_type === opt.value ? UTM.maroon : UTM.gray100}`,
+                                                background  : data.asset_type === opt.value ? '#F3E0E5' : UTM.gray50,
+                                                opacity     : data.asset_type === opt.value ? 1 : 0.5,
+                                                transition  : 'all 0.2s',
+                                                textAlign   : 'left',
+                                            }}
+                                        >
+                                            <p style={{ fontWeight: 700, fontSize: '13px',
+                                                        color: data.asset_type === opt.value ? UTM.maroon : UTM.gray900,
+                                                        marginBottom: 2 }}>
+                                                {opt.label}
+                                            </p>
+                                            <p style={{ fontSize: '11px', color: UTM.gray500, lineHeight: 1.4 }}>
+                                                {opt.desc}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                                {/* Error handling for backend overrides */}
+                                {errors?.asset_type && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.asset_type}</p>}
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-black uppercase text-gray-400 mb-1">Kategori Aset</label>
-                                <select 
+                            <div style={{ marginBottom: 14 }}>
+                                <label style={labelStyle}>Harga Seunit (RM) *</label>
+                                <input
+                                    type="number"
                                     required
-                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500"
+                                    min="0"          // ROBUSTNESS: Prevent negative numbers
+                                    step="0.01"      // ROBUSTNESS: Allow cents (Sen)
+                                    style={inputStyle}
+                                    value={data.unit_price}
+                                    onChange={e => {
+                                        const price = parseFloat(e.target.value) || 0;
+                                       setData(prev => ({
+                                            ...prev,
+                                            unit_price: e.target.value,
+                                            asset_type: price > 1000 ? 'fixed_asset' : 'inventory'
+                                        }));
+                                    }}
+                                    placeholder="cth: 5000.50"
+                                />
+                                {errors?.unit_price && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.unit_price}</p>}
+                            </div>
+
+                            <div style={{ marginBottom: 14 }}>
+                                <label style={labelStyle}>Kategori Aset *</label>
+                                <select
+                                    required
+                                    style={inputStyle}
                                     value={data.category}
                                     onChange={e => setData('category', e.target.value)}
                                 >
-                                    <option value="">Pilih Kategori...</option>
+                                    <option value="">Pilih kategori...</option>
                                     <option value="Server">Server</option>
                                     <option value="Workstation">Workstation</option>
                                     <option value="GPU Node">GPU Node</option>
                                     <option value="Sensor">Sensor</option>
+                                    <option value="Perabot">Perabot</option>
+                                    <option value="Lain-lain">Lain-lain</option>
                                 </select>
+                                {errors?.category && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.category}</p>}
                             </div>
 
-                            <div>
-                                <label className="block text-xs font-black uppercase text-gray-400 mb-1">Lokasi Penempatan</label>
-                                <input 
-                                    type="text" 
-                                    required
-                                    className="w-full border-gray-300 rounded-lg shadow-sm focus:ring-indigo-500"
-                                    value={data.location}
-                                    onChange={e => setData('location', e.target.value)}
-                                    placeholder="e.g. Makmal AI, Aras 2"
-                                />
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+                                <div>
+                                    <label style={labelStyle}>Lokasi Penempatan *</label>
+                                    <input
+                                        type="text"
+                                        required
+                                        maxLength="255" // ROBUSTNESS: Prevent database overflow
+                                        style={inputStyle}
+                                        value={data.location}
+                                        onChange={e => setData('location', e.target.value)}
+                                        placeholder="cth: Makmal AI"
+                                    />
+                                    {errors?.location && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.location}</p>}
+                                </div>
+        
+                                <div>
+                                    <label style={labelStyle}>Tamat Waranti</label>
+                                    <input
+                                        type="date"
+                                        // ROBUSTNESS: Restrict to today or future dates only
+                                        min={new Date().toISOString().split('T')[0]} 
+                                        style={inputStyle}
+                                        value={data.warranty_expiry}
+                                        onChange={e => setData('warranty_expiry', e.target.value)}
+                                    />
+                                    {errors?.warranty_expiry && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.warranty_expiry}</p>}
+                                </div>
                             </div>
 
-                            <div className="flex justify-end gap-3 mt-8">
-                                <button 
+                            <div style={{ marginBottom: 20 }}>
+                                <label style={labelStyle}>Kampus *</label>
+                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
+                                    {[
+                                        { value: 'utm_jb', label: 'UTM Johor Bahru' },
+                                        { value: 'utm_kl', label: 'UTM Kuala Lumpur' },
+                                    ].map(opt => (
+                                        <button
+                                            key={opt.value}
+                                            type="button"
+                                            onClick={() => setData('campus', opt.value)}
+                                            style={{
+                                                padding    : '10px 14px',
+                                                borderRadius: 8,
+                                                border     : `2px solid ${data.campus === opt.value
+                                                    ? (opt.value === 'utm_kl' ? UTM.maroon : UTM.goldDark)
+                                                    : UTM.gray100}`,
+                                                background : data.campus === opt.value
+                                                    ? (opt.value === 'utm_kl' ? '#F3E0E5' : '#FEF3D6')
+                                                    : UTM.white,
+                                                cursor     : 'pointer',
+                                                fontWeight : 700,
+                                                fontSize   : '13px',
+                                                color      : data.campus === opt.value
+                                                    ? (opt.value === 'utm_kl' ? UTM.maroon : UTM.goldDark)
+                                                    : UTM.gray700,
+                                                transition : 'all 0.12s',
+                                            }}
+                                        >
+                                            {opt.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                {errors?.campus && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.campus}</p>}
+                            </div>
+
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                                <button
                                     type="button"
-                                    onClick={() => setSelectedItem(null)}
-                                    className="px-4 py-2 text-sm font-bold text-gray-500 hover:text-gray-700"
+                                    onClick={() => {
+                                        setSelectedItem(null);
+                                        reset(); // ROBUSTNESS: Clear form state on cancel
+                                    }}
+                                    style={{
+                                        padding     : '10px 20px',
+                                        borderRadius: 8,
+                                        fontSize    : '13px',
+                                        fontWeight  : 700,
+                                        background  : UTM.gray100,
+                                        color       : UTM.gray700,
+                                        border      : 'none',
+                                        cursor      : 'pointer',
+                                    }}
                                 >
                                     Batal
                                 </button>
-                                <button 
+                                <button
                                     type="submit"
                                     disabled={processing}
-                                    className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-bold shadow-md hover:bg-indigo-700 disabled:opacity-50"
+                                    style={{
+                                        padding     : '10px 24px',
+                                        borderRadius: 8,
+                                        fontSize    : '13px',
+                                        fontWeight  : 700,
+                                        background  : processing ? UTM.gray300 : UTM.maroon,
+                                        color       : UTM.white,
+                                        border      : 'none',
+                                        cursor      : processing ? 'not-allowed' : 'pointer',
+                                        boxShadow   : processing ? 'none' : '0 2px 8px rgba(92,0,31,0.2)',
+                                    }}
                                 >
-                                    {processing ? 'Menjana...' : 'Sahkan & Daftar'}
+                                    {processing ? 'Menjana...' : 'Sahkan & Daftar Aset'}
                                 </button>
                             </div>
                         </form>
@@ -161,3 +461,4 @@ export default function ReceivingIndex({ receivings }) {
         </AuthenticatedLayout>
     );
 }
+ 

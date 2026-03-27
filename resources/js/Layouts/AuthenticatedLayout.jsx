@@ -1,72 +1,260 @@
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import { Link, usePage } from '@inertiajs/react';
-
+ 
+// ─── UTM brand palette ────────────────────────────────────────────────────────
+const UTM = {
+    maroon : '#5C001F',
+    maroon2: '#7A0029',
+    gold   : '#F8A617',
+    goldDark:'#C9840A',
+    sand   : '#FFF5AB',
+    white  : '#FFFFFF',
+    gray50 : '#F9F7F5',
+    gray100: '#EDE9E4',
+    gray500: '#8A8480',
+};
+ 
+function NavSection({ label, children }) {
+    return (
+        <div style={{ marginBottom: 24 }}>
+            <p style={{
+                fontSize     : '10px',
+                fontWeight   : 700,
+                letterSpacing: '0.1em',
+                textTransform: 'uppercase',
+                color        : 'rgba(255,245,171,0.5)',  // sand at 50% opacity
+                padding      : '0 12px',
+                marginBottom : 6,
+            }}>
+                {label}
+            </p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                {children}
+            </div>
+        </div>
+    );
+}
+ 
+function NavLink({ href, icon, label, active }) {
+    return (
+        <Link
+            href={href}
+            style={{
+                display        : 'flex',
+                alignItems     : 'center',
+                gap            : 10,
+                padding        : '9px 12px',
+                borderRadius   : 8,
+                fontSize       : '13px',
+                fontWeight     : active ? 700 : 500,
+                color          : active ? UTM.gold : 'rgba(255,255,255,0.75)',
+                background     : active ? 'rgba(248,166,23,0.12)' : 'transparent',
+                borderLeft     : active ? `3px solid ${UTM.gold}` : '3px solid transparent',
+                textDecoration : 'none',
+                transition     : 'all 0.12s',
+            }}
+            onMouseEnter={e => {
+                if (!active) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
+                    e.currentTarget.style.color = UTM.white;
+                }
+            }}
+            onMouseLeave={e => {
+                if (!active) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.75)';
+                }
+            }}
+        >
+            <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
+            <span>{label}</span>
+        </Link>
+    );
+}
+ 
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props.auth.user;
-
+ 
     return (
-        <div className="min-h-screen bg-gray-100 flex">
-            {/* Sidebar */}
-            <aside className="w-64 bg-indigo-900 text-white hidden md:flex flex-col sticky top-0 h-screen">
-                <div className="p-6 flex items-center gap-3">
-                    <ApplicationLogo className="block h-9 w-auto fill-current text-white" />
-                    <span className="font-bold text-lg tracking-wider">CAIRO INV</span>
-                </div>
-
-                <nav className="flex-1 px-4 mt-4 space-y-6">
-                    {/* General Section */}
-                    <div>
-                        <p className="px-3 text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">Main</p>
-                        <Link href={route('dashboard')} className={`block p-3 rounded-lg hover:bg-indigo-800 transition ${route().current('dashboard') ? 'bg-indigo-800' : ''}`}>
-                            📊 Dashboard
-                        </Link>
-                    </div>
-
-                    {/* Operational Section (KEW.PA-1 Workflow) */}
-                    <div>
-                        <p className="px-3 text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">Logistics (KEW.PA-1)</p>
-                        <div className="space-y-1">
-                            <Link href={route('receivings.create')} className={`block p-3 rounded-lg hover:bg-indigo-800 transition ${route().current('receivings.create') ? 'bg-indigo-800' : ''}`}>
-                                ➕ New Delivery
-                            </Link>
-                            <Link href={route('receivings.index')} className={`block p-3 rounded-lg hover:bg-indigo-800 transition ${route().current('receivings.index') ? 'bg-indigo-800' : ''}`}>
-                                🚚 Receiving List
-                            </Link>
+        <div style={{ minHeight: '100vh', background: UTM.gray50, display: 'flex' }}>
+ 
+            {/* ── Sidebar ── */}
+            <aside style={{
+                width      : 240,
+                background : UTM.maroon,
+                display    : 'flex',
+                flexDirection: 'column',
+                position   : 'sticky',
+                top        : 0,
+                height     : '100vh',
+                flexShrink : 0,
+                // Subtle texture via box-shadow
+                boxShadow  : '2px 0 12px rgba(0,0,0,0.15)',
+            }}>
+ 
+                {/* Logo / brand */}
+                <div style={{
+                    padding        : '20px 16px 16px',
+                    borderBottom   : '1px solid rgba(255,245,171,0.12)',
+                    marginBottom   : 20,
+                }}>
+                    {/* Gold accent bar at top of sidebar */}
+                    <div style={{
+                        height      : 3,
+                        background  : `linear-gradient(90deg, ${UTM.gold}, ${UTM.sand})`,
+                        borderRadius: 2,
+                        marginBottom: 16,
+                        marginLeft  : -16,
+                        marginRight : -16,
+                    }} />
+ 
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <ApplicationLogo style={{ height: 32, width: 'auto' }} className="fill-current" />
+                        <div>
+                            <p style={{ fontSize: '15px', fontWeight: 800, color: UTM.white,
+                                        letterSpacing: '0.05em', lineHeight: 1.1 }}>
+                                CAIRO INV
+                            </p>
+                            <p style={{ fontSize: '10px', color: 'rgba(255,245,171,0.6)',
+                                        letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                                UTM Asset System
+                            </p>
                         </div>
                     </div>
-
-                    {/* Registry Section (KEW.PA-3 Inventory) */}
-                    <div>
-                        <p className="px-3 text-xs font-semibold text-indigo-300 uppercase tracking-wider mb-2">Registry (KEW.PA-3)</p>
-                        <Link href={route('assets.index')} className={`block p-3 rounded-lg hover:bg-indigo-800 transition ${route().current('assets.*') ? 'bg-indigo-800' : ''}`}>
-                            📦 Assets Inventory
-                        </Link>
-                    </div>
+                </div>
+ 
+                {/* Nav */}
+                <nav style={{ flex: 1, padding: '0 12px', overflowY: 'auto' }}>
+                    <NavSection label="Utama">
+                        <NavLink
+                            href={route('dashboard')}
+                            icon="▣"
+                            label="Dashboard"
+                            active={route().current('dashboard')}
+                        />
+                    </NavSection>
+ 
+                    <NavSection label="Logistik (KEW.PA-1)">
+                        <NavLink
+                            href={route('receivings.create')}
+                            icon="＋"
+                            label="Daftar Penerimaan"
+                            active={route().current('receivings.create')}
+                        />
+                        <NavLink
+                            href={route('receivings.index')}
+                            icon="◫"
+                            label="Senarai Penerimaan"
+                            active={route().current('receivings.index')}
+                        />
+                    </NavSection>
+ 
+                    <NavSection label="Daftar Aset (KEW.PA-3)">
+                        <NavLink
+                            href={route('assets.index')}
+                            icon="◈"
+                            label="Inventori Aset"
+                            active={route().current('assets.*')}
+                        />
+                    </NavSection>
                 </nav>
-
-                {/* User Footer */}
-                <div className="p-4 border-t border-indigo-800 bg-indigo-950">
-                    <p className="text-xs text-indigo-300 italic mb-1 uppercase">Logged in as</p>
-                    <div className="flex justify-between items-center">
-                        <span className="text-sm font-bold truncate">{user.name}</span>
-                        <Link href={route('logout')} method="post" as="button" className="text-xs text-red-400 hover:text-red-300 font-bold">
-                            Logout
+ 
+                {/* User footer */}
+                <div style={{
+                    padding      : '14px 16px',
+                    borderTop    : '1px solid rgba(255,245,171,0.12)',
+                    background   : 'rgba(0,0,0,0.2)',
+                }}>
+                    <p style={{ fontSize: '10px', fontWeight: 700, textTransform: 'uppercase',
+                                letterSpacing: '0.08em', color: 'rgba(255,245,171,0.5)',
+                                marginBottom: 6 }}>
+                        Log masuk sebagai
+                    </p>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 0 }}>
+                            {/* Avatar circle */}
+                            <div style={{
+                                width       : 28,
+                                height      : 28,
+                                borderRadius: '50%',
+                                background  : UTM.gold,
+                                display     : 'flex',
+                                alignItems  : 'center',
+                                justifyContent: 'center',
+                                fontSize    : '12px',
+                                fontWeight  : 800,
+                                color       : UTM.maroon,
+                                flexShrink  : 0,
+                            }}>
+                                {user.name.charAt(0).toUpperCase()}
+                            </div>
+                            <span style={{ fontSize: '13px', fontWeight: 700, color: UTM.white,
+                                           overflow: 'hidden', textOverflow: 'ellipsis',
+                                           whiteSpace: 'nowrap' }}>
+                                {user.name}
+                            </span>
+                        </div>
+                        <Link
+                            href={route('logout')}
+                            method="post"
+                            as="button"
+                            style={{
+                                fontSize      : '11px',
+                                fontWeight    : 700,
+                                color         : 'rgba(255,100,100,0.8)',
+                                background    : 'none',
+                                border        : 'none',
+                                cursor        : 'pointer',
+                                padding       : '4px 8px',
+                                borderRadius  : 4,
+                                textDecoration: 'none',
+                                flexShrink    : 0,
+                            }}
+                        >
+                            Keluar
                         </Link>
                     </div>
                 </div>
             </aside>
-
-            {/* Main Content Area */}
-            <div className="flex-1 flex flex-col overflow-hidden">
-                <header className="bg-white shadow-sm py-4 px-8 border-b border-gray-200">
-                    <div className="flex justify-between items-center">
-                        {header}
-                        <div className="text-xs text-gray-400 font-medium">
-                            CAIRO Asset Management System v1.0
+ 
+            {/* ── Main content area ── */}
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+ 
+                {/* Top header bar */}
+                <header style={{
+                    background  : UTM.white,
+                    borderBottom: `1px solid ${UTM.gray100}`,
+                    padding     : '0 32px',
+                    height      : 60,
+                    display     : 'flex',
+                    alignItems  : 'center',
+                    justifyContent: 'space-between',
+                    flexShrink  : 0,
+                    boxShadow   : '0 1px 4px rgba(92,0,31,0.05)',
+                }}>
+                    {header}
+ 
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        {/* UTM color pill */}
+                        <div style={{
+                            display     : 'flex',
+                            alignItems  : 'center',
+                            gap         : 6,
+                            padding     : '4px 10px',
+                            borderRadius: '999px',
+                            background  : UTM.gray50,
+                            border      : `1px solid ${UTM.gray100}`,
+                        }}>
+                            <div style={{ width: 8, height: 8, borderRadius: '50%',
+                                          background: UTM.maroon }} />
+                            <span style={{ fontSize: '11px', fontWeight: 600, color: UTM.gray500 }}>
+                                CAIRO v1.0
+                            </span>
                         </div>
                     </div>
                 </header>
-                <main className="flex-1 overflow-y-auto bg-gray-50 p-8">
+ 
+                <main style={{ flex: 1, overflowY: 'auto', background: UTM.gray50 }}>
                     {children}
                 </main>
             </div>
