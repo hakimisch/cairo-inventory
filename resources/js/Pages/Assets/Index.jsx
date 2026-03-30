@@ -156,7 +156,9 @@ export default function Index({ assets, totalValue }) {
         const matchSearch =
             a.name.toLowerCase().includes(search.toLowerCase()) ||
             a.asset_tag.toLowerCase().includes(search.toLowerCase()) ||
-            (a.location ?? '').toLowerCase().includes(search.toLowerCase());
+            (a.location ?? '').toLowerCase().includes(search.toLowerCase()) ||
+            (a.custodian_name ?? '').toLowerCase().includes(search.toLowerCase())
+            ;
         const matchType =
             typeFilter === 'all' || a.asset_type === typeFilter;
         return matchSearch && matchType;
@@ -277,6 +279,7 @@ export default function Index({ assets, totalValue }) {
                                     <th style={thStyle}>Jenis</th>
                                     <th style={thStyle}>Kategori</th>
                                     <th style={thStyle}>Harga (RM)</th>
+                                    <th style={thStyle}>Pegawai</th>
                                     <th style={thStyle}>Lokasi</th>
                                     <th style={thStyle}>Waranti</th>
                                     <th style={thStyle}>Status</th>
@@ -324,6 +327,9 @@ export default function Index({ assets, totalValue }) {
                                                      fontWeight: 700, color: UTM.gray900 }}>
                                             {Number(asset.purchase_price).toLocaleString()}
                                         </td>
+                                        <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>
+                                            {asset.custodian_name || <span style={{color: UTM.gray300, fontStyle: 'italic'}}>Belum ditetapkan</span>}
+                                        </td>
                                         <td style={{ padding: '14px 20px', fontSize: '13px',
                                                      color: UTM.gray700, maxWidth: 180,
                                                      overflow: 'hidden', textOverflow: 'ellipsis',
@@ -358,7 +364,8 @@ export default function Index({ assets, totalValue }) {
                                             </Link>
  
                                             <a
-                                                href={route('assets.kewpa3.download', asset.id)}
+                                                // FORK LOGIC: Fixed Assets get KEW.PA-2, Inventory gets KEW.PA-3
+                                                href={asset.asset_type === 'fixed_asset' ? route('assets.kewpa2.download', asset.id) : route('assets.kewpa3.download', asset.id)}
                                                 style={{
                                                     display     : 'inline-block',
                                                     padding     : '5px 12px',
@@ -371,24 +378,8 @@ export default function Index({ assets, totalValue }) {
                                                     marginRight : 6,
                                                 }}
                                             >
-                                                PDF
+                                                {asset.asset_type === 'fixed_asset' ? 'KEW.PA-2' : 'KEW.PA-3'}
                                             </a>
- 
-                                            <Link
-                                                href={route('assets.kewpa2', asset.id)}
-                                                style={{
-                                                    display     : 'inline-block',
-                                                    padding     : '5px 12px',
-                                                    borderRadius: 6,
-                                                    fontSize    : '12px',
-                                                    fontWeight  : 700,
-                                                    background  : '#F3E0E5',
-                                                    color       : UTM.maroon,
-                                                    textDecoration: 'none',
-                                                }}
-                                            >
-                                                Tolak
-                                            </Link>
                                         </td>
                                     </tr>
                                 ))}

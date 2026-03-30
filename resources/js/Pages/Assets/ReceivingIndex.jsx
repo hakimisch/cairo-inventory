@@ -64,13 +64,20 @@ const labelStyle = {
 export default function ReceivingIndex({ receivings }) {
     const [selectedItem, setSelectedItem] = useState(null);
  
-    const { data, setData, post, processing, reset } = useForm({
+    const { data, setData, post, processing, errors, reset } = useForm({
         unit_price : '',
         category   : '',
         location   : '',
+        custodian_name  : '',
         asset_type : 'fixed_asset',
         campus     : 'utm_jb',
         warranty_expiry : '',
+        photo           : null,
+        brand           : '',
+        model           : '',
+        serial_number   : '',
+        saga_id         : '',
+        budget_vot      : '',
     });
  
     const handleAcceptClick = (item) => {
@@ -193,21 +200,41 @@ export default function ReceivingIndex({ receivings }) {
                                             </Link>
  
                                             {item.status === 'pending' && (
-                                                <button
-                                                    onClick={() => handleAcceptClick(item)}
-                                                    style={{
-                                                        padding     : '5px 12px',
-                                                        borderRadius: 6,
-                                                        fontSize    : '12px',
-                                                        fontWeight  : 700,
-                                                        background  : '#1A7A3C',
-                                                        color       : UTM.white,
-                                                        border      : 'none',
-                                                        cursor      : 'pointer',
-                                                    }}
-                                                >
-                                                    Terima & Daftar
-                                                </button>
+                                                <>
+                                                    <button
+                                                        onClick={() => handleAcceptClick(item)}
+                                                        style={{
+                                                            padding     : '5px 12px',
+                                                            borderRadius: 6,
+                                                            fontSize    : '12px',
+                                                            fontWeight  : 700,
+                                                            background  : '#1A7A3C',
+                                                            color       : UTM.white,
+                                                            border      : 'none',
+                                                            cursor      : 'pointer',
+                                                            marginRight : 8,
+                                                        }}
+                                                    >
+                                                        Terima & Daftar
+                                                    </button>
+                                                    <Link
+                                                        href={route('receivings.reject', item.id)} /* Make sure this route exists in web.php */
+                                                        method="post"
+                                                        as="button"
+                                                        style={{
+                                                            padding     : '5px 12px',
+                                                            borderRadius: 6,
+                                                            fontSize    : '12px',
+                                                            fontWeight  : 700,
+                                                            background  : '#F3E0E5',
+                                                            color       : UTM.maroon,
+                                                            border      : 'none',
+                                                            cursor      : 'pointer',
+                                                        }}
+                                                   >
+                                                        Tolak
+                                                    </Link>
+                                                </>
                                             )}
                                         </td>
                                     </tr>
@@ -269,67 +296,68 @@ export default function ReceivingIndex({ receivings }) {
                                 <strong style={{ color: UTM.maroon }}>KEW.PA-3</strong> dan mendaftarkan aset.
                             </p>
 
-                            {/* Asset type — Auto-calculated visual indicator */}
-                            <div style={{ marginBottom: 16 }}>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginBottom: 5 }}>
-                                    <label style={{...labelStyle, marginBottom: 0}}>Jenis Aset *</label>
-                                    <span style={{ fontSize: '10px', color: UTM.goldDark, fontWeight: 700, fontStyle: 'italic' }}>
-                                        *Ditetapkan secara automatik
-                                    </span>
+                            {/* ── UTM Specs & Financials ── */}
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginBottom: 20 }}>
+                                <div>
+                                    <label style={labelStyle}>Buatan (Brand) *</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        style={inputStyle} 
+                                        value={data.brand} 
+                                        onChange={e => setData('brand', e.target.value)} 
+                                        placeholder="cth: Lenovo" 
+                                    />
+                                    {errors?.brand && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.brand}</p>}
                                 </div>
         
-                                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-                                    {[
-                                        { value: 'fixed_asset', label: 'Aset Tetap', desc: 'Modal > RM1,000, tempoh guna > 1 tahun' },
-                                        { value: 'inventory',   label: 'Inventori', desc: 'Habis guna / nilai rendah' },
-                                    ].map(opt => (
-                                        <div 
-                                            key={opt.value}
-                                            style={{
-                                                padding     : '12px 14px',
-                                                borderRadius: 8,
-                                                border      : `2px solid ${data.asset_type === opt.value ? UTM.maroon : UTM.gray100}`,
-                                                background  : data.asset_type === opt.value ? '#F3E0E5' : UTM.gray50,
-                                                opacity     : data.asset_type === opt.value ? 1 : 0.5,
-                                                transition  : 'all 0.2s',
-                                                textAlign   : 'left',
-                                            }}
-                                        >
-                                            <p style={{ fontWeight: 700, fontSize: '13px',
-                                                        color: data.asset_type === opt.value ? UTM.maroon : UTM.gray900,
-                                                        marginBottom: 2 }}>
-                                                {opt.label}
-                                            </p>
-                                            <p style={{ fontSize: '11px', color: UTM.gray500, lineHeight: 1.4 }}>
-                                                {opt.desc}
-                                            </p>
-                                        </div>
-                                    ))}
+                                <div>
+                                    <label style={labelStyle}>Model *</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        style={inputStyle} 
+                                        value={data.model} 
+                                        onChange={e => setData('model', e.target.value)} 
+                                        placeholder="cth: Legion Pro 5" 
+                                    />
+                                    {errors?.model && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.model}</p>}
                                 </div>
-                                {/* Error handling for backend overrides */}
-                                {errors?.asset_type && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.asset_type}</p>}
-                            </div>
 
-                            <div style={{ marginBottom: 14 }}>
-                                <label style={labelStyle}>Harga Seunit (RM) *</label>
-                                <input
-                                    type="number"
-                                    required
-                                    min="0"          // ROBUSTNESS: Prevent negative numbers
-                                    step="0.01"      // ROBUSTNESS: Allow cents (Sen)
-                                    style={inputStyle}
-                                    value={data.unit_price}
-                                    onChange={e => {
-                                        const price = parseFloat(e.target.value) || 0;
-                                       setData(prev => ({
-                                            ...prev,
-                                            unit_price: e.target.value,
-                                            asset_type: price > 1000 ? 'fixed_asset' : 'inventory'
-                                        }));
-                                    }}
-                                    placeholder="cth: 5000.50"
-                                />
-                                {errors?.unit_price && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.unit_price}</p>}
+                                <div>
+                                    <label style={labelStyle}>No. Siri / Casis *</label>
+                                    <input 
+                                        type="text" 
+                                        required 
+                                        style={inputStyle} 
+                                        value={data.serial_number} 
+                                        onChange={e => setData('serial_number', e.target.value)} 
+                                        placeholder="cth: PF57G36K" 
+                                    />
+                                    {errors?.serial_number && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.serial_number}</p>}
+                                </div>
+
+                                <div>
+                                    <label style={labelStyle}>ID SAGA</label>
+                                    <input 
+                                        type="text" 
+                                        style={inputStyle} 
+                                        value={data.saga_id} 
+                                        onChange={e => setData('saga_id', e.target.value)} 
+                                        placeholder="cth: B35201" 
+                                    />
+                                </div>
+
+                                <div style={{ gridColumn: '1 / -1' }}>
+                                    <label style={labelStyle}>Vot Bajet</label>
+                                    <input 
+                                        type="text" 
+                                        style={inputStyle} 
+                                        value={data.budget_vot} 
+                                        onChange={e => setData('budget_vot', e.target.value)} 
+                                        placeholder="cth: A.K090302.5500.07204" 
+                                    />
+                                </div>
                             </div>
 
                             <div style={{ marginBottom: 14 }}>
@@ -378,6 +406,48 @@ export default function ReceivingIndex({ receivings }) {
                                     />
                                     {errors?.warranty_expiry && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.warranty_expiry}</p>}
                                 </div>
+                            </div>
+
+                            <div style={{ marginBottom: 20 }}>
+                                <label style={labelStyle}>Pegawai Bertanggungjawab (Pemegang Aset)</label>
+                                <input
+                                    type="text"
+                                    maxLength="255"
+                                    style={inputStyle}
+                                    value={data.custodian_name}
+                                    onChange={e => setData('custodian_name', e.target.value)}
+                                    placeholder="cth: Ts. Dr. Mohd Ibrahim"
+                                />
+                                {errors?.custodian_name && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.custodian_name}</p>}
+                            </div>
+
+                            {/* NEW: Asset Photo Upload */}
+                            <div style={{ marginBottom: 20 }}>
+                                <label style={labelStyle}>Gambar Aset (Pilihan)</label>
+                                <div style={{
+                                    border: `1.5px dashed ${UTM.gray300}`,
+                                    borderRadius: 8,
+                                    padding: '12px',
+                                    background: UTM.white,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 10
+                                }}>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={e => setData('photo', e.target.files[0])}
+                                        style={{
+                                            fontSize: '12px',
+                                            color: UTM.gray700,
+                                            width: '100%'
+                                        }}
+                                    />
+                                </div>
+                                <p style={{ fontSize: '10px', color: UTM.gray500, marginTop: 4, fontStyle: 'italic' }}>
+                                    *Gambar akan dipaparkan pada borang KEW.PA-3
+                                </p>
+                                {errors?.photo && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.photo}</p>}
                             </div>
 
                             <div style={{ marginBottom: 20 }}>

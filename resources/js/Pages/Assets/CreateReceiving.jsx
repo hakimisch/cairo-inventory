@@ -9,9 +9,11 @@ export default function CreateReceiving() {
         supplier_address: '',
         purchase_order_no: '',
         delivery_order_no: '',
+        invoice_no: '',
         item_description: '',
         quantity_ordered: 1,
         quantity_received: 1,
+        unit_price: '',
     });
 
     const submit = (e) => {
@@ -46,6 +48,16 @@ export default function CreateReceiving() {
                             <div>
                                 <label className="block text-sm font-bold text-gray-700">No. Nota Hantaran (DO)</label>
                                 <input type="text" className="mt-1 block w-full rounded-md border-gray-300" value={data.delivery_order_no} onChange={e => setData('delivery_order_no', e.target.value)} required />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">No. Invois</label>
+                                <input type="text" className="mt-1 block w-full rounded-md border-gray-300" value={data.invoice_no} onChange={e => setData('invoice_no', e.target.value)} required />
+                            </div>
+
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700">Harga Seunit (RM)</label>
+                                <input type="number" step="0.01" min="0" className="mt-1 block w-full rounded-md border-gray-300" value={data.unit_price} onChange={e => setData('unit_price', e.target.value)} required />
                             </div>
 
                             <div className="md:col-span-2">

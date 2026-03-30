@@ -28,14 +28,23 @@ class Asset extends Model
         'received_date',
         'rejection_reason',
         'receiver_name',
+        'custodian_name',
         'image_url',
         'components',
+        'model',
+        'brand',
+        'serial_number',
+        'requires_maintenance',
+        'saga_id',
+        'voucher_no',
+        'budget_vot',
     ];
  
     protected $casts = [
         'components'      => 'array',
         'warranty_expiry' => 'date',
         'received_date'   => 'date',
+        'requires_maintenance' => 'boolean',
     ];
  
     // ─── Scopes ───────────────────────────────────────────────────────────────
@@ -52,5 +61,11 @@ class Asset extends Model
     public function scopeByCampus($query, string $campus)
     {
         return $query->where('campus', $campus);
+    }
+
+    public function placements()
+    {
+        // Orders by newest first so we see the current location at the top
+        return $this->hasMany(AssetPlacement::class)->orderBy('assigned_date', 'desc');
     }
 }

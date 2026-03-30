@@ -1,107 +1,331 @@
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 
-export default function Kewpa3({ asset }) {
+// ── Shared Bahagian A table ────────────────────────────────────────────────────
+function BahagianA({ asset, jenisLabel }) {
     return (
-        <AuthenticatedLayout header={<h2 className="print:hidden uppercase text-sm font-bold">Pratonton KEW.PA-3</h2>}>
-            <Head title={`KEW.PA-3 - ${asset.asset_tag}`} />
-            
-            <div className="py-12 bg-white min-h-screen">
-                <div className="max-w-5xl mx-auto border-2 border-black p-8 font-serif text-[11px] leading-tight">
-                    <div className="text-right font-bold mb-2">KEW.PA-3</div>
-                    <div className="text-center font-bold text-lg mb-6 underline uppercase tracking-tighter">DAFTAR HARTA MODAL</div>
-                    
-                    <div className="grid grid-cols-2 mb-4 border-b border-black pb-2">
-                        <div>
-                            <p><strong>Kementerian/Jabatan:</strong> CAIRO UTM</p>
-                            <p><strong>Bahagian:</strong> Research & Robotics</p>
-                        </div>
+        <table className="w-full border-collapse border border-black mb-6">
+            <tbody>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50 w-[22%]">Kategori</td>
+                    <td className="border border-black p-2 w-[28%] uppercase">{asset.category}</td>
+                    <td className="border border-black p-2 font-bold bg-gray-50 w-[22%]">No Bar Kod</td>
+                    <td className="border border-black p-2 w-[28%] font-mono">
+                        {asset.national_code || asset.asset_tag}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Nama Alat</td>
+                    <td className="border border-black p-2 uppercase font-bold">{asset.name}</td>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Saga</td>
+                    <td className="border border-black p-2 font-mono uppercase">{asset.saga_id || '—'}</td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Jenis</td>
+                    <td className="border border-black p-2 font-bold uppercase">{jenisLabel}</td>
+                    <td className="border border-black p-2 font-bold bg-gray-50">No Baucer Bayaran</td>
+                    <td className="border border-black p-2 uppercase">{asset.voucher_no || '—'}</td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Sub Jenis/Jenama/Model</td>
+                    <td className="border border-black p-2 uppercase">
+                        {[asset.brand, asset.model].filter(Boolean).join(' / ') || '—'}
+                    </td>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Bajet</td>
+                    <td className="border border-black p-2 uppercase">{asset.budget_vot || '—'}</td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Buatan</td>
+                    <td className="border border-black p-2 uppercase">{asset.brand || '—'}</td>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Harga Perolehan Asal</td>
+                    <td className="border border-black p-2 font-bold">
+                        RM {Number(asset.purchase_price).toLocaleString('ms-MY', { minimumFractionDigits: 2 })}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Jenis dan No Enjin</td>
+                    <td className="border border-black p-2">—</td>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Tarikh Diterima</td>
+                    <td className="border border-black p-2">
+                        {new Date(asset.received_date || asset.created_at).toLocaleDateString('ms-MY')}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">No Casis</td>
+                    <td className="border border-black p-2">—</td>
+                    <td className="border border-black p-2 font-bold bg-gray-50 align-top" rowSpan="3">
+                        No. Pesanan Tempatan<br />Universiti dan Tarikh
+                    </td>
+                    <td className="border border-black p-2 align-top font-mono" rowSpan="3">
+                        {asset.po_reference || '—'}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Siri Buatan</td>
+                    <td className="border border-black p-2 font-mono">{asset.serial_number || '—'}</td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">No Pendaftaran Kenderaan</td>
+                    <td className="border border-black p-2">—</td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Peralatan Diterima</td>
+                    <td className="border border-black p-2">SET</td>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Tempoh Jaminan</td>
+                    <td className="border border-black p-2">
+                        {asset.warranty_period ? `${asset.warranty_period} tahun` : '—'}
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Penyelenggaraan</td>
+                    <td className="border border-black p-2 font-bold">
+                        {asset.requires_maintenance ? 'YA' : 'TIDAK'}
+                    </td>
+                    <td className="border border-black p-2 font-bold bg-gray-50 align-top" rowSpan="2">Pembekal</td>
+                    <td className="border border-black p-2 align-top uppercase" rowSpan="2">
+                        <strong>{asset.supplier_name || '—'}</strong><br />
+                        <span className="text-[9px]">{asset.supplier_address || ''}</span>
+                    </td>
+                </tr>
+                <tr>
+                    <td className="border border-black p-2 font-bold bg-gray-50">Status Alat</td>
+                    <td className="border border-black p-2 font-bold">
+                        {asset.status === 'active' ? 'ASET BARU' : 'LAMA'}
+                    </td>
+                </tr>
+            </tbody>
+        </table>
+    );
+}
+
+function KomponenTable({ asset }) {
+    return (
+        <>
+            <div className="font-bold mb-1 uppercase">KOMPONEN / AKSESORI</div>
+            <table className="w-full border-collapse border border-black mb-0">
+                <thead>
+                    <tr className="bg-gray-50 font-bold text-[10px]">
+                        <th className="border border-black p-2 w-8 text-center">Bil</th>
+                        <th className="border border-black p-2 text-left w-1/2">Keterangan</th>
+                        <th className="border border-black p-2 w-24 text-right">Harga (RM)</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {asset.components && asset.components.length > 0 ? (
+                        asset.components.map((comp, i) => (
+                            <tr key={i}>
+                                <td className="border border-black p-2 text-center">{i + 1}</td>
+                                <td className="border border-black p-2 uppercase">{comp.description || comp.brand || '—'}</td>
+                                <td className="border border-black p-2 text-right">
+                                    {comp.cost ? Number(comp.cost).toLocaleString('ms-MY', { minimumFractionDigits: 2 }) : '0.00'}
+                                </td>
+                            </tr>
+                        ))
+                    ) : (
+                        <tr className="h-12">
+                            <td className="border border-black p-2 text-center">1</td>
+                            <td className="border border-black p-2 italic text-gray-400 uppercase">—</td>
+                            <td className="border border-black p-2 text-right">0</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+        </>
+    );
+}
+
+function SignatureAndPenempatan({ asset, data, setData, processing, handleAddPlacement }) {
+    return (
+        <>
+            <table className="w-full border-collapse border-t-0 border border-black mb-6">
+                <tbody>
+                    <tr>
+                        <td className="border border-black p-3 w-1/2 align-top text-[10px]"></td>
+                        <td className="border border-black p-3 w-1/2 align-top">
+                            <p className="mb-8">...........................................................................</p>
+                            <p className="font-bold">Tandatangan Pegawai Bertanggungjawab</p>
+                            <p className="mt-2">Nama : <span className="font-bold uppercase">{asset.custodian_name || '—'}</span></p>
+                            <p>Jawatan : PEGAWAI PENYELIDIK CAIRO</p>
+                            <p>Tarikh : {new Date(asset.received_date || asset.created_at).toLocaleDateString('ms-MY')}</p>
+                            <p>Cop :</p>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+
+            <div className="font-bold mb-1 text-center uppercase tracking-widest">PENEMPATAN</div>
+            <table className="w-full border-collapse border border-black text-center text-[10px]">
+                <thead className="bg-gray-50 font-bold">
+                    <tr>
+                        <th className="border border-black p-2 w-8">BIL</th>
+                        <th className="border border-black p-2 w-20">TARIKH</th>
+                        <th className="border border-black p-2 text-left">LOKASI</th>
+                        <th className="border border-black p-2 text-left">NAMA PEGAWAI</th>
+                        <th className="border border-black p-2 w-28">T/TANGAN</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {asset.placements && asset.placements.length > 0 ? (
+                        <>
+                            {asset.placements.map((p, i) => (
+                                <tr key={p.id} className="h-10">
+                                    <td className="border border-black p-1.5">{i + 1}</td>
+                                    <td className="border border-black p-1.5">
+                                        {new Date(p.assigned_date).toLocaleDateString('ms-MY')}
+                                    </td>
+                                    <td className="border border-black p-1.5 text-left uppercase">{p.location}</td>
+                                    <td className="border border-black p-1.5 text-left uppercase">{p.custodian_name}</td>
+                                    <td className="border border-black p-1.5"></td>
+                                </tr>
+                            ))}
+                            {asset.placements.some(p => p.is_lokasi_luar) && (
+                                <tr>
+                                    <td className="border border-black p-1.5 font-bold" colSpan="2">LOKASI LUAR</td>
+                                    <td className="border border-black p-1.5 uppercase text-left" colSpan="3">
+                                        {asset.placements.find(p => p.is_lokasi_luar)?.location || '—'}
+                                    </td>
+                                </tr>
+                            )}
+                        </>
+                    ) : (
+                        <tr className="h-10">
+                            <td className="border border-black p-1.5" colSpan="5">Tiada rekod penempatan</td>
+                        </tr>
+                    )}
+                </tbody>
+            </table>
+
+            <div className="mt-5 p-4 bg-gray-50 border border-gray-200 rounded print:hidden">
+                <p className="font-bold text-xs uppercase mb-3" style={{ color: '#5C001F' }}>
+                    Tambah Rekod Penempatan / Pinjaman
+                </p>
+                <form onSubmit={handleAddPlacement} className="flex flex-wrap gap-3 items-end">
+                    <div className="flex-1 min-w-40">
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">Nama Pegawai</label>
+                        <input
+                            type="text" required
+                            value={data.custodian_name}
+                            onChange={e => setData('custodian_name', e.target.value)}
+                            className="w-full text-xs p-2 border border-gray-300 rounded"
+                            placeholder="Nama Pegawai"
+                        />
+                    </div>
+                    <div className="flex-1 min-w-40">
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">Lokasi Baru</label>
+                        <input
+                            type="text" required
+                            value={data.location}
+                            onChange={e => setData('location', e.target.value)}
+                            className="w-full text-xs p-2 border border-gray-300 rounded"
+                            placeholder="Bilik / Makmal"
+                        />
+                    </div>
+                    <div>
+                        <label className="block text-[10px] font-bold text-gray-600 mb-1">Tarikh</label>
+                        <input
+                            type="date" required
+                            value={data.assigned_date}
+                            onChange={e => setData('assigned_date', e.target.value)}
+                            className="text-xs p-2 border border-gray-300 rounded"
+                        />
+                    </div>
+                    <div className="flex items-center gap-2 mb-1">
+                        <input
+                            type="checkbox" id="luar3"
+                            checked={data.is_lokasi_luar}
+                            onChange={e => setData('is_lokasi_luar', e.target.checked)}
+                        />
+                        <label htmlFor="luar3" className="text-[10px] font-bold text-gray-600">Lokasi Luar</label>
+                    </div>
+                    <button
+                        type="submit" disabled={processing}
+                        className="px-4 py-2 rounded text-xs font-bold text-white disabled:opacity-50"
+                        style={{ background: '#5C001F' }}
+                    >
+                        {processing ? 'Menyimpan...' : 'Tambah Rekod'}
+                    </button>
+                </form>
+            </div>
+        </>
+    );
+}
+
+// ── KEW.PA-3 — Daftar Inventori ───────────────────────────────────────────────
+export default function Kewpa3({ asset }) {
+    const { data, setData, post, processing, reset } = useForm({
+        custodian_name : '',
+        location       : '',
+        is_lokasi_luar : false,
+        assigned_date  : new Date().toISOString().split('T')[0],
+    });
+
+    const handleAddPlacement = (e) => {
+        e.preventDefault();
+        post(route('assets.placements.store', asset.id), { onSuccess: () => reset() });
+    };
+
+    return (
+        <AuthenticatedLayout header={
+            <h2 className="print:hidden text-sm font-bold uppercase" style={{ color: '#5C001F' }}>
+                Pratonton KEW.PA-3 — Daftar Inventori
+            </h2>
+        }>
+            <Head title={`KEW.PA-3 — ${asset.asset_tag}`} />
+
+            <style>{`
+                @media print { .print\\:hidden { display: none !important; } body { margin: 0; } }
+            `}</style>
+
+            <div className="py-8 bg-gray-100 min-h-screen">
+                <div className="max-w-5xl mx-auto bg-white shadow-lg p-10 font-serif text-[11px] leading-tight text-black">
+
+                    {/* Header */}
+                    <div className="flex justify-between items-start mb-1">
+                        <div />
                         <div className="text-right">
-                            <p><strong>No. Siri Pendaftaran:</strong> {asset.asset_tag}</p>
+                            <div className="font-bold text-[12px]">KEW.PA-3 DERAF</div>
+                            <div className="text-[10px]">No. Rujukan Permohonan : {asset.asset_tag}</div>
                         </div>
                     </div>
 
+                    <div className="text-center font-bold text-[13px] mb-4">
+                        UNIVERSITI TEKNOLOGI MALAYSIA<br />
+                        DAFTAR INVENTORI
+                    </div>
+
+                    <div className="mb-4 space-y-0.5">
+                        <p><strong>Fakulti/PTJ</strong>&nbsp;&nbsp; CAIRO UTM</p>
+                        <p><strong>Unit/Makmal</strong>&nbsp; {asset.location}</p>
+                    </div>
+
                     <div className="font-bold mb-1">BAHAGIAN A</div>
-                    <table className="w-full border-collapse border border-black mb-6">
-                        <tbody>
-                            <tr>
-                                <td className="border border-black p-2 w-1/4 font-bold bg-gray-50 uppercase">Keterangan Aset</td>
-                                <td colSpan="3" className="border border-black p-2 uppercase font-medium">{asset.name}</td>
-                            </tr>
-                            {/* Spatie Media Library Photo Integration */}
-                            <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50 uppercase">Gambar Aset</td>
-                                <td colSpan="3" className="border border-black p-2 h-40 text-center text-gray-400">
-                                    {asset.image_url ? (
-                                        <img src={asset.image_url} alt={asset.name} className="mx-auto h-full object-contain" />
-                                    ) : (
-                                        <span className="italic uppercase">[ Gambar akan dijana oleh Spatie Media Library ]</span>
-                                    )}
-                                </td>
-                            </tr>
-                            <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50 uppercase">Kategori</td>
-                                <td className="border border-black p-2 w-1/4">{asset.category}</td>
-                                <td className="border border-black p-2 font-bold bg-gray-50 w-1/4 uppercase">Tarikh Perolehan</td>
-                                <td className="border border-black p-2">{new Date(asset.received_date || asset.created_at).toLocaleDateString('ms-MY')}</td>
-                            </tr>
-                            <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50 uppercase">Harga Perolehan</td>
-                                <td className="border border-black p-2 font-bold text-indigo-700 uppercase">RM {Number(asset.purchase_price).toLocaleString()}</td>
-                                <td className="border border-black p-2 font-bold bg-gray-50 uppercase">Lokasi</td>
-                                <td className="border border-black p-2">{asset.location}</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                    <BahagianA asset={asset} jenisLabel="INVENTORI" />
 
-                    <div className="font-bold mb-1 uppercase italic text-gray-600">BAHAGIAN B (Aksesori/Komponen)</div>
-                    <table className="w-full border-collapse border border-black">
-                        <thead className="bg-gray-50 text-center font-bold">
-                            <tr>
-                                <th className="border border-black p-1 w-8">Bil</th>
-                                <th className="border border-black p-1">No. Siri Pendaftaran Komponen</th>
-                                <th className="border border-black p-1">Jenis/Jenama</th>
-                                <th className="border border-black p-1">Kos (RM)</th>
-                                <th className="border border-black p-1">Tarikh Pasang</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {asset.components && asset.components.length > 0 ? (
-                                asset.components.map((comp, index) => (
-                                    <tr key={index}>
-                                        <td className="border border-black p-1 text-center">{index + 1}</td>
-                                        <td className="border border-black p-1">{comp.serial_no}</td>
-                                        <td className="border border-black p-1">{comp.brand}</td>
-                                        <td className="border border-black p-1 text-right">{Number(comp.cost).toLocaleString()}</td>
-                                        <td className="border border-black p-1 text-center">{comp.installed_date}</td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td className="border border-black p-4 text-center">1</td>
-                                    <td className="border border-black p-4 italic text-gray-400 uppercase">Tiada data komponen / aksesori didaftarkan</td>
-                                    <td className="border border-black p-4"></td>
-                                    <td className="border border-black p-4"></td>
-                                    <td className="border border-black p-4"></td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
+                    <KomponenTable asset={asset} />
+                    <SignatureAndPenempatan
+                        asset={asset}
+                        data={data} setData={setData}
+                        processing={processing}
+                        handleAddPlacement={handleAddPlacement}
+                    />
 
+                    {/* Actions */}
                     <div className="mt-8 flex justify-end gap-3 print:hidden">
-                        <a 
-                            href={route('assets.kewpa3.download', asset.id)} 
-                            className="bg-indigo-600 text-white px-6 py-2 rounded font-bold shadow hover:bg-indigo-700 transition"
+                        <a
+                            href={route('assets.kewpa3.download', asset.id)}
+                            className="px-6 py-2 rounded font-bold shadow text-white"
+                            style={{ background: '#5C001F' }}
                         >
-                            Download Official PDF (KEW.PA-3)
+                            Muat Turun PDF (KEW.PA-3)
                         </a>
-                        <button 
-                            onClick={() => window.print()} 
+                        <button
+                            onClick={() => window.print()}
                             className="border border-gray-300 px-6 py-2 rounded font-bold hover:bg-gray-50"
                         >
                             Cetak Skrin
                         </button>
                     </div>
+
                 </div>
             </div>
         </AuthenticatedLayout>
