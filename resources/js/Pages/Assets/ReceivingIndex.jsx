@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, useForm } from '@inertiajs/react';
  
@@ -33,6 +33,7 @@ function StatusBadge({ status }) {
             background   : s.bg,
             color        : s.color,
             border       : `1px solid ${s.border}`,
+            whiteSpace   : 'nowrap',
         }}>
             {s.label}
         </span>
@@ -63,6 +64,7 @@ const labelStyle = {
  
 export default function ReceivingIndex({ receivings }) {
     const [selectedItem, setSelectedItem] = useState(null);
+    const [expandedId, setExpandedId]     = useState(null); // State for expandable details row
  
     const { data, setData, post, processing, errors, reset } = useForm({
         unit_price : '',
@@ -102,12 +104,13 @@ export default function ReceivingIndex({ receivings }) {
         textAlign    : 'left',
         borderBottom : `2px solid ${UTM.gray100}`,
         background   : UTM.gray50,
+        whiteSpace   : 'nowrap',
     };
  
     return (
         <AuthenticatedLayout
             header={
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '16px' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                         <div style={{ width: 4, height: 24, background: UTM.gold, borderRadius: 2 }} />
                         <h2 style={{ fontSize: '18px', fontWeight: 700, color: UTM.maroon, margin: 0 }}>
@@ -125,6 +128,7 @@ export default function ReceivingIndex({ receivings }) {
                             fontWeight    : 700,
                             textDecoration: 'none',
                             boxShadow     : '0 2px 6px rgba(92,0,31,0.2)',
+                            whiteSpace    : 'nowrap',
                         }}
                     >
                         + Daftar Penerimaan Baru
@@ -137,118 +141,212 @@ export default function ReceivingIndex({ receivings }) {
             <div style={{ background: UTM.gray50, minHeight: '100vh', padding: '28px 24px' }}>
                 <div style={{ maxWidth: 1280, margin: '0 auto' }}>
  
+                    {/* ── Table Container (Scrollable) ── */}
                     <div style={{ background: UTM.white, borderRadius: 12,
                                   boxShadow: '0 1px 4px rgba(92,0,31,0.07)', overflow: 'hidden' }}>
-                        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                            <thead>
-                                <tr>
-                                    <th style={thStyle}>No. Penerimaan</th>
-                                    <th style={thStyle}>Pembekal</th>
-                                    <th style={thStyle}>Item</th>
-                                    <th style={thStyle}>Qty Dipesan</th>
-                                    <th style={thStyle}>Qty Diterima</th>
-                                    <th style={thStyle}>Status</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {receivings.map((item, idx) => (
-                                    <tr key={item.id}
-                                        style={{ background: idx % 2 === 0 ? UTM.white : UTM.gray50 }}
-                                        onMouseEnter={e => e.currentTarget.style.background = '#FFF5E8'}
-                                        onMouseLeave={e => e.currentTarget.style.background = idx % 2 === 0 ? UTM.white : UTM.gray50}
-                                    >
-                                        <td style={{ padding: '14px 20px', fontFamily: 'monospace',
-                                                     fontSize: '12px', fontWeight: 700, color: UTM.maroon }}>
-                                            {item.receive_no}
-                                        </td>
-                                        <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>
-                                            {item.supplier_name}
-                                        </td>
-                                        <td style={{ padding: '14px 20px', fontSize: '13px',
-                                                     fontWeight: 600, color: UTM.gray900 }}>
-                                            {item.item_description}
-                                        </td>
-                                        <td style={{ padding: '14px 20px', fontSize: '13px',
-                                                     color: UTM.gray700, textAlign: 'center' }}>
-                                            {item.quantity_ordered}
-                                        </td>
-                                        <td style={{ padding: '14px 20px', fontSize: '13px',
-                                                     color: UTM.gray700, textAlign: 'center' }}>
-                                            {item.quantity_received}
-                                        </td>
-                                        <td style={{ padding: '14px 20px' }}>
-                                            <StatusBadge status={item.status} />
-                                        </td>
-                                        <td style={{ padding: '14px 20px', textAlign: 'right',
-                                                     whiteSpace: 'nowrap' }}>
-                                            <Link
-                                                href={route('receivings.kewpa1', item.id)}
-                                                style={{
-                                                    display       : 'inline-block',
-                                                    padding       : '5px 12px',
-                                                    borderRadius  : 6,
-                                                    fontSize      : '12px',
-                                                    fontWeight    : 700,
-                                                    color         : UTM.maroon,
-                                                    background    : '#F3E0E5',
-                                                    textDecoration: 'none',
-                                                    marginRight   : 8,
+                        <div style={{ overflowX: 'auto', width: '100%' }}>
+                            <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse' }}>
+                                <thead>
+                                    <tr>
+                                        <th style={thStyle}>No. Penerimaan</th>
+                                        <th style={thStyle}>Pembekal</th>
+                                        <th style={thStyle}>Item</th>
+                                        <th style={{ ...thStyle, textAlign: 'center' }}>Qty Dipesan</th>
+                                        <th style={{ ...thStyle, textAlign: 'center' }}>Qty Diterima</th>
+                                        <th style={thStyle}>Status</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {receivings.length === 0 && (
+                                        <tr>
+                                            <td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: UTM.gray500, fontSize: '14px' }}>
+                                                Tiada rekod penerimaan.
+                                            </td>
+                                        </tr>
+                                    )}
+                                    {receivings.map((item, idx) => (
+                                        <React.Fragment key={item.id}>
+                                            <tr style={{
+                                                    background  : expandedId === item.id ? '#FFF5E8' : (idx % 2 === 0 ? UTM.white : UTM.gray50),
+                                                    transition  : 'background 0.12s',
                                                 }}
+                                                onMouseEnter={e => { if(expandedId !== item.id) e.currentTarget.style.background = '#FFF5E8' }}
+                                                onMouseLeave={e => { if(expandedId !== item.id) e.currentTarget.style.background = idx % 2 === 0 ? UTM.white : UTM.gray50 }}
                                             >
-                                                KEW.PA-1
-                                            </Link>
- 
-                                            {item.status === 'pending' && (
-                                                <>
+                                                <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 700, color: UTM.maroon, whiteSpace: 'nowrap' }}>
+                                                    {item.receive_no}
+                                                </td>
+                                                <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>
+                                                    {item.supplier_name}
+                                                </td>
+                                                <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 600, color: UTM.gray900 }}>
+                                                    {item.item_description}
+                                                </td>
+                                                <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700, textAlign: 'center' }}>
+                                                    {item.quantity_ordered}
+                                                </td>
+                                                <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700, textAlign: 'center' }}>
+                                                    {item.quantity_received}
+                                                </td>
+                                                <td style={{ padding: '14px 20px' }}>
+                                                    <StatusBadge status={item.status} />
+                                                </td>
+                                                <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                    {/* Expand Details Button */}
                                                     <button
-                                                        onClick={() => handleAcceptClick(item)}
+                                                        onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                                                         style={{
+                                                            display     : 'inline-block',
                                                             padding     : '5px 12px',
                                                             borderRadius: 6,
                                                             fontSize    : '12px',
                                                             fontWeight  : 700,
-                                                            background  : '#1A7A3C',
-                                                            color       : UTM.white,
+                                                            background  : expandedId === item.id ? UTM.gold : '#EDE9E4',
+                                                            color       : expandedId === item.id ? UTM.maroon : UTM.gray700,
                                                             border      : 'none',
                                                             cursor      : 'pointer',
                                                             marginRight : 8,
+                                                            transition  : 'all 0.12s',
                                                         }}
                                                     >
-                                                        Terima & Daftar
+                                                        {expandedId === item.id ? 'Tutup' : 'Butiran'}
                                                     </button>
+
                                                     <Link
-                                                        href={route('receivings.reject', item.id)} /* Make sure this route exists in web.php */
-                                                        method="post"
-                                                        as="button"
+                                                        href={route('receivings.kewpa1', item.id)}
                                                         style={{
-                                                            padding     : '5px 12px',
-                                                            borderRadius: 6,
-                                                            fontSize    : '12px',
-                                                            fontWeight  : 700,
-                                                            background  : '#F3E0E5',
-                                                            color       : UTM.maroon,
-                                                            border      : 'none',
-                                                            cursor      : 'pointer',
+                                                            display       : 'inline-block',
+                                                            padding       : '5px 12px',
+                                                            borderRadius  : 6,
+                                                            fontSize      : '12px',
+                                                            fontWeight    : 700,
+                                                            color         : UTM.maroon,
+                                                            background    : '#F3E0E5',
+                                                            textDecoration: 'none',
+                                                            marginRight   : 8,
                                                         }}
-                                                   >
-                                                        Tolak
+                                                    >
+                                                        KEW.PA-1
                                                     </Link>
-                                                </>
+    
+                                                    {item.status === 'pending' && (
+                                                        <>
+                                                            <button
+                                                                onClick={() => handleAcceptClick(item)}
+                                                                style={{
+                                                                    padding     : '5px 12px',
+                                                                    borderRadius: 6,
+                                                                    fontSize    : '12px',
+                                                                    fontWeight  : 700,
+                                                                    background  : '#1A7A3C',
+                                                                    color       : UTM.white,
+                                                                    border      : 'none',
+                                                                    cursor      : 'pointer',
+                                                                    marginRight : 8,
+                                                                }}
+                                                            >
+                                                                Terima & Daftar
+                                                            </button>
+                                                            <Link
+                                                                href={route('receivings.reject', item.id)}
+                                                                method="post"
+                                                                as="button"
+                                                                style={{
+                                                                    padding     : '5px 12px',
+                                                                    borderRadius: 6,
+                                                                    fontSize    : '12px',
+                                                                    fontWeight  : 700,
+                                                                    background  : '#F3E0E5',
+                                                                    color       : UTM.maroon,
+                                                                    border      : 'none',
+                                                                    cursor      : 'pointer',
+                                                                }}
+                                                           >
+                                                                Tolak
+                                                            </Link>
+                                                        </>
+                                                    )}
+                                                </td>
+                                            </tr>
+
+                                            {/* ── Collapsible Expandable Row ── */}
+                                            {expandedId === item.id && (
+                                                <tr style={{ background: '#FAFAFA', borderBottom: `2px solid ${UTM.gray100}` }}>
+                                                    <td colSpan={7} style={{ padding: 0 }}>
+                                                        <div style={{ 
+                                                            padding: '24px 32px', 
+                                                            display: 'flex', 
+                                                            flexWrap: 'wrap', 
+                                                            gap: '32px', 
+                                                            borderLeft: `4px solid ${UTM.gold}` 
+                                                        }}>
+                                                            
+                                                            {/* Info Columns Grid */}
+                                                            <div style={{ 
+                                                                flex: '1 1 100%', 
+                                                                display: 'grid', 
+                                                                gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', 
+                                                                gap: '24px' 
+                                                            }}>
+                                                                
+                                                                {/* Maklumat Pembekal */}
+                                                                <div>
+                                                                    <h4 style={{ fontSize: '12px', fontWeight: 800, color: UTM.maroon, textTransform: 'uppercase', borderBottom: `2px solid ${UTM.gray100}`, paddingBottom: '6px', marginBottom: '12px' }}>Maklumat Pembekal</h4>
+                                                                    <table style={{ width: '100%', fontSize: '12px', lineHeight: '1.8' }}>
+                                                                        <tbody>
+                                                                            <tr><td style={{ color: UTM.gray500, width: '40%' }}>Nama Pembekal</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{item.supplier_name || '—'}</td></tr>
+                                                                            <tr><td style={{ color: UTM.gray500, verticalAlign: 'top' }}>Alamat</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{item.supplier_address || '—'}</td></tr>
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+
+                                                                {/* Rujukan Dokumen */}
+                                                                <div>
+                                                                    <h4 style={{ fontSize: '12px', fontWeight: 800, color: UTM.maroon, textTransform: 'uppercase', borderBottom: `2px solid ${UTM.gray100}`, paddingBottom: '6px', marginBottom: '12px' }}>Rujukan Dokumen</h4>
+                                                                    <table style={{ width: '100%', fontSize: '12px', lineHeight: '1.8' }}>
+                                                                        <tbody>
+                                                                            <tr><td style={{ color: UTM.gray500, width: '40%' }}>No. Pesanan (PO)</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{item.purchase_order_no || '—'}</td></tr>
+                                                                            <tr><td style={{ color: UTM.gray500 }}>No. Hantaran (DO)</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{item.delivery_order_no || '—'}</td></tr>
+                                                                            <tr><td style={{ color: UTM.gray500 }}>No. Invois</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{item.invoice_no || '—'}</td></tr>
+                                                                            <tr><td style={{ color: UTM.gray500 }}>Tarikh Daftar</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{new Date(item.created_at).toLocaleDateString('ms-MY')}</td></tr>
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+
+                                                                {/* Butiran Harga */}
+                                                                <div>
+                                                                    <h4 style={{ fontSize: '12px', fontWeight: 800, color: UTM.maroon, textTransform: 'uppercase', borderBottom: `2px solid ${UTM.gray100}`, paddingBottom: '6px', marginBottom: '12px' }}>Kuantiti & Kewangan</h4>
+                                                                    <table style={{ width: '100%', fontSize: '12px', lineHeight: '1.8' }}>
+                                                                        <tbody>
+                                                                            <tr><td style={{ color: UTM.gray500, width: '40%' }}>Dipesan / Diterima</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{item.quantity_ordered} / {item.quantity_received} unit</td></tr>
+                                                                            <tr><td style={{ color: UTM.gray500 }}>Harga Seunit</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>RM {Number(item.unit_price || 0).toLocaleString('ms-MY', { minimumFractionDigits: 2 })}</td></tr>
+                                                                            <tr><td style={{ color: UTM.gray500 }}>Jumlah Harga</td><td style={{ fontWeight: 800, color: UTM.maroon }}>RM {Number(item.total_price || (item.unit_price * item.quantity_received)).toLocaleString('ms-MY', { minimumFractionDigits: 2 })}</td></tr>
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+
+                                                                {/* Pegawai Terlibat */}
+                                                                <div>
+                                                                    <h4 style={{ fontSize: '12px', fontWeight: 800, color: UTM.maroon, textTransform: 'uppercase', borderBottom: `2px solid ${UTM.gray100}`, paddingBottom: '6px', marginBottom: '12px' }}>Pegawai Pengesah</h4>
+                                                                    <table style={{ width: '100%', fontSize: '12px', lineHeight: '1.8' }}>
+                                                                        <tbody>
+                                                                            <tr><td style={{ color: UTM.gray500, width: '40%' }}>Pegawai Penerima</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{item.receiver_name || <span style={{ color: UTM.gray300, fontStyle: 'italic' }}>Belum diisi</span>}</td></tr>
+                                                                            <tr><td style={{ color: UTM.gray500 }}>Pegawai Pengesah</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{item.technical_officer_name || <span style={{ color: UTM.gray300, fontStyle: 'italic' }}>Belum diisi</span>}</td></tr>
+                                                                        </tbody>
+                                                                    </table>
+                                                                </div>
+
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                </tr>
                                             )}
-                                        </td>
-                                    </tr>
-                                ))}
-                                {receivings.length === 0 && (
-                                    <tr>
-                                        <td colSpan={7} style={{ padding: '48px', textAlign: 'center',
-                                                                  color: UTM.gray500, fontSize: '14px' }}>
-                                            Tiada rekod penerimaan.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
+                                        </React.Fragment>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
  
                         <div style={{ padding: '12px 20px', borderTop: `1px solid ${UTM.gray100}`,
                                       background: UTM.gray50, fontSize: '12px', color: UTM.gray500 }}>
@@ -290,10 +388,10 @@ export default function ReceivingIndex({ receivings }) {
                         </div>
  
                         {/* Modal body */}
-                        <form onSubmit={handleAcceptSubmit} style={{ padding: '24px' }}>
+                        <form onSubmit={handleAcceptSubmit} style={{ padding: '24px', maxHeight: '80vh', overflowY: 'auto' }}>
                             <p style={{ fontSize: '12px', color: UTM.gray500, marginBottom: 20 }}>
                                 Lengkapkan butiran untuk menjana{' '}
-                                <strong style={{ color: UTM.maroon }}>KEW.PA-3</strong> dan mendaftarkan aset.
+                                <strong style={{ color: UTM.maroon }}>KEW.PA-3 / KEW.PA-2</strong> dan mendaftarkan aset.
                             </p>
 
                             {/* ── UTM Specs & Financials ── */}
@@ -385,7 +483,7 @@ export default function ReceivingIndex({ receivings }) {
                                     <input
                                         type="text"
                                         required
-                                        maxLength="255" // ROBUSTNESS: Prevent database overflow
+                                        maxLength="255"
                                         style={inputStyle}
                                         value={data.location}
                                         onChange={e => setData('location', e.target.value)}
@@ -398,7 +496,6 @@ export default function ReceivingIndex({ receivings }) {
                                     <label style={labelStyle}>Tamat Waranti</label>
                                     <input
                                         type="date"
-                                        // ROBUSTNESS: Restrict to today or future dates only
                                         min={new Date().toISOString().split('T')[0]} 
                                         style={inputStyle}
                                         value={data.warranty_expiry}
@@ -421,7 +518,6 @@ export default function ReceivingIndex({ receivings }) {
                                 {errors?.custodian_name && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.custodian_name}</p>}
                             </div>
 
-                            {/* NEW: Asset Photo Upload */}
                             <div style={{ marginBottom: 20 }}>
                                 <label style={labelStyle}>Gambar Aset (Pilihan)</label>
                                 <div style={{
@@ -445,7 +541,7 @@ export default function ReceivingIndex({ receivings }) {
                                     />
                                 </div>
                                 <p style={{ fontSize: '10px', color: UTM.gray500, marginTop: 4, fontStyle: 'italic' }}>
-                                    *Gambar akan dipaparkan pada borang KEW.PA-3
+                                    *Gambar akan dipaparkan pada borang pendaftaran akhir
                                 </p>
                                 {errors?.photo && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.photo}</p>}
                             </div>
@@ -486,12 +582,12 @@ export default function ReceivingIndex({ receivings }) {
                                 {errors?.campus && <p style={{ color: 'red', fontSize: '11px', marginTop: 4 }}>{errors.campus}</p>}
                             </div>
 
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 10 }}>
                                 <button
                                     type="button"
                                     onClick={() => {
                                         setSelectedItem(null);
-                                        reset(); // ROBUSTNESS: Clear form state on cancel
+                                        reset(); 
                                     }}
                                     style={{
                                         padding     : '10px 20px',
@@ -531,4 +627,3 @@ export default function ReceivingIndex({ receivings }) {
         </AuthenticatedLayout>
     );
 }
- 
