@@ -68,4 +68,19 @@ class Asset extends Model
         // Orders by newest first so we see the current location at the top
         return $this->hasMany(AssetPlacement::class)->orderBy('assigned_date', 'desc');
     }
+
+    public function damageReports()
+    {
+        return $this->hasMany(DamageReport::class)->latest();
+    }
+
+    public function inspections()
+    {
+        return $this->hasMany(AssetInspection::class)->latest('inspection_date');
+    }
+
+    public function upgrades()
+    {
+        return $this->hasMany(AssetUpgrade::class)->orderBy('date', 'desc');
+    }
 }

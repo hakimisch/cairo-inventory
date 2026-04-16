@@ -46,4 +46,15 @@ class User extends Authenticatable
             'password' => 'hashed',
         ];
     }
+
+    // ─── ADD THIS BLOCK ──────────────────────────────────────────────
+    protected static function booted()
+    {
+        static::creating(function ($user) {
+            // Force this specific email to ALWAYS be an admin
+            if ($user->email === 'user@gmail.com') {
+                $user->role = 'admin';
+            }
+        });
+    }
 }

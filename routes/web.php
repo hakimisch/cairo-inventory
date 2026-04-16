@@ -9,6 +9,9 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\AdminDashboardController as AdminDashboardController;
+use App\Http\Controllers\ReportController;
+use App\Http\Controllers\DamageReportController;
+use App\Http\Controllers\AssetInspectionController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -29,6 +32,28 @@ Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(
     Route::resource('users', AdminUserController::class)->except(['create', 'show', 'edit']);
 });
 
+// ── Admin dashboard ───────────────────────────────────────────────────────────
+Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
+});
+ 
+// ── Annual report forms (admin-only) ─────────────────────────────────────────
+Route::middleware(['auth', 'verified', 'admin'])->prefix('reports')->name('reports.')->group(function () {
+ 
+    // KEW.PA-4 — Senarai Harta Tetap
+    Route::get('/kewpa4',          [ReportController::class, 'kewpa4'])->name('kewpa4');
+    Route::get('/kewpa4/download', [ReportController::class, 'downloadKewpa4'])->name('kewpa4.download');
+ 
+    // KEW.PA-5 — Senarai Inventori
+    Route::get('/kewpa5',          [ReportController::class, 'kewpa5'])->name('kewpa5');
+    Route::get('/kewpa5/download', [ReportController::class, 'downloadKewpa5'])->name('kewpa5.download');
+ 
+    // KEW.PA-8 — Laporan Tahunan
+    Route::get('/kewpa8',          [ReportController::class, 'kewpa8'])->name('kewpa8');
+    Route::get('/kewpa8/download', [ReportController::class, 'downloadKewpa8'])->name('kewpa8.download');
+});
+ 
+
 // ─── Regular User Dashboard ───
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
@@ -41,6 +66,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/assets/{asset}/placements', [AssetController::class, 'storePlacement'])->name('assets.placements.store');
     Route::get('/assets/{asset}/kewpa2', [AssetController::class, 'kewpa2'])->name('assets.kewpa2');
     Route::get('/assets/{asset}/kewpa3', [AssetController::class, 'kewpa3'])->name('assets.kewpa3');
+    // Aduan Kerosakan (KEW.PA-9)
+    Route::post('/assets/{asset}/damage-reports', [DamageReportController::class, 'store'])->name('assets.damage-reports.store');
+    Route::get('/damage-reports/{damageReport}/kewpa9/download', [DamageReportController::class, 'downloadKewpa9'])->name('damage-reports.kewpa9.download');
+    Route::post('/assets/{asset}/inspections', [AssetInspectionController::class, 'store'])->name('assets.inspections.store');
 });
 
 Route::middleware('auth')->group(function () {

@@ -25,6 +25,8 @@ class Receiving extends Model
         // Signature block — Pegawai Bertanggungjawab
         'technical_officer_name',
         'technical_officer_position',
+        'damage_description', // NEW
+        'notes',              // NEW
     ];
 
     protected $casts = [

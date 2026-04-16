@@ -163,10 +163,13 @@ class AssetController extends Controller
     public function storePlacement(Request $request, Asset $asset)
     {
         $validated = $request->validate([
-            'custodian_name' => 'required|string|max:255',
-            'location'       => 'required|string|max:255',
-            'is_lokasi_luar' => 'boolean',
-            'assigned_date'  => 'required|date',
+            'custodian_name'     => 'required|string|max:255',
+            'staff_id'           => 'nullable|string|max:100', // NEW
+            'location'           => 'required|string|max:255',
+            'quantity_placed'    => 'nullable|integer|min:1',  // NEW
+            'specific_serial_no' => 'nullable|string|max:255', // NEW
+            'is_lokasi_luar'     => 'boolean',
+            'assigned_date'      => 'required|date',
         ]);
 
         $asset->placements()->create($validated);
@@ -186,13 +189,13 @@ class AssetController extends Controller
 
     public function kewpa2(Asset $asset)
     {
-        $asset->load('placements');
+        $asset->load('placements', 'inspections', 'upgrades');
         return Inertia::render('Assets/Kewpa2', ['asset' => $asset]);
     }
 
     public function kewpa3(Asset $asset)
     {
-        $asset->load('placements',);
+        $asset->load('placements', 'inspections');
         return Inertia::render('Assets/Kewpa3', ['asset' => $asset]);
     }
 

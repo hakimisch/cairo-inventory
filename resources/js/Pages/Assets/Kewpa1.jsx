@@ -2,17 +2,31 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head } from '@inertiajs/react';
 
 export default function Kewpa1({ receiving }) {
-    const totalAmount = (receiving.unit_price ?? 0) * (receiving.quantity_received ?? 0);
+    // Support both single receiving record and an array of items on the same DO
+    const items = receiving.items && receiving.items.length > 0
+        ? receiving.items
+        : [{
+            delivery_order_no: receiving.delivery_order_no,
+            delivery_order_date: receiving.created_at,
+            item_description: receiving.item_description,
+            quantity_ordered: receiving.quantity_ordered,
+            quantity_received: receiving.quantity_received,
+            damage_description: receiving.damage_description,
+            notes: receiving.notes,
+        }];
+
+    const hasDiscrepancyOrDamage = items.some(
+        i => (i.quantity_ordered - i.quantity_received) !== 0 || i.damage_description
+    );
 
     return (
         <AuthenticatedLayout header={
             <h2 className="print:hidden text-sm font-bold uppercase" style={{ color: '#5C001F' }}>
-                Pratonton KEW.PA-1A — Borang Terimaan Aset
+                Pratonton KEW.PA-1 — Borang Laporan Penerimaan Aset Alih Universiti
             </h2>
         }>
-            <Head title="KEW.PA-1A Borang Terimaan Aset" />
+            <Head title="KEW.PA-1 Borang Laporan Penerimaan Aset Alih Universiti" />
 
-            {/* Print styles */}
             <style>{`
                 @media print {
                     .print\\:hidden { display: none !important; }
@@ -27,142 +41,133 @@ export default function Kewpa1({ receiving }) {
                     <div className="flex justify-between items-start mb-1">
                         <div />
                         <div className="text-right">
-                            <div className="font-bold text-[12px]">KEW.PA-1A</div>
-                            <div className="text-[10px]">No. Rujukan BTA : {receiving.receive_no}</div>
+                            <div className="font-bold text-[12px]">KEW.PA-1</div>
                         </div>
                     </div>
 
                     <div className="text-center font-bold text-[13px] mb-1 uppercase">
-                        BORANG TERIMAAN ASET (BTA)
+                        UNIVERSITI TEKNOLOGI MALAYSIA
                     </div>
-                    <div className="text-center text-[10px] mb-6">
-                        (Disediakan dalam 3 salinan oleh Pegawai Penerima)
+                    <div className="text-center font-bold text-[12px] mb-1 uppercase">
+                        BORANG LAPORAN PENERIMAAN ASET ALIH UNIVERSITI
+                    </div>
+                    <div className="text-center text-[10px] mb-4 italic">
+                        (Hendaklah diisi dalam 2 salinan jika terdapat kerosakan/perselisihan)
                     </div>
 
-                    {/* ── Supplier / reference info ── */}
-                    <table className="w-full border-collapse border border-black mb-4">
-                        <thead>
-                            <tr className="text-center text-[10px] font-bold">
-                                <th className="border border-black p-2 text-left w-[18%]">Nama Pembekal :</th>
-                                <th className="border border-black p-2 text-left w-[28%]">Alamat Pembekal :</th>
-                                <th className="border border-black p-2 w-[18%]">No Pesanan Tempatan<br/>dan Tarikh (PT) :</th>
-                                <th className="border border-black p-2 w-[12%]">No Invois :</th>
-                                <th className="border border-black p-2 w-[14%]">No Nota Hantaran (DO) :</th>
-                                <th className="border border-black p-2 w-[10%]">Tarikh Terimaan Aset :</th>
-                            </tr>
-                        </thead>
+                    {/* ── Supplier info ── */}
+                    <table className="w-full border-collapse border border-black mb-6">
                         <tbody>
-                            <tr className="align-top">
-                                <td className="border border-black p-2 font-bold uppercase">
+                            <tr>
+                                <td className="border border-black p-2 font-bold bg-gray-50 w-[30%]">Nama Pembekal</td>
+                                <td className="border border-black p-2 uppercase font-bold" colSpan="3">
                                     {receiving.supplier_name}
                                 </td>
-                                <td className="border border-black p-2 text-[10px]">
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-2 font-bold bg-gray-50 align-top" rowSpan="2">Alamat Pembekal</td>
+                                <td className="border border-black p-2 text-[10px] align-top" rowSpan="2" style={{ whiteSpace: 'pre-wrap' }}>
                                     {receiving.supplier_address}
                                 </td>
-                                <td className="border border-black p-2 text-center font-mono">
-                                    {receiving.purchase_order_no}
+                                <td className="border border-black p-2 font-bold bg-gray-50 w-[20%]">No. Telefon</td>
+                                <td className="border border-black p-2 w-[20%]">
+                                    {receiving.supplier_phone || '—'}
                                 </td>
-                                <td className="border border-black p-2 text-center font-mono">
-                                    {receiving.invoice_no || '—'}
-                                </td>
-                                <td className="border border-black p-2 text-center font-mono">
-                                    {receiving.delivery_order_no}
-                                </td>
-                                <td className="border border-black p-2 text-center">
-                                    {new Date(receiving.created_at).toLocaleDateString('ms-MY')}
+                            </tr>
+                            <tr>
+                                <td className="border border-black p-2 font-bold bg-gray-50">No. Faks</td>
+                                <td className="border border-black p-2">
+                                    {receiving.supplier_fax || '—'}
                                 </td>
                             </tr>
                         </tbody>
                     </table>
 
                     {/* ── Items table ── */}
-                    <table className="w-full border-collapse border border-black mb-8 text-center">
+                    <table className="w-full border-collapse border border-black mb-8 text-center text-[10px]">
                         <thead>
-                            <tr className="font-bold text-[10px] bg-gray-50">
-                                <th className="border border-black p-2 w-8">Bil</th>
-                                <th className="border border-black p-2 text-left">Perihal Aset</th>
-                                <th className="border border-black p-2 w-20" colSpan="2">Kuantiti</th>
-                                <th className="border border-black p-2 w-28" colSpan="2">Harga</th>
-                                <th className="border border-black p-2 w-24">Catatan</th>
+                            <tr className="font-bold bg-gray-50">
+                                <th className="border border-black p-2 w-8" rowSpan="2">Bil</th>
+                                <th className="border border-black p-2 w-32" rowSpan="2">Nota Hantaran<br/>(No. &amp; Tarikh)</th>
+                                <th className="border border-black p-2 text-left" rowSpan="2">Nama Aset</th>
+                                <th className="border border-black p-2" colSpan="3">Kuantiti</th>
+                                <th className="border border-black p-2 w-32" rowSpan="2">Perihal Kerosakan</th>
+                                <th className="border border-black p-2 w-24" rowSpan="2">Catatan</th>
                             </tr>
-                            <tr className="font-bold text-[10px] bg-gray-50">
-                                <th className="border border-black p-1"></th>
-                                <th className="border border-black p-1"></th>
-                                <th className="border border-black p-1 w-16">Dipesan</th>
-                                <th className="border border-black p-1 w-16">Diterima</th>
-                                <th className="border border-black p-1 w-24">Seunit</th>
-                                <th className="border border-black p-1 w-24">Jumlah</th>
-                                <th className="border border-black p-1"></th>
+                            <tr className="font-bold bg-gray-50">
+                                <th className="border border-black p-1 w-12">Dipesan</th>
+                                <th className="border border-black p-1 w-12">Diterima</th>
+                                <th className="border border-black p-1 w-16">Perselisihan</th>
                             </tr>
                         </thead>
                         <tbody>
-                            <tr className="h-16 align-top">
-                                <td className="border border-black p-2">1</td>
-                                <td className="border border-black p-2 text-left uppercase font-medium">
-                                    {receiving.item_description}
-                                </td>
-                                <td className="border border-black p-2 text-lg font-bold">
-                                    {receiving.quantity_ordered}
-                                </td>
-                                <td className="border border-black p-2 text-lg font-bold">
-                                    {receiving.quantity_received}
-                                </td>
-                                <td className="border border-black p-2 font-bold">
-                                    {receiving.unit_price
-                                        ? Number(receiving.unit_price).toLocaleString('ms-MY', { minimumFractionDigits: 2 })
-                                        : '—'}
-                                </td>
-                                <td className="border border-black p-2 font-bold">
-                                    {receiving.unit_price
-                                        ? Number(totalAmount).toLocaleString('ms-MY', { minimumFractionDigits: 2 })
-                                        : '—'}
-                                </td>
-                                <td className="border border-black p-2"></td>
-                            </tr>
+                            {items.map((item, idx) => {
+                                const diff = (item.quantity_ordered ?? 0) - (item.quantity_received ?? 0);
+                                return (
+                                    <tr key={idx} className="h-16 align-top">
+                                        <td className="border border-black p-2">{idx + 1}</td>
+                                        <td className="border border-black p-2 font-mono">
+                                            {item.delivery_order_no}<br/>
+                                            {new Date(item.delivery_order_date ?? receiving.created_at).toLocaleDateString('ms-MY')}
+                                        </td>
+                                        <td className="border border-black p-2 text-left uppercase font-medium">
+                                            {item.item_description}
+                                        </td>
+                                        <td className="border border-black p-2 font-bold">{item.quantity_ordered}</td>
+                                        <td className="border border-black p-2 font-bold">{item.quantity_received}</td>
+                                        <td className={`border border-black p-2 font-bold ${diff !== 0 ? 'text-red-600' : ''}`}>
+                                            {diff !== 0 ? diff : '-'}
+                                        </td>
+                                        <td className="border border-black p-2 uppercase text-red-600">
+                                            {item.damage_description || '-'}
+                                        </td>
+                                        <td className="border border-black p-2">{item.notes || '-'}</td>
+                                    </tr>
+                                );
+                            })}
                         </tbody>
                     </table>
 
                     {/* ── Signature blocks ── */}
-                    <div className="grid grid-cols-3 gap-6 mt-4">
+                    <div className="grid grid-cols-2 gap-10 mt-4">
 
-                        {/* Sig 1 — Pegawai Penerima */}
+                        {/* Sig 1 — Penerima */}
                         <div className="space-y-1">
                             <p className="font-bold text-[10px]">...........................................................................</p>
-                            <p className="font-bold">(Tandatangan Pegawai Penerima)</p>
-                            <p>Nama : {receiving.receiver_name || '............................................'}</p>
+                            <p className="font-bold">Tandatangan Penerima</p>
+                            <p>Nama &nbsp;&nbsp;&nbsp;: {receiving.receiver_name || '............................................'}</p>
                             <p>Jawatan : {receiving.receiver_position || '............................................'}</p>
-                            <p>Fakulti/PTJ : CAIRO UTM</p>
-                            <p>Tarikh : {new Date(receiving.created_at).toLocaleDateString('ms-MY')}</p>
+                            <p>Tarikh &nbsp;&nbsp;: {new Date(receiving.created_at).toLocaleDateString('ms-MY')}</p>
                         </div>
 
                         {/* Sig 2 — Pegawai Bertanggungjawab */}
                         <div className="space-y-1">
                             <p className="font-bold text-[10px]">...........................................................................</p>
-                            <p className="font-bold">(Tandatangan Pegawai Bertanggungjawab)</p>
-                            <p>Nama : {receiving.technical_officer_name || '............................................'}</p>
+                            <p className="font-bold">Tandatangan Pegawai Bertanggungjawab</p>
+                            <p>Nama &nbsp;&nbsp;&nbsp;: {receiving.technical_officer_name || '............................................'}</p>
                             <p>Jawatan : {receiving.technical_officer_position || '............................................'}</p>
-                            <p>Fakulti/PTJ : CAIRO UTM</p>
-                            <p>Tarikh : {new Date(receiving.created_at).toLocaleDateString('ms-MY')}</p>
-                        </div>
-
-                        {/* Nota */}
-                        <div className="text-[10px] space-y-1">
-                            <p className="font-bold">Nota :</p>
-                            <p>Kegunaan di Fakulti/PTJ (3 salinan)</p>
-                            <p>Salinan 1 - Jabatan/Makmal/Bahagian/Unit</p>
-                            <p>Salinan 2 - Pejabat/Bahagian/Unit Pentadbiran</p>
-                            <p>Salinan 3 - Pejabat Bendahari (Pembayaran)</p>
+                            <p>Tarikh &nbsp;&nbsp;: {new Date(receiving.created_at).toLocaleDateString('ms-MY')}</p>
                         </div>
                     </div>
 
+                    {/* ── Copy instruction note ── */}
+                    <div className="mt-8 text-[10px] space-y-0.5 border-t border-gray-300 pt-3">
+                        <p className="font-bold">Nota :</p>
+                        {hasDiscrepancyOrDamage ? (
+                            <p>Borang ini hendaklah disediakan dalam <strong>2 salinan</strong> memandangkan terdapat kerosakan atau perselisihan kuantiti.</p>
+                        ) : (
+                            <p>Borang ini disediakan dalam <strong>1 salinan</strong> jika tiada kerosakan atau perselisihan.</p>
+                        )}
+                    </div>
+
                     {/* ── Actions (hidden on print) ── */}
-                    <div className="mt-10 flex justify-end gap-3 print:hidden">
+                    <div className="mt-8 flex justify-end gap-3 print:hidden">
                         <a
                             href={route('receivings.kewpa1.download', receiving.id)}
                             className="px-6 py-2 rounded font-bold shadow text-white"
                             style={{ background: '#5C001F' }}
                         >
-                            Muat Turun PDF (KEW.PA-1A)
+                            Muat Turun PDF (KEW.PA-1)
                         </a>
                         <button
                             onClick={() => window.print()}
