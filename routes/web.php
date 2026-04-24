@@ -12,6 +12,11 @@ use App\Http\Controllers\Admin\AdminDashboardController as AdminDashboardControl
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\DamageReportController;
 use App\Http\Controllers\AssetInspectionController;
+use App\Http\Controllers\AssetMaintenanceController;
+use App\Http\Controllers\AssetDisposalController;
+use App\Http\Controllers\CommitteeAppointmentController;
+use App\Http\Controllers\AssetLossReportController;
+use App\Http\Controllers\AssetTransferController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -70,6 +75,35 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/assets/{asset}/damage-reports', [DamageReportController::class, 'store'])->name('assets.damage-reports.store');
     Route::get('/damage-reports/{damageReport}/kewpa9/download', [DamageReportController::class, 'downloadKewpa9'])->name('damage-reports.kewpa9.download');
     Route::post('/assets/{asset}/inspections', [AssetInspectionController::class, 'store'])->name('assets.inspections.store');
+
+    // ── Phase 2: New Routes ──────────────────────────────────────────────────
+
+    // KEW.PA-13/14 — Penyelenggaraan (Maintenance)
+    Route::post('/assets/{asset}/maintenances', [AssetMaintenanceController::class, 'store'])->name('assets.maintenances.store');
+    Route::put('/assets/{asset}/maintenances/{maintenance}', [AssetMaintenanceController::class, 'update'])->name('assets.maintenances.update');
+    Route::delete('/assets/{asset}/maintenances/{maintenance}', [AssetMaintenanceController::class, 'destroy'])->name('assets.maintenances.destroy');
+
+    // KEW.PA-17/18/19 — Pelupusan (Disposal)
+    Route::post('/assets/{asset}/disposals', [AssetDisposalController::class, 'store'])->name('assets.disposals.store');
+    Route::put('/assets/{asset}/disposals/{disposal}', [AssetDisposalController::class, 'update'])->name('assets.disposals.update');
+    Route::delete('/assets/{asset}/disposals/{disposal}', [AssetDisposalController::class, 'destroy'])->name('assets.disposals.destroy');
+
+    // KEW.PA-28→32 — Kehilangan (Loss Report)
+    Route::post('/assets/{asset}/loss-reports', [AssetLossReportController::class, 'store'])->name('assets.loss-reports.store');
+    Route::put('/assets/{asset}/loss-reports/{lossReport}', [AssetLossReportController::class, 'update'])->name('assets.loss-reports.update');
+    Route::delete('/assets/{asset}/loss-reports/{lossReport}', [AssetLossReportController::class, 'destroy'])->name('assets.loss-reports.destroy');
+
+    // KEW.PA-6 — Daftar Pergerakan (Transfer/Movement)
+    Route::post('/assets/{asset}/transfers', [AssetTransferController::class, 'store'])->name('assets.transfers.store');
+    Route::put('/assets/{asset}/transfers/{transfer}', [AssetTransferController::class, 'update'])->name('assets.transfers.update');
+    Route::delete('/assets/{asset}/transfers/{transfer}', [AssetTransferController::class, 'destroy'])->name('assets.transfers.destroy');
+});
+
+// KEW.PA-15/29 — Committee Appointments (standalone, polymorphic)
+Route::middleware(['auth', 'verified'])->group(function () {
+    Route::post('/committee-appointments', [CommitteeAppointmentController::class, 'store'])->name('committee-appointments.store');
+    Route::put('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'update'])->name('committee-appointments.update');
+    Route::delete('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'destroy'])->name('committee-appointments.destroy');
 });
 
 Route::middleware('auth')->group(function () {

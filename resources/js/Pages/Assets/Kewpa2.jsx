@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
 
@@ -291,34 +292,191 @@ function PemeriksaanTable({ asset, data, setData, post, processing }) {
     );
 }
 
-// ── Pelupusan / Hapus Kira — standard: Rujukan Kelulusan / Tarikh / Kaedah / Tandatangan ─
+// ── Pelupusan / Hapus Kira — PA-17/18/19 ──────────────────────────────────────
 function PelupusanTable({ asset }) {
-    const isDisposed = asset.status === 'disposed';
+    const disposals = asset.disposals || [];
     return (
         <div className="border border-black mt-6">
-            <div className="bg-gray-50 font-bold p-2 border-b border-black text-center">PELUPUSAN / HAPUS KIRA</div>
+            <div className="bg-gray-50 font-bold p-2 border-b border-black text-center">PELUPUSAN / HAPUS KIRA (KEW.PA-17/18/19)</div>
             <table className="w-full text-center text-[10px]">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-black">
-                        <th className="p-2 border-r border-black w-[28%]">Rujukan Kelulusan</th>
-                        <th className="p-2 border-r border-black w-[15%]">Tarikh</th>
-                        <th className="p-2 border-r border-black w-[27%]">Kaedah Pelupusan</th>
-                        <th className="p-2 w-[30%]">Tandatangan</th>
+                        <th className="p-2 border-r border-black w-[18%]">Tarikh</th>
+                        <th className="p-2 border-r border-black w-[22%]">Rujukan Kelulusan</th>
+                        <th className="p-2 border-r border-black w-[18%]">Kaedah Pelupusan</th>
+                        <th className="p-2 border-r border-black w-[17%]">Status</th>
+                        <th className="p-2 w-[25%]">Tandatangan</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {!isDisposed ? (
-                        <tr><td colSpan="4" className="p-4 italic text-gray-500">Aset belum dilupuskan.</td></tr>
+                    {disposals.length === 0 ? (
+                        <tr><td colSpan="5" className="p-4 italic text-gray-500">Aset belum dilupuskan.</td></tr>
                     ) : (
-                        <tr>
-                            <td className="p-2 border-r border-black">{asset.disposal_reference || '-'}</td>
-                            <td className="p-2 border-r border-black">{new Date(asset.updated_at).toLocaleDateString('ms-MY')}</td>
-                            <td className="p-2 border-r border-black">{asset.disposal_method || 'Dilupuskan'}</td>
-                            <td className="p-2"></td>
-                        </tr>
+                        disposals.map(d => (
+                            <tr key={d.id} className="border-b border-black">
+                                <td className="p-2 border-r border-black">{d.disposal_date ? new Date(d.disposal_date).toLocaleDateString('ms-MY') : '-'}</td>
+                                <td className="p-2 border-r border-black">{d.approval_reference || '-'}</td>
+                                <td className="p-2 border-r border-black">{d.disposal_method || '-'}</td>
+                                <td className="p-2 border-r border-black uppercase">{d.status}</td>
+                                <td className="p-2"></td>
+                            </tr>
+                        ))
                     )}
                 </tbody>
             </table>
+        </div>
+    );
+}
+
+// ── Penyelenggaraan — PA-13/14 ────────────────────────────────────────────────
+function MaintenanceTable({ asset }) {
+    const maintenances = asset.maintenances || [];
+    const [showForm, setShowForm] = useState(false);
+    const [form, setForm] = useState({
+        maintenance_date: new Date().toISOString().split('T')[0],
+        description: '',
+        contract_no: '',
+        company_name: '',
+        cost: '',
+        notes: '',
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        router.post(route('assets.maintenances.store', asset.id), form, {
+            preserveScroll: true,
+            onSuccess: () => { setShowForm(false); setForm({ maintenance_date: new Date().toISOString().split('T')[0], description: '', contract_no: '', company_name: '', cost: '', notes: '' }); }
+        });
+    };
+
+    return (
+        <div className="border border-black mt-6">
+            <div className="bg-gray-50 font-bold p-2 border-b border-black text-center">PENYELENGGARAAN (KEW.PA-13/14)</div>
+            <table className="w-full text-center text-[10px]">
+                <thead className="bg-gray-50">
+                    <tr className="border-b border-black">
+                        <th className="p-2 border-r border-black w-[12%]">Tarikh</th>
+                        <th className="p-2 border-r border-black w-[25%]">Perihal</th>
+                        <th className="p-2 border-r border-black w-[18%]">Kontraktor</th>
+                        <th className="p-2 border-r border-black w-[10%]">Kos (RM)</th>
+                        <th className="p-2 border-r border-black w-[10%]">Status</th>
+                        <th className="p-2 w-[25%]">Tandatangan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {maintenances.length === 0 ? (
+                        <tr><td colSpan="6" className="p-4 italic text-gray-500">Tiada rekod penyelenggaraan.</td></tr>
+                    ) : (
+                        maintenances.map(m => (
+                            <tr key={m.id} className="border-b border-black">
+                                <td className="p-2 border-r border-black">{new Date(m.maintenance_date).toLocaleDateString('ms-MY')}</td>
+                                <td className="p-2 border-r border-black text-left">{m.description}</td>
+                                <td className="p-2 border-r border-black">{m.company_name || '-'}</td>
+                                <td className="p-2 border-r border-black text-right">{Number(m.cost).toFixed(2)}</td>
+                                <td className="p-2 border-r border-black uppercase">{m.status}</td>
+                                <td className="p-2"></td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+            <div className="p-3 bg-green-50 border-t border-black print:hidden">
+                {!showForm ? (
+                    <button onClick={() => setShowForm(true)} className="bg-green-600 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-green-700">
+                        Tambah Rekod Penyelenggaraan
+                    </button>
+                ) : (
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                        <div className="flex gap-2 flex-wrap">
+                            <input type="date" className="text-[10px] p-1 border rounded flex-1" value={form.maintenance_date} onChange={e => setForm({...form, maintenance_date: e.target.value})} required />
+                            <input type="text" placeholder="No. Kontrak" className="text-[10px] p-1 border rounded flex-1" value={form.contract_no} onChange={e => setForm({...form, contract_no: e.target.value})} />
+                            <input type="text" placeholder="Syarikat" className="text-[10px] p-1 border rounded flex-1" value={form.company_name} onChange={e => setForm({...form, company_name: e.target.value})} />
+                            <input type="number" step="0.01" placeholder="Kos (RM)" className="text-[10px] p-1 border rounded w-24" value={form.cost} onChange={e => setForm({...form, cost: e.target.value})} />
+                        </div>
+                        <textarea rows="2" placeholder="Perihal kerja penyelenggaraan..." className="text-[10px] p-1 border rounded" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required />
+                        <div className="flex gap-2">
+                            <button type="submit" className="bg-green-600 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-green-700">Simpan</button>
+                            <button type="button" onClick={() => setShowForm(false)} className="bg-gray-400 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-gray-500">Batal</button>
+                        </div>
+                    </form>
+                )}
+            </div>
+        </div>
+    );
+}
+
+// ── Pergerakan / Pindahan — PA-6 ──────────────────────────────────────────────
+function TransferTable({ asset }) {
+    const transfers = asset.transfers || [];
+    const [showForm, setShowForm] = useState(false);
+    const [form, setForm] = useState({
+        to_location: '',
+        to_custodian: '',
+        transfer_date: new Date().toISOString().split('T')[0],
+        reference_no: '',
+        reason: '',
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        router.post(route('assets.transfers.store', asset.id), form, {
+            preserveScroll: true,
+            onSuccess: () => { setShowForm(false); setForm({ to_location: '', to_custodian: '', transfer_date: new Date().toISOString().split('T')[0], reference_no: '', reason: '' }); }
+        });
+    };
+
+    return (
+        <div className="border border-black mt-6">
+            <div className="bg-gray-50 font-bold p-2 border-b border-black text-center">DAFTAR PERGERAKAN (KEW.PA-6)</div>
+            <table className="w-full text-center text-[10px]">
+                <thead className="bg-gray-50">
+                    <tr className="border-b border-black">
+                        <th className="p-2 border-r border-black w-[12%]">Tarikh</th>
+                        <th className="p-2 border-r border-black w-[20%]">Dari</th>
+                        <th className="p-2 border-r border-black w-[20%]">Ke</th>
+                        <th className="p-2 border-r border-black w-[15%]">Penjaga</th>
+                        <th className="p-2 border-r border-black w-[10%]">Status</th>
+                        <th className="p-2 w-[23%]">Tandatangan</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {transfers.length === 0 ? (
+                        <tr><td colSpan="6" className="p-4 italic text-gray-500">Tiada rekod pergerakan.</td></tr>
+                    ) : (
+                        transfers.map(t => (
+                            <tr key={t.id} className="border-b border-black">
+                                <td className="p-2 border-r border-black">{new Date(t.transfer_date).toLocaleDateString('ms-MY')}</td>
+                                <td className="p-2 border-r border-black">{t.from_location || asset.location || '-'}</td>
+                                <td className="p-2 border-r border-black">{t.to_location}</td>
+                                <td className="p-2 border-r border-black">{t.to_custodian}</td>
+                                <td className="p-2 border-r border-black uppercase">{t.status}</td>
+                                <td className="p-2"></td>
+                            </tr>
+                        ))
+                    )}
+                </tbody>
+            </table>
+            <div className="p-3 bg-purple-50 border-t border-black print:hidden">
+                {!showForm ? (
+                    <button onClick={() => setShowForm(true)} className="bg-purple-600 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-purple-700">
+                        Rekod Pergerakan Baru
+                    </button>
+                ) : (
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                        <div className="flex gap-2 flex-wrap">
+                            <input type="date" className="text-[10px] p-1 border rounded flex-1" value={form.transfer_date} onChange={e => setForm({...form, transfer_date: e.target.value})} required />
+                            <input type="text" placeholder="Lokasi Baru" className="text-[10px] p-1 border rounded flex-1" value={form.to_location} onChange={e => setForm({...form, to_location: e.target.value})} required />
+                            <input type="text" placeholder="Penjaga Baru" className="text-[10px] p-1 border rounded flex-1" value={form.to_custodian} onChange={e => setForm({...form, to_custodian: e.target.value})} required />
+                            <input type="text" placeholder="No. Rujukan" className="text-[10px] p-1 border rounded w-28" value={form.reference_no} onChange={e => setForm({...form, reference_no: e.target.value})} />
+                        </div>
+                        <input type="text" placeholder="Sebab Pergerakan (Pilihan)" className="text-[10px] p-1 border rounded" value={form.reason} onChange={e => setForm({...form, reason: e.target.value})} />
+                        <div className="flex gap-2">
+                            <button type="submit" className="bg-purple-600 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-purple-700">Simpan</button>
+                            <button type="button" onClick={() => setShowForm(false)} className="bg-gray-400 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-gray-500">Batal</button>
+                        </div>
+                    </form>
+                )}
+            </div>
         </div>
     );
 }
@@ -407,6 +565,32 @@ export default function Kewpa2({ asset }) {
         });
     };
 
+    // ── Loss Report (KEW.PA-28→32) ──────────────────────────────────────────
+    const [isLossModalOpen, setIsLossModalOpen] = useState(false);
+    const {
+        data: lossData,
+        setData: setLossData,
+        post: postLoss,
+        processing: lossProcessing,
+        reset: resetLoss
+    } = useForm({
+        incident_location: '',
+        loss_date: new Date().toISOString().split('T')[0],
+        loss_method: 'hilang',
+        last_officer: asset.custodian_name || '',
+        police_report_no: '',
+        current_value: asset.purchase_price || '',
+        investigation_summary: '',
+        approval_reference: '',
+    });
+
+    const submitLoss = (e) => {
+        e.preventDefault();
+        postLoss(route('assets.loss-reports.store', asset.id), {
+            onSuccess: () => { setIsLossModalOpen(false); resetLoss(); }
+        });
+    };
+
     return (
         <AuthenticatedLayout header={
             <h2 className="print:hidden text-sm font-bold uppercase" style={{ color: '#5C001F' }}>
@@ -464,6 +648,10 @@ export default function Kewpa2({ asset }) {
                         post={post} processing={processing}
                     />
 
+                    <MaintenanceTable asset={asset} />
+
+                    <TransferTable asset={asset} />
+
                     <PelupusanTable asset={asset} />
 
                     {/* Page break before Bahagian B for print */}
@@ -481,6 +669,12 @@ export default function Kewpa2({ asset }) {
                             className="border border-red-300 text-red-700 px-6 py-2 rounded font-bold hover:bg-red-50"
                         >
                             Lapor Kerosakan (KEW.PA-9)
+                        </button>
+                        <button
+                            onClick={() => setIsLossModalOpen(true)}
+                            className="border border-orange-300 text-orange-700 px-6 py-2 rounded font-bold hover:bg-orange-50"
+                        >
+                            Lapor Kehilangan (KEW.PA-28)
                         </button>
                         <a
                             href={route('assets.kewpa2.download', asset.id)}
@@ -528,6 +722,77 @@ export default function Kewpa2({ asset }) {
                                 <button type="button" onClick={() => setIsDamageModalOpen(false)} style={{ padding: '8px 16px', borderRadius: 6, background: '#F9F7F5', color: '#4A4540', fontWeight: 700 }}>Batal</button>
                                 <button type="submit" disabled={damageProcessing} style={{ padding: '8px 16px', borderRadius: 6, background: '#5C001F', color: '#FFF', fontWeight: 700 }}>
                                     {damageProcessing ? 'Menghantar...' : 'Hantar Laporan'}
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            )}
+
+            {/* Loss Report Modal (KEW.PA-28→32) */}
+            {isLossModalOpen && (
+                <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}>
+                    <div style={{ background: '#FFF', borderRadius: 12, maxWidth: 520, width: '100%', overflow: 'hidden', boxShadow: '0 10px 40px rgba(0,0,0,0.2)' }}>
+                        <div style={{ background: '#CC5500', padding: '16px 20px' }}>
+                            <h3 style={{ color: '#FFF', fontWeight: 800, margin: 0 }}>Lapor Kehilangan Aset (KEW.PA-28)</h3>
+                            <p style={{ color: '#FFE0B2', fontSize: '12px', margin: 0 }}>{asset.name} ({asset.asset_tag})</p>
+                        </div>
+                        <form onSubmit={submitLoss} style={{ padding: '20px' }}>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8A8480', marginBottom: 4 }}>Tarikh Kehilangan</label>
+                                    <input type="date" value={lossData.loss_date} onChange={e => setLossData('loss_date', e.target.value)} required
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #EDE9E4' }} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8A8480', marginBottom: 4 }}>Kaedah Kehilangan</label>
+                                    <select value={lossData.loss_method} onChange={e => setLossData('loss_method', e.target.value)} required
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #EDE9E4' }}>
+                                        <option value="hilang">Hilang</option>
+                                        <option value="curi">Curi</option>
+                                        <option value="musnah">Musnah</option>
+                                        <option value="other">Lain-lain</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div style={{ marginBottom: 16 }}>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8A8480', marginBottom: 4 }}>Lokasi Kejadian</label>
+                                <input type="text" value={lossData.incident_location} onChange={e => setLossData('incident_location', e.target.value)} required
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #EDE9E4' }} placeholder="Lokasi terakhir aset dilihat..." />
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8A8480', marginBottom: 4 }}>Pegawai Terakhir</label>
+                                    <input type="text" value={lossData.last_officer} onChange={e => setLossData('last_officer', e.target.value)}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #EDE9E4' }} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8A8480', marginBottom: 4 }}>No. Laporan Polis</label>
+                                    <input type="text" value={lossData.police_report_no} onChange={e => setLossData('police_report_no', e.target.value)}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #EDE9E4' }} placeholder="PA-31" />
+                                </div>
+                            </div>
+                            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8A8480', marginBottom: 4 }}>Nilai Semasa (RM)</label>
+                                    <input type="number" step="0.01" value={lossData.current_value} onChange={e => setLossData('current_value', e.target.value)} required
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #EDE9E4' }} />
+                                </div>
+                                <div>
+                                    <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8A8480', marginBottom: 4 }}>Rujukan Kelulusan</label>
+                                    <input type="text" value={lossData.approval_reference} onChange={e => setLossData('approval_reference', e.target.value)}
+                                        style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #EDE9E4' }} placeholder="PA-31" />
+                                </div>
+                            </div>
+                            <div style={{ marginBottom: 20 }}>
+                                <label style={{ display: 'block', fontSize: '11px', fontWeight: 700, color: '#8A8480', marginBottom: 4 }}>Ringkasan Siasatan (PA-30)</label>
+                                <textarea rows="3" value={lossData.investigation_summary} onChange={e => setLossData('investigation_summary', e.target.value)}
+                                    style={{ width: '100%', padding: '8px 12px', borderRadius: 6, border: '1px solid #EDE9E4' }} placeholder="Butiran siasatan awal..." />
+                            </div>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+                                <button type="button" onClick={() => setIsLossModalOpen(false)} style={{ padding: '8px 16px', borderRadius: 6, background: '#F9F7F5', color: '#4A4540', fontWeight: 700 }}>Batal</button>
+                                <button type="submit" disabled={lossProcessing} style={{ padding: '8px 16px', borderRadius: 6, background: '#CC5500', color: '#FFF', fontWeight: 700 }}>
+                                    {lossProcessing ? 'Menghantar...' : 'Hantar Laporan Kehilangan'}
                                 </button>
                             </div>
                         </form>

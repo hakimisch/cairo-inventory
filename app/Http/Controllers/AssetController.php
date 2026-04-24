@@ -49,14 +49,7 @@ class AssetController extends Controller
         $price             = $receiving->unit_price ?? 0.00;
         $enforcedAssetType = $price > 1000 ? 'fixed_asset' : 'inventory';
 
-        // Handle photo upload
-        $imageUrl = null;
-        if ($request->hasFile('photo')) {
-            $path     = $request->file('photo')->store('asset_photos', 'public');
-            $imageUrl = '/storage/' . $path;
-        }
-
-        // ─── Single asset creation (fixed duplicate bug) ─────────────────
+        // ─── Single asset creation ──────────────────────────────────────────
         $newAsset = Asset::create([
             'asset_tag'            => $this->generateAssetTag(),
             'name'                 => $receiving->item_description,
@@ -69,7 +62,6 @@ class AssetController extends Controller
             'status'               => 'active',
             'warranty_period'      => $request->warranty_period,
             'warranty_expiry'      => $request->warranty_expiry,
-            'image_url'            => $imageUrl,
             'supplier_name'        => $receiving->supplier_name,
             'supplier_address'     => $receiving->supplier_address,
             'po_reference'         => $receiving->purchase_order_no,
@@ -82,6 +74,12 @@ class AssetController extends Controller
             'budget_vot'           => $request->budget_vot,
             'requires_maintenance' => $request->boolean('requires_maintenance'),
         ]);
+
+        // ─── Handle photo upload via Spatie Media Library ───────────────────
+        if ($request->hasFile('photo')) {
+            $newAsset->addMediaFromRequest('photo')
+                     ->toMediaCollection('asset_photos');
+        }
 
         // Initial placement record
         $newAsset->placements()->create([
@@ -164,10 +162,13 @@ class AssetController extends Controller
     {
         $validated = $request->validate([
             'custodian_name'     => 'required|string|max:255',
-            'staff_id'           => 'nullable|string|max:100', // NEW
+            'staff_id'           => 'nullable|string|max:100',
+            'borrower_phone'     => 'nullable|string|max:20',    // NEW — PA-9A
+            'matric_no'          => 'nullable|string|max:50',    // NEW — PA-9A
+            'authorizer_name'    => 'nullable|string|max:255',   // NEW — PA-9A
             'location'           => 'required|string|max:255',
-            'quantity_placed'    => 'nullable|integer|min:1',  // NEW
-            'specific_serial_no' => 'nullable|string|max:255', // NEW
+            'quantity_placed'    => 'nullable|integer|min:1',
+            'specific_serial_no' => 'nullable|string|max:255',
             'is_lokasi_luar'     => 'boolean',
             'assigned_date'      => 'required|date',
         ]);
@@ -189,13 +190,28 @@ class AssetController extends Controller
 
     public function kewpa2(Asset $asset)
     {
-        $asset->load('placements', 'inspections', 'upgrades');
+        $asset->load([
+            'placements',
+            'inspections',
+            'upgrades',
+            'maintenances',
+            'disposals',
+            'lossReports',
+            'transfers',
+        ]);
         return Inertia::render('Assets/Kewpa2', ['asset' => $asset]);
     }
 
     public function kewpa3(Asset $asset)
     {
-        $asset->load('placements', 'inspections');
+        $asset->load([
+            'placements',
+            'inspections',
+            'maintenances',
+            'disposals',
+            'lossReports',
+            'transfers',
+        ]);
         return Inertia::render('Assets/Kewpa3', ['asset' => $asset]);
     }
 
@@ -205,10 +221,8 @@ class AssetController extends Controller
             ->format('a4')->name("KEW-PA-1A-{$receiving->receive_no}.pdf")
             ->withBrowsershot(function ($b) {
                 if (PHP_OS_FAMILY === 'Windows') {
-                    // Local Windows Development Path
                     $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
                 } else {
-                    // AWS / Linux Production Path
                     $b->noSandbox()
                       ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
                       ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
@@ -223,10 +237,8 @@ class AssetController extends Controller
             ->format('a4')->name("KEW-PA-2-{$asset->asset_tag}.pdf")
             ->withBrowsershot(function ($b) {
                 if (PHP_OS_FAMILY === 'Windows') {
-                    // Local Windows Development Path
                     $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
                 } else {
-                    // AWS / Linux Production Path
                     $b->noSandbox()
                       ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
                       ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
@@ -241,10 +253,8 @@ class AssetController extends Controller
             ->format('a4')->name("KEW-PA-3-{$asset->asset_tag}.pdf")
             ->withBrowsershot(function ($b) {
                 if (PHP_OS_FAMILY === 'Windows') {
-                    // Local Windows Development Path
                     $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
                 } else {
-                    // AWS / Linux Production Path
                     $b->noSandbox()
                       ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
                       ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
