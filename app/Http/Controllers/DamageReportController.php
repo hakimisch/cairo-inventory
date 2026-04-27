@@ -9,6 +9,29 @@ use Spatie\LaravelPdf\Facades\Pdf;
 
 class DamageReportController extends Controller
 {
+    /**
+     * Display a listing of all damage reports (PA-9).
+     */
+    public function index(Request $request)
+    {
+        $damageReports = DamageReport::with('asset')
+            ->when($request->search, function ($q, $search) {
+                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('asset_tag', 'like', "%{$search}%"))
+                  ->orWhere('reported_by', 'like', "%{$search}%")
+                  ->orWhere('damage_description', 'like', "%{$search}%");
+            })
+            ->when($request->status, fn($q, $status) => $q->where('status', $status))
+            ->orderBy('created_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
+
+        return inertia('Assets/Kewpa9Index', [
+            'damageReports' => $damageReports,
+            'filters'       => $request->only(['search', 'status']),
+        ]);
+    }
+
     public function store(Request $request, Asset $asset)
     {
         $validated = $request->validate([

@@ -9,6 +9,29 @@ use Illuminate\Http\Request;
 class AssetDisposalController extends Controller
 {
     /**
+     * Display a listing of all asset disposals (PA-17/18/19).
+     */
+    public function index(Request $request)
+    {
+        $disposals = AssetDisposal::with('asset')
+            ->when($request->search, function ($q, $search) {
+                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('asset_tag', 'like', "%{$search}%"))
+                  ->orWhere('approval_reference', 'like', "%{$search}%")
+                  ->orWhere('disposal_method', 'like', "%{$search}%");
+            })
+            ->when($request->status, fn($q, $status) => $q->where('status', $status))
+            ->orderBy('created_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
+
+        return inertia('Assets/Kewpa17Index', [
+            'disposals' => $disposals,
+            'filters'   => $request->only(['search', 'status']),
+        ]);
+    }
+
+    /**
      * Store a new disposal request for an asset (PA-17/18/19).
      */
     public function store(Request $request, Asset $asset)
@@ -56,5 +79,25 @@ class AssetDisposalController extends Controller
         $disposal->delete();
 
         return redirect()->back()->with('success', 'Disposal record deleted successfully.');
+    }
+
+    /**
+     * Download KEW.PA-17/18/19 — Laporan Pelupusan Aset (PDF)
+     */
+    public function downloadKewpa17(Asset $asset)
+    {
+        $asset->load('disposals');
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa17', ['asset' => $asset])
+            ->format('a4')->name("KEW-PA-17-{$asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
     }
 }

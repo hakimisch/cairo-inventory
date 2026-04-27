@@ -41,6 +41,42 @@ export default function Dashboard({ auth, myAssets, myStats }) {
                     </div>
                 </div>
 
+                {/* ── KEW.PA Form Quick-Access (User) ── */}
+                <div style={{ background: UTM.white, borderRadius: 12, border: `1px solid ${UTM.gray100}`, padding: '20px 22px', marginBottom: 24 }}>
+                    <p style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: UTM.maroon, marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ display: 'inline-block', width: 3, height: 13, background: UTM.gold, borderRadius: 2 }} />
+                        Borang KEW.PA — Akses Pantas
+                    </p>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
+                        {[
+                            { label: 'PA-1 Penerimaan',  href: route('receivings.index'),     color: UTM.maroon,    bg: '#F3E0E5' },
+                            { label: 'PA-2/3 Aset',      href: route('assets.index'),          color: '#0C447C',     bg: '#E6F1FB' },
+                            { label: 'PA-6 Pergerakan',  href: route('transfers.index'),       color: UTM.goldDark,  bg: '#FEF3D6' },
+                            { label: 'PA-9 Kerosakan',   href: route('damage-reports.index'),  color: '#1A7A3C',     bg: '#E6F4EC' },
+                            { label: 'PA-9A Pinjaman',   href: route('placements.index'),      color: UTM.maroon,    bg: '#F3E0E5' },
+                            { label: 'PA-10 Periksa',    href: route('inspections.index'),     color: '#0C447C',     bg: '#E6F1FB' },
+                            { label: 'PA-13/14 Selenggara', href: route('maintenances.index'), color: UTM.goldDark,  bg: '#FEF3D6' },
+                        ].map(item => (
+                            <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
+                                <div style={{
+                                    background    : item.bg,
+                                    borderRadius  : 9,
+                                    padding       : '12px 14px',
+                                    border        : `1.5px solid transparent`,
+                                    cursor        : 'pointer',
+                                    transition    : 'border-color .12s',
+                                    textAlign     : 'center',
+                                }}
+                                    onMouseEnter={e => e.currentTarget.style.borderColor = item.color}
+                                    onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}
+                                >
+                                    <p style={{ fontSize: '12px', fontWeight: 700, color: item.color, margin: 0 }}>{item.label}</p>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+
                 {/* My Assets List */}
                 <div style={{ background: UTM.white, borderRadius: 12, border: `1px solid ${UTM.gray100}`, overflow: 'hidden' }}>
                     <div style={{ padding: '16px 20px', background: UTM.gray50, borderBottom: `1px solid ${UTM.gray100}` }}>
@@ -60,8 +96,8 @@ export default function Dashboard({ auth, myAssets, myStats }) {
                                             {asset.location}
                                         </td>
                                         <td style={{ padding: '16px 20px', textAlign: 'right' }}>
-                                            <Link 
-                                                href={route('assets.index')} 
+                                            <Link
+                                                href={route('assets.index')}
                                                 style={{ fontSize: '12px', fontWeight: 700, color: UTM.maroon, textDecoration: 'none', background: '#F3E0E5', padding: '6px 12px', borderRadius: 6 }}
                                             >
                                                 Lihat Butiran

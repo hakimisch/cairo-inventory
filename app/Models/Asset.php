@@ -119,6 +119,11 @@ class Asset extends Model implements HasMedia
         return $this->hasMany(AssetTransfer::class)->latest('transfer_date');
     }
 
+    public function vehicleDisposalAssessment()
+    {
+        return $this->hasOne(VehicleDisposalAssessment::class);
+    }
+
     // ─── Accessor: Get primary photo URL ──────────────────────────────────────
     public function getPrimaryPhotoUrlAttribute(): ?string
     {

@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import { Link, usePage } from '@inertiajs/react';
 
@@ -16,7 +17,7 @@ const UTM = {
 
 function NavSection({ label, children }) {
     return (
-        <div style={{ marginBottom: 24 }}>
+        <div style={{ marginBottom: 20 }}>
             <p style={{
                 fontSize     : '10px',
                 fontWeight   : 700,
@@ -72,8 +73,108 @@ function NavLink({ href, icon, label, active }) {
     );
 }
 
+// ─── Collapsible sub-menu group (for PA-21→27A) ──────────────────────────────
+function NavGroup({ label, icon, children, defaultOpen = false }) {
+    const [open, setOpen] = useState(defaultOpen);
+
+    return (
+        <div style={{ marginBottom: 2 }}>
+            <button
+                onClick={() => setOpen(!open)}
+                style={{
+                    display        : 'flex',
+                    alignItems     : 'center',
+                    gap            : 10,
+                    padding        : '9px 12px',
+                    borderRadius   : 8,
+                    fontSize       : '13px',
+                    fontWeight     : 600,
+                    color          : 'rgba(255,255,255,0.75)',
+                    background     : 'transparent',
+                    border         : 'none',
+                    cursor         : 'pointer',
+                    width          : '100%',
+                    textAlign      : 'left',
+                    textDecoration : 'none',
+                    transition     : 'all 0.12s',
+                }}
+                onMouseEnter={e => {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.07)';
+                    e.currentTarget.style.color = UTM.white;
+                }}
+                onMouseLeave={e => {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.75)';
+                }}
+            >
+                <span style={{ fontSize: 15, width: 20, textAlign: 'center', flexShrink: 0 }}>{icon}</span>
+                <span style={{ flex: 1 }}>{label}</span>
+                <span style={{
+                    fontSize   : '10px',
+                    transition : 'transform 0.2s',
+                    transform  : open ? 'rotate(90deg)' : 'rotate(0deg)',
+                    color      : 'rgba(255,245,171,0.5)',
+                }}>
+                    ▸
+                </span>
+            </button>
+            {open && (
+                <div style={{
+                    marginLeft : 12,
+                    borderLeft : '1px solid rgba(255,245,171,0.15)',
+                    paddingLeft: 8,
+                    display    : 'flex',
+                    flexDirection: 'column',
+                    gap        : 1,
+                }}>
+                    {children}
+                </div>
+            )}
+        </div>
+    );
+}
+
+function SubNavLink({ href, label, active }) {
+    return (
+        <Link
+            href={href}
+            style={{
+                display        : 'flex',
+                alignItems     : 'center',
+                gap            : 8,
+                padding        : '6px 10px',
+                borderRadius   : 6,
+                fontSize       : '12px',
+                fontWeight     : active ? 700 : 400,
+                color          : active ? UTM.gold : 'rgba(255,255,255,0.65)',
+                background     : active ? 'rgba(248,166,23,0.10)' : 'transparent',
+                textDecoration : 'none',
+                transition     : 'all 0.12s',
+            }}
+            onMouseEnter={e => {
+                if (!active) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)';
+                    e.currentTarget.style.color = UTM.white;
+                }
+            }}
+            onMouseLeave={e => {
+                if (!active) {
+                    e.currentTarget.style.background = 'transparent';
+                    e.currentTarget.style.color = 'rgba(255,255,255,0.65)';
+                }
+            }}
+        >
+            <span style={{ fontSize: '10px', color: active ? UTM.gold : 'rgba(255,245,171,0.3)' }}>▪</span>
+            {label}
+        </Link>
+    );
+}
+
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props.auth.user;
+
+    // ── Helper: check if current route matches any of the given patterns ──
+    const isActive = (...patterns) => patterns.some(p => route().current(p));
 
     return (
         <div style={{ minHeight: '100vh', background: UTM.gray50, display: 'flex' }}>
@@ -94,7 +195,7 @@ export default function AuthenticatedLayout({ header, children }) {
                 <div style={{
                     padding        : '20px 16px 16px',
                     borderBottom   : '1px solid rgba(255,245,171,0.12)',
-                    marginBottom   : 20,
+                    marginBottom   : 16,
                 }}>
                     <div style={{
                         height      : 3,
@@ -122,6 +223,10 @@ export default function AuthenticatedLayout({ header, children }) {
 
                 {/* Nav */}
                 <nav style={{ flex: 1, padding: '0 12px', overflowY: 'auto' }}>
+
+                    {/* ═══════════════════════════════════════════════════════
+                       UTAMA
+                       ═══════════════════════════════════════════════════════ */}
                     <NavSection label="Utama">
                         {user.role === 'admin' ? (
                             <NavLink
@@ -140,66 +245,223 @@ export default function AuthenticatedLayout({ header, children }) {
                         )}
                     </NavSection>
 
-                    {/* Admin-only sections */}
-                    {user.role === 'admin' && (
-                        <NavSection label="Logistik (KEW.PA-1)">
+                    {/* ═══════════════════════════════════════════════════════
+                       LOGISTIK & PENERIMAAN
+                       ═══════════════════════════════════════════════════════ */}
+                    <NavSection label="Logistik & Penerimaan">
+                        {user.role === 'admin' && (
                             <NavLink
                                 href={route('receivings.create')}
                                 icon="＋"
-                                label="Daftar Penerimaan"
+                                label="PA-1 Daftar Penerimaan"
                                 active={route().current('receivings.create')}
                             />
+                        )}
+                        <NavLink
+                            href={route('receivings.index')}
+                            icon="◫"
+                            label="PA-1 Senarai Penerimaan"
+                            active={isActive('receivings.index', 'receivings.kewpa1')}
+                        />
+                        <NavLink
+                            href={route('assets.index')}
+                            icon="◈"
+                            label="PA-2/3 Pendaftaran Aset"
+                            active={isActive('assets.*')}
+                        />
+                    </NavSection>
+
+                    {/* ═══════════════════════════════════════════════════════
+                       PERGERAKAN & PEMERIKSAAN
+                       ═══════════════════════════════════════════════════════ */}
+                    <NavSection label="Pergerakan & Pemeriksaan">
+                        <NavLink
+                            href={route('transfers.index')}
+                            icon="↗"
+                            label="PA-6 Daftar Pergerakan"
+                            active={isActive('transfers.index', 'assets.kewpa6', 'assets.kewpa6.download')}
+                        />
+                        <NavLink
+                            href={route('damage-reports.index')}
+                            icon="⚠️"
+                            label="PA-9 Aduan Kerosakan"
+                            active={isActive('damage-reports.index', 'damage-reports.kewpa9.download')}
+                        />
+                        <NavLink
+                            href={route('placements.index')}
+                            icon="📋"
+                            label="PA-9A Pinjaman Aset"
+                            active={isActive('placements.index', 'assets.kewpa9a', 'assets.placements.kewpa9a', 'assets.kewpa9a.download', 'assets.placements.kewpa9a.download')}
+                        />
+                        <NavLink
+                            href={route('inspections.index')}
+                            icon="🔍"
+                            label="PA-10 Pemeriksaan Aset"
+                            active={isActive('inspections.index', 'assets.kewpa10', 'assets.kewpa10.download')}
+                        />
+                        <NavLink
+                            href={route('reports.kewpa12')}
+                            icon="📄"
+                            label="PA-12 Perakuan Tahunan"
+                            active={isActive('reports.kewpa12', 'reports.kewpa12.download')}
+                        />
+                    </NavSection>
+
+                    {/* ═══════════════════════════════════════════════════════
+                       PENYELENGGARAAN
+                       ═══════════════════════════════════════════════════════ */}
+                    <NavSection label="Penyelenggaraan">
+                        <NavLink
+                            href={route('maintenances.index')}
+                            icon="🔧"
+                            label="PA-13/14 Penyelenggaraan"
+                            active={isActive('maintenances.index', 'assets.maintenances.*')}
+                        />
+                    </NavSection>
+
+                    {/* ═══════════════════════════════════════════════════════
+                       PELUPUSAN & JUALAN
+                       ═══════════════════════════════════════════════════════ */}
+                    <NavSection label="Pelupusan & Jualan">
+                        <NavLink
+                            href={route('vehicle-disposals.index')}
+                            icon="🚗"
+                            label="PA-16 Pelupusan Kenderaan"
+                            active={isActive('vehicle-disposals.index', 'assets.vehicle-disposal.*')}
+                        />
+                        <NavLink
+                            href={route('disposals.index')}
+                            icon="🗑️"
+                            label="PA-17/18/19 Pelupusan"
+                            active={isActive('disposals.index', 'assets.disposals.*')}
+                        />
+                        <NavLink
+                            href={route('reports.kewpa20')}
+                            icon="📊"
+                            label="PA-20 Laporan Pelupusan"
+                            active={isActive('reports.kewpa20', 'reports.kewpa20.download')}
+                        />
+
+                        {/* ── Collapsible: PA-21→27A Jualan Aset ── */}
+                        <NavGroup
+                            icon="💰"
+                            label="PA-21→27A Jualan Aset"
+                            defaultOpen={isActive(
+                                'disposal-sales.*',
+                                'disposal-sales.kewpa21', 'disposal-sales.kewpa21.download',
+                                'disposal-sales.kewpa22', 'disposal-sales.kewpa22.download',
+                                'disposal-sales.kewpa23', 'disposal-sales.kewpa23.download',
+                                'disposal-sales.kewpa24', 'disposal-sales.kewpa24.download',
+                                'disposal-sales.kewpa25', 'disposal-sales.kewpa25.download',
+                                'disposal-sales.kewpa26', 'disposal-sales.kewpa26.download',
+                                'disposal-sales.kewpa27', 'disposal-sales.kewpa27.download',
+                                'disposal-sales.kewpa27a', 'disposal-sales.kewpa27a.download',
+                            )}
+                        >
+                            <SubNavLink
+                                href={route('disposal-sales.index')}
+                                label="Senarai Jualan"
+                                active={isActive('disposal-sales.index', 'disposal-sales.show')}
+                            />
+                            <SubNavLink
+                                href={route('disposal-sales.index')}
+                                label="PA-21 Tawaran"
+                                active={isActive('disposal-sales.kewpa21', 'disposal-sales.kewpa21.download')}
+                            />
+                            <SubNavLink
+                                href={route('disposal-sales.index')}
+                                label="PA-22 Sebutharga"
+                                active={isActive('disposal-sales.kewpa22', 'disposal-sales.kewpa22.download')}
+                            />
+                            <SubNavLink
+                                href={route('disposal-sales.index')}
+                                label="PA-23 Lelongan"
+                                active={isActive('disposal-sales.kewpa23', 'disposal-sales.kewpa23.download')}
+                            />
+                            <SubNavLink
+                                href={route('disposal-sales.index')}
+                                label="PA-24 Keputusan"
+                                active={isActive('disposal-sales.kewpa24', 'disposal-sales.kewpa24.download')}
+                            />
+                            <SubNavLink
+                                href={route('disposal-sales.index')}
+                                label="PA-25 Laporan"
+                                active={isActive('disposal-sales.kewpa25', 'disposal-sales.kewpa25.download')}
+                            />
+                            <SubNavLink
+                                href={route('disposal-sales.index')}
+                                label="PA-26 Perakuan (T/S/L)"
+                                active={isActive('disposal-sales.kewpa26', 'disposal-sales.kewpa26.download')}
+                            />
+                            <SubNavLink
+                                href={route('disposal-sales.index')}
+                                label="PA-27 Perakuan (Pelupusan)"
+                                active={isActive('disposal-sales.kewpa27', 'disposal-sales.kewpa27.download')}
+                            />
+                            <SubNavLink
+                                href={route('disposal-sales.index')}
+                                label="PA-27A Perakuan (Lupus)"
+                                active={isActive('disposal-sales.kewpa27a', 'disposal-sales.kewpa27a.download')}
+                            />
+                        </NavGroup>
+                    </NavSection>
+
+                    {/* ═══════════════════════════════════════════════════════
+                       KEHILANGAN
+                       ═══════════════════════════════════════════════════════ */}
+                    <NavSection label="Kehilangan">
+                        <NavLink
+                            href={route('loss-reports.index')}
+                            icon="⚠️"
+                            label="PA-28→32 Kehilangan"
+                            active={isActive('loss-reports.index', 'assets.loss-reports.*')}
+                        />
+                    </NavSection>
+
+                    {/* ═══════════════════════════════════════════════════════
+                       LAPORAN (Admin)
+                       ═══════════════════════════════════════════════════════ */}
+                    {user.role === 'admin' && (
+                        <NavSection label="Laporan Tahunan">
                             <NavLink
-                                href={route('receivings.index')}
-                                icon="◫"
-                                label="Senarai Penerimaan"
-                                active={route().current('receivings.index')}
+                                href={route('reports.kewpa4')}
+                                icon="▤"
+                                label="PA-4 Harta Tetap"
+                                active={isActive('reports.kewpa4', 'reports.kewpa4.download')}
+                            />
+                            <NavLink
+                                href={route('reports.kewpa5')}
+                                icon="▤"
+                                label="PA-5 Inventori"
+                                active={isActive('reports.kewpa5', 'reports.kewpa5.download')}
+                            />
+                            <NavLink
+                                href={route('reports.kewpa7')}
+                                icon="▤"
+                                label="PA-7 Kedudukan Aset"
+                                active={isActive('reports.kewpa7', 'reports.kewpa7.download')}
+                            />
+                            <NavLink
+                                href={route('reports.kewpa8')}
+                                icon="▤"
+                                label="PA-8 Lap. Tahunan"
+                                active={isActive('reports.kewpa8', 'reports.kewpa8.download')}
                             />
                         </NavSection>
                     )}
 
-                    <NavSection label="Daftar Aset (KEW.PA-3)">
-                        <NavLink
-                            href={route('assets.index')}
-                            icon="◈"
-                            label="Inventori Aset"
-                            active={route().current('assets.*')}
-                        />
-                    </NavSection>
-
-                    {/* Admin-only sections */}
+                    {/* ═══════════════════════════════════════════════════════
+                       SISTEM (Admin)
+                       ═══════════════════════════════════════════════════════ */}
                     {user.role === 'admin' && (
-                        <>
-                            <NavSection label="Laporan (Admin)">
-                                <NavLink
-                                    href={route('reports.kewpa4')}
-                                    icon="▤"
-                                    label="KEW.PA-4 Harta Tetap"
-                                    active={route().current('reports.kewpa4')}
-                                />
-                                <NavLink
-                                    href={route('reports.kewpa5')}
-                                    icon="▤"
-                                    label="KEW.PA-5 Inventori"
-                                    active={route().current('reports.kewpa5')}
-                                />
-                                <NavLink
-                                    href={route('reports.kewpa8')}
-                                    icon="▤"
-                                    label="KEW.PA-8 Lap. Tahunan"
-                                    active={route().current('reports.kewpa8')}
-                                />
-                            </NavSection>
-                            
-                            <NavSection label="Sistem">
-                                <NavLink 
-                                    href={route('admin.users.index')} 
-                                    icon="👤" 
-                                    label="Pengurusan Pengguna" 
-                                    active={route().current('admin.users.*')} 
-                                />
-                            </NavSection>
-                        </>
+                        <NavSection label="Sistem">
+                            <NavLink
+                                href={route('admin.users.index')}
+                                icon="👤"
+                                label="Pengurusan Pengguna"
+                                active={isActive('admin.users.*')}
+                            />
+                        </NavSection>
                     )}
                 </nav>
 

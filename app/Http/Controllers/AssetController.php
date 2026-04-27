@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Models\Asset;
+use App\Models\AssetPlacement;
 use App\Models\Receiving;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
@@ -251,6 +252,130 @@ class AssetController extends Controller
     {
         return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa3', ['asset' => $asset])
             ->format('a4')->name("KEW-PA-3-{$asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
+    }
+    // ── Phase 4: New View & Download Methods ─────────────────────────────────
+
+    /**
+     * KEW.PA-6 — Daftar Pergerakan Aset (Movement Register)
+     */
+    public function kewpa6(Asset $asset)
+    {
+        $asset->load(['placements', 'transfers']);
+        return Inertia::render('Assets/Kewpa6', ['asset' => $asset]);
+    }
+
+    /**
+     * Download KEW.PA-6 PDF
+     */
+    public function downloadKewpa6(Asset $asset)
+    {
+        $asset->load(['placements', 'transfers']);
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa6', ['asset' => $asset])
+            ->format('a4')->name("KEW-PA-6-{$asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
+    }
+
+    /**
+     * Display a listing of all asset loans/placements (PA-9A).
+     */
+    public function kewpa9aIndex(Request $request)
+    {
+        $placements = AssetPlacement::with('asset')
+            ->when($request->search, function ($q, $search) {
+                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('asset_tag', 'like', "%{$search}%"))
+                  ->orWhere('custodian_name', 'like', "%{$search}%")
+                  ->orWhere('location', 'like', "%{$search}%")
+                  ->orWhere('borrower_phone', 'like', "%{$search}%");
+            })
+            ->orderBy('created_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
+
+        return inertia('Assets/Kewpa9aIndex', [
+            'placements' => $placements,
+            'filters'    => $request->only(['search']),
+        ]);
+    }
+
+    /**
+     * KEW.PA-9A — Borang Pinjaman Aset (Loan Form)
+     */
+    public function kewpa9a(Asset $asset, ?AssetPlacement $placement = null)
+    {
+        $asset->load('placements');
+        // Use the latest placement if none specified
+        if (!$placement->exists) {
+            $placement = $asset->placements()->latest()->first();
+        }
+        return Inertia::render('Assets/Kewpa9a', [
+            'asset'     => $asset,
+            'placement' => $placement,
+        ]);
+    }
+
+    /**
+     * Download KEW.PA-9A PDF
+     */
+    public function downloadKewpa9a(Asset $asset, ?AssetPlacement $placement = null)
+    {
+        $asset->load('placements');
+        if (!$placement || !$placement->exists) {
+            $placement = $asset->placements()->latest()->first();
+        }
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa9a', [
+            'asset'     => $asset,
+            'placement' => $placement,
+        ])
+            ->format('a4')->name("KEW-PA-9A-{$asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
+    }
+
+    /**
+     * KEW.PA-10 — Laporan Pemeriksaan Aset (Inspection Report)
+     */
+    public function kewpa10(Asset $asset)
+    {
+        $asset->load('inspections');
+        return Inertia::render('Assets/Kewpa10', ['asset' => $asset]);
+    }
+
+    /**
+     * Download KEW.PA-10 PDF
+     */
+    public function downloadKewpa10(Asset $asset)
+    {
+        $asset->load('inspections');
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa10', ['asset' => $asset])
+            ->format('a4')->name("KEW-PA-10-{$asset->asset_tag}.pdf")
             ->withBrowsershot(function ($b) {
                 if (PHP_OS_FAMILY === 'Windows') {
                     $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');

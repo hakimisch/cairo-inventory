@@ -7,6 +7,15 @@ use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Models\Asset;
 use App\Models\Receiving;
+use App\Models\AssetTransfer;
+use App\Models\DamageReport;
+use App\Models\AssetPlacement;
+use App\Models\AssetInspection;
+use App\Models\AssetMaintenance;
+use App\Models\AssetDisposal;
+use App\Models\AssetLossReport;
+use App\Models\VehicleDisposalAssessment;
+use App\Models\DisposalSale;
 use Illuminate\Support\Facades\DB;
 
 class AdminDashboardController extends Controller
@@ -34,11 +43,25 @@ class AdminDashboardController extends Controller
                                     ->count(),
         ];
 
-        // 3. Chart Data (Categories & Types)
+        // 3. KEW.PA Form Quick-Access Counts
+        $kewpaCounts = [
+            'pending_receivings'    => Receiving::where('status', 'pending')->count(),
+            'total_transfers'       => AssetTransfer::count(),
+            'total_damage_reports'  => DamageReport::count(),
+            'total_placements'      => AssetPlacement::count(),
+            'total_inspections'     => AssetInspection::count(),
+            'total_maintenances'    => AssetMaintenance::count(),
+            'total_vehicle_disposals' => VehicleDisposalAssessment::count(),
+            'total_disposals'       => AssetDisposal::count(),
+            'total_loss_reports'    => AssetLossReport::count(),
+            'active_disposal_sales' => DisposalSale::whereIn('status', ['active', 'open'])->count(),
+        ];
+
+        // 4. Chart Data (Categories & Types)
         $chartData = Asset::select('category', DB::raw('count(*) as total'))->groupBy('category')->get();
         $assetTypeChart = Asset::select('asset_type', DB::raw('count(*) as total'))->groupBy('asset_type')->get();
 
-        // 4. Campus Data
+        // 5. Campus Data
         $campusChart = Asset::select('campus', DB::raw('sum(purchase_price) as total'))->whereNotNull('campus')->groupBy('campus')->get();
         
         $campusStats = [];
@@ -58,6 +81,7 @@ class AdminDashboardController extends Controller
         return Inertia::render('Admin/AdminDashboard', [
             'stats'           => $stats,
             'adminAlerts'     => $adminAlerts,
+            'kewpaCounts'     => $kewpaCounts,
             'chartData'       => $chartData,
             'assetTypeChart'  => $assetTypeChart,
             'campusChart'     => $campusChart,

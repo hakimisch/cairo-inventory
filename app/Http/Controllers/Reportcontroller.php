@@ -1,8 +1,9 @@
 <?php
- 
+  
 namespace App\Http\Controllers;
- 
+  
 use App\Models\Asset;
+use App\Models\AssetDisposal;
 use Inertia\Inertia;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -146,7 +147,154 @@ class ReportController extends Controller
         ])->format('a4')->name("KEW-PA-8-{$year}.pdf")
           ->withBrowsershot(fn($b) => $this->browsershot($b));
     }
- 
+
+    // ─── KEW.PA-7 — Laporan Kedudukan Aset ────────────────────────────────────
+    public function kewpa7(Request $request)
+    {
+        $location   = $request->input('location');
+        $reportDate = $request->input('report_date', now()->format('Y-m-d'));
+
+        $query = Asset::query();
+        if ($location) {
+            $query->where('location', $location);
+        }
+        $assets = $query->orderBy('asset_tag')->get();
+
+        return Inertia::render('Reports/Kewpa7', [
+            'assets'     => $assets,
+            'location'   => $location,
+            'reportDate' => $reportDate,
+        ]);
+    }
+
+    public function downloadKewpa7(Request $request)
+    {
+        $location   = $request->input('location');
+        $reportDate = $request->input('report_date', now()->format('Y-m-d'));
+
+        $query = Asset::query();
+        if ($location) {
+            $query->where('location', $location);
+        }
+        $assets = $query->orderBy('asset_tag')->get();
+
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa7', [
+            'assets'      => $assets,
+            'location'    => $location,
+            'report_date' => $reportDate,
+        ])
+            ->format('a4')->name("KEW-PA-7-{$reportDate}.pdf")
+            ->withBrowsershot(fn($b) => $this->browsershot($b));
+    }
+
+    // ─── KEW.PA-12 — Perakuan Pemeriksaan Tahunan Aset ────────────────────────
+    public function kewpa12(Request $request)
+    {
+        $year       = $request->input('year', now()->year);
+        $reportDate = $request->input('report_date', now()->format('Y-m-d'));
+
+        $assets = Asset::with('inspections')
+            ->whereYear('created_at', $year)
+            ->orWhereYear('received_date', $year)
+            ->orderBy('asset_tag')
+            ->get()
+            ->map(function ($asset) {
+                $latestInsp = $asset->inspections->sortByDesc('inspection_date')->first();
+                $asset->latest_inspection_status = $latestInsp?->status;
+                return $asset;
+            });
+
+        $inspected    = $assets->filter(fn($a) => $a->latest_inspection_status !== null)->count();
+        $notInspected = $assets->filter(fn($a) => $a->latest_inspection_status === null)->count();
+        $damagedLost  = $assets->filter(fn($a) => in_array($a->latest_inspection_status, ['rosak', 'hilang', 'damaged', 'lost']))->count();
+
+        return Inertia::render('Reports/Kewpa12', [
+            'assets'     => $assets,
+            'year'       => $year,
+            'reportDate' => $reportDate,
+            'summary'    => [
+                'inspected'     => $inspected,
+                'not_inspected' => $notInspected,
+                'damaged_lost'  => $damagedLost,
+                'total'         => $assets->count(),
+            ],
+        ]);
+    }
+
+    public function downloadKewpa12(Request $request)
+    {
+        $year       = $request->input('year', now()->year);
+        $reportDate = $request->input('report_date', now()->format('Y-m-d'));
+
+        $assets = Asset::with('inspections')
+            ->whereYear('created_at', $year)
+            ->orWhereYear('received_date', $year)
+            ->orderBy('asset_tag')
+            ->get()
+            ->map(function ($asset) {
+                $latestInsp = $asset->inspections->sortByDesc('inspection_date')->first();
+                $asset->latest_inspection_status = $latestInsp?->status;
+                return $asset;
+            });
+
+        $inspected    = $assets->filter(fn($a) => $a->latest_inspection_status !== null)->count();
+        $notInspected = $assets->filter(fn($a) => $a->latest_inspection_status === null)->count();
+        $damagedLost  = $assets->filter(fn($a) => in_array($a->latest_inspection_status, ['rosak', 'hilang', 'damaged', 'lost']))->count();
+
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa12', [
+            'assets'      => $assets,
+            'year'        => $year,
+            'report_date' => $reportDate,
+            'summary'     => [
+                'inspected'     => $inspected,
+                'not_inspected' => $notInspected,
+                'damaged_lost'  => $damagedLost,
+                'total'         => $assets->count(),
+            ],
+        ])
+            ->format('a4')->name("KEW-PA-12-{$year}.pdf")
+            ->withBrowsershot(fn($b) => $this->browsershot($b));
+    }
+
+    // ─── KEW.PA-20 — Laporan Pelupusan Aset Tahunan ───────────────────────────
+    public function kewpa20(Request $request)
+    {
+        $year       = $request->input('year', now()->year);
+        $reportDate = $request->input('report_date', now()->format('Y-m-d'));
+
+        $disposals = AssetDisposal::with('asset')
+            ->whereYear('created_at', $year)
+            ->orWhereYear('disposal_date', $year)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return Inertia::render('Reports/Kewpa20', [
+            'disposals'  => $disposals,
+            'year'       => $year,
+            'reportDate' => $reportDate,
+        ]);
+    }
+
+    public function downloadKewpa20(Request $request)
+    {
+        $year       = $request->input('year', now()->year);
+        $reportDate = $request->input('report_date', now()->format('Y-m-d'));
+
+        $disposals = AssetDisposal::with('asset')
+            ->whereYear('created_at', $year)
+            ->orWhereYear('disposal_date', $year)
+            ->orderBy('created_at', 'desc')
+            ->get();
+
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa20', [
+            'disposals'   => $disposals,
+            'year'        => $year,
+            'report_date' => $reportDate,
+        ])
+            ->format('a4')->name("KEW-PA-20-{$year}.pdf")
+            ->withBrowsershot(fn($b) => $this->browsershot($b));
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
     private function availableYears(): array
     {

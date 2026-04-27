@@ -57,7 +57,7 @@ function AlertCard({ label, count, color, bg, border, href }) {
     return href ? <Link href={href} style={{ textDecoration: 'none' }}>{inner}</Link> : inner;
 }
 
-export default function AdminDashboard({ auth, stats, adminAlerts, chartData, assetTypeChart, campusChart, campusStats, highValueAssets }) {
+export default function AdminDashboard({ auth, stats, adminAlerts, kewpaCounts, chartData, assetTypeChart, campusChart, campusStats, highValueAssets }) {
     const PIE_OPTS = { plugins: { legend: { position: 'bottom', labels: { font: { size: 11, weight: '600' }, color: UTM.gray700, padding: 12 } } } };
     const CHART_COLORS = [UTM.maroon, UTM.gold, UTM.maroon2, UTM.goldDark, '#A0001A', '#E8C85A'];
 
@@ -194,6 +194,59 @@ export default function AdminDashboard({ auth, stats, adminAlerts, chartData, as
                     ))}
                 </div>
 
+                {/* ── KEW.PA Form Quick-Access ── */}
+                <Card style={{ marginBottom: 20 }}>
+                    <SectionTitle>Borang KEW.PA — Akses Pantas</SectionTitle>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 10 }}>
+                        {[
+                            { label: 'PA-1 Penerimaan',  count: kewpaCounts.pending_receivings,    href: route('receivings.index'),         color: UTM.maroon,    bg: '#F3E0E5' },
+                            { label: 'PA-6 Pergerakan',  count: kewpaCounts.total_transfers,       href: route('transfers.index'),          color: '#0C447C',     bg: '#E6F1FB' },
+                            { label: 'PA-9 Kerosakan',   count: kewpaCounts.total_damage_reports,  href: route('damage-reports.index'),     color: UTM.goldDark,  bg: '#FEF3D6' },
+                            { label: 'PA-9A Pinjaman',   count: kewpaCounts.total_placements,      href: route('placements.index'),         color: '#1A7A3C',     bg: '#E6F4EC' },
+                            { label: 'PA-10 Pemeriksaan',count: kewpaCounts.total_inspections,     href: route('inspections.index'),        color: UTM.maroon,    bg: '#F3E0E5' },
+                            { label: 'PA-13/14 Selenggara',count: kewpaCounts.total_maintenances,  href: route('maintenances.index'),       color: '#0C447C',     bg: '#E6F1FB' },
+                            { label: 'PA-16 Kenderaan',  count: kewpaCounts.total_vehicle_disposals, href: route('vehicle-disposals.index'), color: UTM.goldDark,  bg: '#FEF3D6' },
+                            { label: 'PA-17/18/19 Lupus',count: kewpaCounts.total_disposals,       href: route('disposals.index'),          color: '#1A7A3C',     bg: '#E6F4EC' },
+                            { label: 'PA-28→32 Hilang',  count: kewpaCounts.total_loss_reports,    href: route('loss-reports.index'),       color: UTM.maroon,    bg: '#F3E0E5' },
+                            { label: 'PA-21→27A Jualan', count: kewpaCounts.active_disposal_sales, href: route('disposal-sales.index'),     color: '#0C447C',     bg: '#E6F1FB' },
+                        ].map(item => (
+                            <Link key={item.label} href={item.href} style={{ textDecoration: 'none' }}>
+                                <div style={{
+                                    background    : item.bg,
+                                    borderRadius  : 9,
+                                    padding       : '12px 14px',
+                                    border        : `1.5px solid transparent`,
+                                    cursor        : 'pointer',
+                                    transition    : 'border-color .12s',
+                                    display       : 'flex',
+                                    justifyContent: 'space-between',
+                                    alignItems    : 'center',
+                                }}
+                                    onMouseEnter={e => e.currentTarget.style.borderColor = item.color}
+                                    onMouseLeave={e => e.currentTarget.style.borderColor = 'transparent'}
+                                >
+                                    <p style={{ fontSize: '12px', fontWeight: 700, color: item.color, margin: 0 }}>{item.label}</p>
+                                    <span style={{
+                                        display       : 'inline-flex',
+                                        alignItems    : 'center',
+                                        justifyContent: 'center',
+                                        minWidth      : 24,
+                                        height        : 24,
+                                        borderRadius  : '999px',
+                                        background    : item.color,
+                                        color         : '#FFFFFF',
+                                        fontSize      : '11px',
+                                        fontWeight    : 800,
+                                        padding       : '0 6px',
+                                    }}>
+                                        {item.count}
+                                    </span>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </Card>
+
                 {/* ── Reports quick-access ── */}
                 <Card>
                     <SectionTitle>Laporan Tahunan</SectionTitle>
@@ -201,7 +254,10 @@ export default function AdminDashboard({ auth, stats, adminAlerts, chartData, as
                         {[
                             { title: 'KEW.PA-4', sub: 'Senarai Harta Tetap', href: route('reports.kewpa4'), color: UTM.maroon },
                             { title: 'KEW.PA-5', sub: 'Senarai Inventori', href: route('reports.kewpa5'), color: UTM.goldDark },
-                            { title: 'KEW.PA-8', sub: 'Laporan Tahunan', href: route('reports.kewpa8'), color: '#0C447C' },
+                            { title: 'KEW.PA-7', sub: 'Kedudukan Aset',    href: route('reports.kewpa7'), color: '#0C447C' },
+                            { title: 'KEW.PA-8', sub: 'Laporan Tahunan',   href: route('reports.kewpa8'), color: UTM.maroon },
+                            { title: 'KEW.PA-12',sub: 'Perakuan Tahunan',  href: route('reports.kewpa12'),color: UTM.goldDark },
+                            { title: 'KEW.PA-20',sub: 'Laporan Pelupusan', href: route('reports.kewpa20'),color: '#1A7A3C' },
                         ].map(r => (
                             <Link key={r.title} href={r.href} style={{ textDecoration: 'none' }}>
                                 <div style={{ background: UTM.gray50, borderRadius: 9, padding: '14px 18px', border: `1.5px solid ${UTM.gray100}`, cursor: 'pointer', transition: 'border-color .12s', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

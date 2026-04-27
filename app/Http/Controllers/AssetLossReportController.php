@@ -9,6 +9,30 @@ use Illuminate\Http\Request;
 class AssetLossReportController extends Controller
 {
     /**
+     * Display a listing of all loss reports (PA-28→32).
+     */
+    public function index(Request $request)
+    {
+        $lossReports = AssetLossReport::with('asset')
+            ->when($request->search, function ($q, $search) {
+                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
+                    ->orWhere('asset_tag', 'like', "%{$search}%"))
+                  ->orWhere('police_report_no', 'like', "%{$search}%")
+                  ->orWhere('incident_location', 'like', "%{$search}%")
+                  ->orWhere('approval_reference', 'like', "%{$search}%");
+            })
+            ->when($request->status, fn($q, $status) => $q->where('status', $status))
+            ->orderBy('created_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
+
+        return inertia('Assets/Kewpa28Index', [
+            'lossReports' => $lossReports,
+            'filters'     => $request->only(['search', 'status']),
+        ]);
+    }
+
+    /**
      * Store a new loss report for an asset (PA-28→32).
      */
     public function store(Request $request, Asset $asset)
@@ -70,5 +94,25 @@ class AssetLossReportController extends Controller
         $lossReport->delete();
 
         return redirect()->back()->with('success', 'Loss report deleted successfully.');
+    }
+
+    /**
+     * Download KEW.PA-28→32 — Laporan Kehilangan Aset (PDF)
+     */
+    public function downloadKewpa28(Asset $asset)
+    {
+        $asset->load('lossReports');
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa28', ['asset' => $asset])
+            ->format('a4')->name("KEW-PA-28-{$asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
     }
 }

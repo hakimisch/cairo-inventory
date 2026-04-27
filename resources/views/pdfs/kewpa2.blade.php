@@ -218,7 +218,7 @@
         </tbody>
     </table>
 
-    {{-- ── PELUPUSAN / HAPUS KIRA — standard columns: Rujukan Kelulusan / Tarikh / Kaedah / Tandatangan ── --}}
+    {{-- ── PELUPUSAN / HAPUS KIRA — using $asset->disposals relationship (Phase 2+) ── --}}
     <div class="font-bold mb-1 uppercase">PELUPUSAN / HAPUS KIRA</div>
     <table class="w-full border-collapse border border-black mb-8 text-center">
         <thead class="bg-gray-50 font-bold">
@@ -230,18 +230,18 @@
             </tr>
         </thead>
         <tbody>
-            @if($asset->status === 'disposed')
+            @forelse($asset->disposals as $disposal)
                 <tr class="h-10">
-                    <td class="border border-black p-1.5">{{ $asset->disposal_reference ?? '-' }}</td>
-                    <td class="border border-black p-1.5">{{ \Carbon\Carbon::parse($asset->updated_at)->format('d/m/Y') }}</td>
-                    <td class="border border-black p-1.5">{{ $asset->disposal_method ?? 'Dilupuskan' }}</td>
+                    <td class="border border-black p-1.5">{{ $disposal->approval_reference ?? '-' }}</td>
+                    <td class="border border-black p-1.5">{{ $disposal->disposal_date ? \Carbon\Carbon::parse($disposal->disposal_date)->format('d/m/Y') : '-' }}</td>
+                    <td class="border border-black p-1.5">{{ $disposal->disposal_method ?? 'Dilupuskan' }}</td>
                     <td class="border border-black p-1.5"></td>
                 </tr>
-            @else
+            @empty
                 <tr class="h-10">
                     <td class="border border-black p-1.5 italic text-gray-500" colspan="4">Aset belum dilupuskan.</td>
                 </tr>
-            @endif
+            @endforelse
         </tbody>
     </table>
 

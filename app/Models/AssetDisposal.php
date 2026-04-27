@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AssetDisposal extends Model
 {
@@ -37,5 +38,13 @@ class AssetDisposal extends Model
     public function committeeAppointments(): MorphMany
     {
         return $this->morphMany(CommitteeAppointment::class, 'appointable');
+    }
+
+    /**
+     * Get all disposal sales (PA-21→27A) for this disposal.
+     */
+    public function disposalSales(): HasMany
+    {
+        return $this->hasMany(DisposalSale::class);
     }
 }
