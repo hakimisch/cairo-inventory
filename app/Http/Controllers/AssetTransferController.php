@@ -15,11 +15,11 @@ class AssetTransferController extends Controller
     {
         $transfers = AssetTransfer::with('asset')
             ->when($request->search, function ($q, $search) {
-                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('asset_tag', 'like', "%{$search}%"))
-                  ->orWhere('reference_no', 'like', "%{$search}%")
-                  ->orWhere('from_location', 'like', "%{$search}%")
-                  ->orWhere('to_location', 'like', "%{$search}%");
+                $q->whereHas('asset', fn($q) => $q->where('name', 'ILIKE', "%{$search}%")
+                    ->orWhere('asset_tag', 'ILIKE', "%{$search}%"))
+                  ->orWhere('reference_no', 'ILIKE', "%{$search}%")
+                  ->orWhere('from_location', 'ILIKE', "%{$search}%")
+                  ->orWhere('to_location', 'ILIKE', "%{$search}%");
             })
             ->when($request->status, fn($q, $status) => $q->where('status', $status))
             ->orderBy('created_at', 'desc')
@@ -27,8 +27,8 @@ class AssetTransferController extends Controller
             ->withQueryString();
 
         return inertia('Assets/Kewpa6Index', [
-            'transfers' => $transfers,
-            'filters'   => $request->only(['search', 'status']),
+            'records' => $transfers,
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
 

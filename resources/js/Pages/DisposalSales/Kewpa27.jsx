@@ -9,8 +9,9 @@ export default function Kewpa27({ sale }) {
                 <div className="flex items-center justify-between">
                     <h2 className="text-xl font-semibold leading-tight text-gray-800">KEW.PA-27 — Perakuan Pelupusan (Pelupusan)</h2>
                     <div className="flex gap-2">
-                        <Link href={route('disposal-sales.show', sale.id)} className="text-sm text-indigo-600 hover:text-indigo-900">← Back</Link>
-                        <Link href={route('disposal-sales.kewpa27.download', sale.id)} className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Download PDF</Link>
+                        <Link href={route('disposal-sales.index')} className="text-sm text-indigo-600 hover:text-indigo-900">← Senarai Jualan</Link>
+                        <Link href={route('disposal-sales.show', sale.id)} className="text-sm text-indigo-600 hover:text-indigo-900">← Butiran</Link>
+                        <a href={route('disposal-sales.kewpa27.download', sale.id)} className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700">Download PDF</a>
                     </div>
                 </div>
             }

@@ -301,19 +301,19 @@ class AssetController extends Controller
     {
         $placements = AssetPlacement::with('asset')
             ->when($request->search, function ($q, $search) {
-                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('asset_tag', 'like', "%{$search}%"))
-                  ->orWhere('custodian_name', 'like', "%{$search}%")
-                  ->orWhere('location', 'like', "%{$search}%")
-                  ->orWhere('borrower_phone', 'like', "%{$search}%");
+                $q->whereHas('asset', fn($q) => $q->where('name', 'ILIKE', "%{$search}%")
+                    ->orWhere('asset_tag', 'ILIKE', "%{$search}%"))
+                  ->orWhere('custodian_name', 'ILIKE', "%{$search}%")
+                  ->orWhere('location', 'ILIKE', "%{$search}%")
+                  ->orWhere('borrower_phone', 'ILIKE', "%{$search}%");
             })
             ->orderBy('created_at', 'desc')
             ->paginate(20)
             ->withQueryString();
 
         return inertia('Assets/Kewpa9aIndex', [
-            'placements' => $placements,
-            'filters'    => $request->only(['search']),
+            'records' => $placements,
+            'filters' => $request->only(['search']),
         ]);
     }
 

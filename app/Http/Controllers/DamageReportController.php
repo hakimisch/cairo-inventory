@@ -16,10 +16,10 @@ class DamageReportController extends Controller
     {
         $damageReports = DamageReport::with('asset')
             ->when($request->search, function ($q, $search) {
-                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('asset_tag', 'like', "%{$search}%"))
-                  ->orWhere('reported_by', 'like', "%{$search}%")
-                  ->orWhere('damage_description', 'like', "%{$search}%");
+                $q->whereHas('asset', fn($q) => $q->where('name', 'ILIKE', "%{$search}%")
+                    ->orWhere('asset_tag', 'ILIKE', "%{$search}%"))
+                  ->orWhere('reported_by', 'ILIKE', "%{$search}%")
+                  ->orWhere('damage_description', 'ILIKE', "%{$search}%");
             })
             ->when($request->status, fn($q, $status) => $q->where('status', $status))
             ->orderBy('created_at', 'desc')
@@ -27,8 +27,8 @@ class DamageReportController extends Controller
             ->withQueryString();
 
         return inertia('Assets/Kewpa9Index', [
-            'damageReports' => $damageReports,
-            'filters'       => $request->only(['search', 'status']),
+            'records' => $damageReports,
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
 

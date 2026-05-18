@@ -15,11 +15,11 @@ class AssetMaintenanceController extends Controller
     {
         $maintenances = AssetMaintenance::with('asset')
             ->when($request->search, function ($q, $search) {
-                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('asset_tag', 'like', "%{$search}%"))
-                  ->orWhere('company_name', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%")
-                  ->orWhere('contract_no', 'like', "%{$search}%");
+                $q->whereHas('asset', fn($q) => $q->where('name', 'ILIKE', "%{$search}%")
+                    ->orWhere('asset_tag', 'ILIKE', "%{$search}%"))
+                  ->orWhere('company_name', 'ILIKE', "%{$search}%")
+                  ->orWhere('description', 'ILIKE', "%{$search}%")
+                  ->orWhere('contract_no', 'ILIKE', "%{$search}%");
             })
             ->when($request->status, fn($q, $status) => $q->where('status', $status))
             ->orderBy('maintenance_date', 'desc')
@@ -27,8 +27,8 @@ class AssetMaintenanceController extends Controller
             ->withQueryString();
 
         return inertia('Assets/Kewpa13Index', [
-            'maintenances' => $maintenances,
-            'filters'      => $request->only(['search', 'status']),
+            'records' => $maintenances,
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
 

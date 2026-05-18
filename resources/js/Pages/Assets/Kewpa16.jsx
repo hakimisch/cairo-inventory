@@ -50,12 +50,12 @@ export default function Kewpa16({ asset, assessment }) {
                             ← Back to Asset
                         </Link>
                         {assessment?.id && (
-                            <Link
+                            <a
                                 href={route('assets.vehicle-disposal.kewpa16.download', asset.id)}
                                 className="inline-flex items-center px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
                             >
                                 Download PDF
-                            </Link>
+                            </a>
                         )}
                     </div>
                 </div>

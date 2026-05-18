@@ -15,11 +15,11 @@ class AssetLossReportController extends Controller
     {
         $lossReports = AssetLossReport::with('asset')
             ->when($request->search, function ($q, $search) {
-                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('asset_tag', 'like', "%{$search}%"))
-                  ->orWhere('police_report_no', 'like', "%{$search}%")
-                  ->orWhere('incident_location', 'like', "%{$search}%")
-                  ->orWhere('approval_reference', 'like', "%{$search}%");
+                $q->whereHas('asset', fn($q) => $q->where('name', 'ILIKE', "%{$search}%")
+                    ->orWhere('asset_tag', 'ILIKE', "%{$search}%"))
+                  ->orWhere('police_report_no', 'ILIKE', "%{$search}%")
+                  ->orWhere('incident_location', 'ILIKE', "%{$search}%")
+                  ->orWhere('approval_reference', 'ILIKE', "%{$search}%");
             })
             ->when($request->status, fn($q, $status) => $q->where('status', $status))
             ->orderBy('created_at', 'desc')
@@ -27,8 +27,8 @@ class AssetLossReportController extends Controller
             ->withQueryString();
 
         return inertia('Assets/Kewpa28Index', [
-            'lossReports' => $lossReports,
-            'filters'     => $request->only(['search', 'status']),
+            'records' => $lossReports,
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
 

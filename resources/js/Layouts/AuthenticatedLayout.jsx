@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import { Link, usePage } from '@inertiajs/react';
+import { ToastProvider } from '@/Components/Toast';
 
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -363,46 +364,6 @@ export default function AuthenticatedLayout({ header, children }) {
                                 label="Senarai Jualan"
                                 active={isActive('disposal-sales.index', 'disposal-sales.show')}
                             />
-                            <SubNavLink
-                                href={route('disposal-sales.index')}
-                                label="PA-21 Tawaran"
-                                active={isActive('disposal-sales.kewpa21', 'disposal-sales.kewpa21.download')}
-                            />
-                            <SubNavLink
-                                href={route('disposal-sales.index')}
-                                label="PA-22 Sebutharga"
-                                active={isActive('disposal-sales.kewpa22', 'disposal-sales.kewpa22.download')}
-                            />
-                            <SubNavLink
-                                href={route('disposal-sales.index')}
-                                label="PA-23 Lelongan"
-                                active={isActive('disposal-sales.kewpa23', 'disposal-sales.kewpa23.download')}
-                            />
-                            <SubNavLink
-                                href={route('disposal-sales.index')}
-                                label="PA-24 Keputusan"
-                                active={isActive('disposal-sales.kewpa24', 'disposal-sales.kewpa24.download')}
-                            />
-                            <SubNavLink
-                                href={route('disposal-sales.index')}
-                                label="PA-25 Laporan"
-                                active={isActive('disposal-sales.kewpa25', 'disposal-sales.kewpa25.download')}
-                            />
-                            <SubNavLink
-                                href={route('disposal-sales.index')}
-                                label="PA-26 Perakuan (T/S/L)"
-                                active={isActive('disposal-sales.kewpa26', 'disposal-sales.kewpa26.download')}
-                            />
-                            <SubNavLink
-                                href={route('disposal-sales.index')}
-                                label="PA-27 Perakuan (Pelupusan)"
-                                active={isActive('disposal-sales.kewpa27', 'disposal-sales.kewpa27.download')}
-                            />
-                            <SubNavLink
-                                href={route('disposal-sales.index')}
-                                label="PA-27A Perakuan (Lupus)"
-                                active={isActive('disposal-sales.kewpa27a', 'disposal-sales.kewpa27a.download')}
-                            />
                         </NavGroup>
                     </NavSection>
 
@@ -564,7 +525,9 @@ export default function AuthenticatedLayout({ header, children }) {
                 </header>
 
                 <main style={{ flex: 1, overflowY: 'auto', background: UTM.gray50 }}>
-                    {children}
+                    <ToastProvider>
+                        {children}
+                    </ToastProvider>
                 </main>
             </div>
         </div>

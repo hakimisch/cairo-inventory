@@ -181,7 +181,8 @@ export default function Kewpa28Index({ records, filters }) {
                     border       : `1px solid ${UTM.gray100}`,
                     overflow     : 'hidden',
                 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <div style={{ overflowX: 'auto', width: '100%' }}>
+<table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse' }}>
                         <thead>
                             <tr style={{ background: UTM.gray50 }}>
                                 <th style={thStyle}>Aset</th>
@@ -201,10 +202,13 @@ export default function Kewpa28Index({ records, filters }) {
                                         Tiada rekod kehilangan aset.
                                     </td>
                                 </tr>
-                            ) : records.data.map((record) => (
-                                <tr key={record.id} style={{ transition: 'background 0.15s' }}
-                                    onMouseEnter={e => e.currentTarget.style.background = UTM.gray50}
-                                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+) : records.data.map((record, idx) => (
+                                                <tr key={record.id} style={{
+                                                    background: idx % 2 === 0 ? UTM.white : UTM.gray50,
+                                                    transition: 'background 0.12s',
+                                                }}
+                                                    onMouseEnter={e => { e.currentTarget.style.background = '#FFF5E8'; }}
+                                                    onMouseLeave={e => { e.currentTarget.style.background = idx % 2 === 0 ? UTM.white : UTM.gray50; }}
                                 >
                                     <td style={tdStyle}>
                                         <Link href={route('assets.kewpa3', record.asset_id)}
@@ -224,25 +228,40 @@ export default function Kewpa28Index({ records, filters }) {
                                     <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                                         {record.created_at ? new Date(record.created_at).toLocaleDateString('ms-MY') : '—'}
                                     </td>
-                                    <td style={tdStyle}>
+                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                                        <Link href={route('assets.kewpa2', record.asset_id)}
+                                            style={{
+                                                display       : 'inline-block',
+                                                padding       : '5px 12px',
+                                                borderRadius  : 6,
+                                                fontSize      : '11px',
+                                                fontWeight    : 600,
+                                                background    : '#EDE9E4',
+                                                color         : UTM.gray700,
+                                                textDecoration: 'none',
+                                                marginRight   : 6,
+                                            }}>
+                                            Borang
+                                        </Link>
                                         <a href={route('assets.loss-reports.kewpa28.download', record.asset_id)}
                                             style={{
-                                                padding      : '5px 12px',
-                                                borderRadius : 6,
-                                                border       : `1px solid ${UTM.gray100}`,
-                                                fontSize     : '11px',
-                                                fontWeight   : 600,
-                                                color        : UTM.gray700,
+                                                display       : 'inline-block',
+                                                padding       : '5px 12px',
+                                                borderRadius  : 6,
+                                                fontSize      : '11px',
+                                                fontWeight    : 600,
+                                                background    : UTM.maroon,
+                                                color         : UTM.white,
                                                 textDecoration: 'none',
-                                                whiteSpace   : 'nowrap',
                                             }}>
-                                            PDF ↓
+                                            KEW.PA-28
                                         </a>
                                     </td>
                                 </tr>
                             ))}
                         </tbody>
                     </table>
+</div>
                 </div>
 
                 {/* ── Pagination ─────────────────────────────────────────── */}

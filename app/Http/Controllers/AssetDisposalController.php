@@ -15,10 +15,10 @@ class AssetDisposalController extends Controller
     {
         $disposals = AssetDisposal::with('asset')
             ->when($request->search, function ($q, $search) {
-                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('asset_tag', 'like', "%{$search}%"))
-                  ->orWhere('approval_reference', 'like', "%{$search}%")
-                  ->orWhere('disposal_method', 'like', "%{$search}%");
+                $q->whereHas('asset', fn($q) => $q->where('name', 'ILIKE', "%{$search}%")
+                    ->orWhere('asset_tag', 'ILIKE', "%{$search}%"))
+                  ->orWhere('approval_reference', 'ILIKE', "%{$search}%")
+                  ->orWhere('disposal_method', 'ILIKE', "%{$search}%");
             })
             ->when($request->status, fn($q, $status) => $q->where('status', $status))
             ->orderBy('created_at', 'desc')
@@ -26,8 +26,8 @@ class AssetDisposalController extends Controller
             ->withQueryString();
 
         return inertia('Assets/Kewpa17Index', [
-            'disposals' => $disposals,
-            'filters'   => $request->only(['search', 'status']),
+            'records' => $disposals,
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
 

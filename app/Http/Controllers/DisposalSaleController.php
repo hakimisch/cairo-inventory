@@ -16,13 +16,27 @@ class DisposalSaleController extends Controller
     {
         $sales = DisposalSale::with('assetDisposal.asset')
             ->when($request->sale_type, fn($q, $v) => $q->where('sale_type', $v))
+            ->when($request->search, fn($q, $v) => $q->where(function($q) use ($v) {
+                $q->where('sale_reference', 'ILIKE', "%{$v}%")
+                  ->orWhere('sale_officer', 'ILIKE', "%{$v}%")
+                  ->orWhere('sale_location', 'ILIKE', "%{$v}%");
+            }))
             ->when($request->status, fn($q, $v) => $q->where('status', $v))
             ->orderBy('created_at', 'desc')
-            ->paginate(20);
+            ->paginate(20)
+            ->withQueryString();
+
+        $typeCounts = [
+            'total'      => DisposalSale::count(),
+            'Tawaran'    => DisposalSale::where('sale_type', 'Tawaran')->count(),
+            'Sebutharga' => DisposalSale::where('sale_type', 'Sebutharga')->count(),
+            'Lelongan'   => DisposalSale::where('sale_type', 'Lelongan')->count(),
+        ];
 
         return inertia('DisposalSales/Index', [
             'sales' => $sales,
-            'filters' => $request->only(['sale_type', 'status']),
+            'filters' => $request->only(['sale_type', 'search', 'status']),
+            'typeCounts' => $typeCounts,
         ]);
     }
 

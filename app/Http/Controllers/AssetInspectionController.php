@@ -15,10 +15,10 @@ class AssetInspectionController extends Controller
     {
         $inspections = AssetInspection::with('asset')
             ->when($request->search, function ($q, $search) {
-                $q->whereHas('asset', fn($q) => $q->where('name', 'like', "%{$search}%")
-                    ->orWhere('asset_tag', 'like', "%{$search}%"))
-                  ->orWhere('inspector_name', 'like', "%{$search}%")
-                  ->orWhere('notes', 'like', "%{$search}%");
+                $q->whereHas('asset', fn($q) => $q->where('name', 'ILIKE', "%{$search}%")
+                    ->orWhere('asset_tag', 'ILIKE', "%{$search}%"))
+                  ->orWhere('inspector_name', 'ILIKE', "%{$search}%")
+                  ->orWhere('notes', 'ILIKE', "%{$search}%");
             })
             ->when($request->status, fn($q, $status) => $q->where('status', $status))
             ->orderBy('inspection_date', 'desc')
@@ -26,8 +26,8 @@ class AssetInspectionController extends Controller
             ->withQueryString();
 
         return inertia('Assets/Kewpa10Index', [
-            'inspections' => $inspections,
-            'filters'     => $request->only(['search', 'status']),
+            'records' => $inspections,
+            'filters' => $request->only(['search', 'status']),
         ]);
     }
 
