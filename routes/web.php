@@ -23,6 +23,8 @@ use App\Http\Controllers\DisposalSaleController;
 use App\Http\Controllers\DisposalSaleItemController;
 use App\Http\Controllers\SaleBidController;
 
+use App\Http\Controllers\KewpaDirectoryController;
+
 Route::get('/', function () {
     return Inertia::render('Welcome', [
         'canLogin' => Route::has('login'),
@@ -33,18 +35,13 @@ Route::get('/', function () {
 });
 
 // ─── Admin Group ───
-Route::middleware(['auth', 'verified'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
     
     // Admin Dashboard: /admin/dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     
     // Admin Users
     Route::resource('users', AdminUserController::class)->except(['create', 'show', 'edit']);
-});
-
-// ── Admin dashboard ───────────────────────────────────────────────────────────
-Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
-    Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
 });
  
 // ── Annual report forms (admin-only) ─────────────────────────────────────────
@@ -80,6 +77,11 @@ Route::middleware(['auth', 'verified', 'admin'])->prefix('reports')->name('repor
 Route::get('/dashboard', [DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
+
+// ─── KEW.PA Form Directory ───
+Route::get('/kewpa', [KewpaDirectoryController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('kewpa.directory');
 
 // Asset Management Group (Protected)
 Route::middleware(['auth', 'verified'])->group(function () {

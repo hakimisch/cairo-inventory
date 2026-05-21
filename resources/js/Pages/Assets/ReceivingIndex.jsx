@@ -63,6 +63,129 @@ const labelStyle = {
     marginBottom : 5,
 };
 
+// ── Inline Create Form ────────────────────────────────────────────────────────
+
+function CreateReceivingForm({ onDone }) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        supplier_name:      '',
+        supplier_address:   '',
+        purchase_order_no:  '',
+        delivery_order_no:  '',
+        invoice_no:         '',
+        item_description:   '',
+        quantity_ordered:   '1',
+        quantity_received:  '1',
+        unit_price:         '',
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        post(route('receivings.store'), {
+            preserveScroll: true,
+            onSuccess: () => {
+                reset();
+                onDone();
+            },
+        });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} style={{
+            background: '#FFF5E8', borderRadius: 12,
+            border: `1.5px solid ${UTM.gold}`,
+            padding: 20, marginBottom: 20,
+        }}>
+            <p style={{ fontSize: 14, fontWeight: 800, color: UTM.maroon, marginBottom: 16 }}>
+                📝 Daftar Penerimaan Baru
+            </p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                    <label style={labelStyle}>Nama Pembekal *</label>
+                    <input type="text" style={inputStyle} value={data.supplier_name}
+                        onChange={e => setData('supplier_name', e.target.value)} required />
+                    {errors.supplier_name && <p style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>{errors.supplier_name}</p>}
+                </div>
+                <div>
+                    <label style={labelStyle}>No. Pesanan (PO) *</label>
+                    <input type="text" style={inputStyle} value={data.purchase_order_no}
+                        onChange={e => setData('purchase_order_no', e.target.value)} required />
+                    {errors.purchase_order_no && <p style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>{errors.purchase_order_no}</p>}
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                    <label style={labelStyle}>Alamat Pembekal *</label>
+                    <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} value={data.supplier_address}
+                        onChange={e => setData('supplier_address', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>Butiran Item *</label>
+                    <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} value={data.item_description}
+                        onChange={e => setData('item_description', e.target.value)} required />
+                    {errors.item_description && <p style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>{errors.item_description}</p>}
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 12, marginBottom: 12 }}>
+                <div>
+                    <label style={labelStyle}>No. DO *</label>
+                    <input type="text" style={inputStyle} value={data.delivery_order_no}
+                        onChange={e => setData('delivery_order_no', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>No. Invois *</label>
+                    <input type="text" style={inputStyle} value={data.invoice_no}
+                        onChange={e => setData('invoice_no', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>Kuantiti Dipesan *</label>
+                    <input type="number" min="1" style={inputStyle} value={data.quantity_ordered}
+                        onChange={e => setData('quantity_ordered', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>Kuantiti Diterima *</label>
+                    <input type="number" min="1" style={inputStyle} value={data.quantity_received}
+                        onChange={e => setData('quantity_received', e.target.value)} required />
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                <div>
+                    <label style={labelStyle}>Harga Seunit (RM) *</label>
+                    <input type="number" step="0.01" min="0" style={inputStyle} value={data.unit_price}
+                        onChange={e => setData('unit_price', e.target.value)} required />
+                    {errors.unit_price && <p style={{ color: '#DC2626', fontSize: 11, marginTop: 3 }}>{errors.unit_price}</p>}
+                </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={processing}
+                    style={{
+                        padding: '8px 22px', borderRadius: 6, border: 'none',
+                        background: processing ? UTM.gray200 : UTM.maroon,
+                        color: UTM.white, fontSize: 12, fontWeight: 700,
+                        cursor: processing ? 'not-allowed' : 'pointer',
+                        opacity: processing ? 0.7 : 1,
+                        boxShadow: processing ? 'none' : '0 2px 6px rgba(92,0,31,0.2)',
+                    }}>
+                    {processing ? 'Menyimpan...' : 'Simpan'}
+                </button>
+                <button type="button" onClick={() => { reset(); onDone(); }}
+                    style={{
+                        padding: '8px 16px', borderRadius: 6,
+                        border: `1.5px solid ${UTM.gray100}`,
+                        background: UTM.white, color: UTM.gray600,
+                        fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                    }}>
+                    Batal
+                </button>
+            </div>
+        </form>
+    );
+}
+
 // ── Inline Edit Form ─────────────────────────────────────────────────────────
 
 function EditReceivingForm({ record, onDone }) {
@@ -160,6 +283,7 @@ export default function ReceivingIndex({ receivings }) {
     const [selectedItem, setSelectedItem] = useState(null);
     const [expandedId, setExpandedId]     = useState(null);
     const [editingId, setEditingId]       = useState(null);
+    const [showCreate, setShowCreate]     = useState(false);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         unit_price : '',
@@ -218,22 +342,24 @@ export default function ReceivingIndex({ receivings }) {
                             Pengurusan Penerimaan (KEW.PA-1)
                         </h2>
                     </div>
-                    <Link
-                        href={route('receivings.create')}
+                    <button
+                        onClick={() => setShowCreate(!showCreate)}
                         style={{
-                            background    : UTM.maroon,
-                            color         : UTM.white,
+                            background    : showCreate ? UTM.gray100 : UTM.maroon,
+                            color         : showCreate ? UTM.gray700 : UTM.white,
                             padding       : '9px 18px',
                             borderRadius  : 8,
                             fontSize      : '13px',
                             fontWeight    : 700,
-                            textDecoration: 'none',
-                            boxShadow     : '0 2px 6px rgba(92,0,31,0.2)',
+                            border        : showCreate ? `1.5px solid ${UTM.gray200}` : 'none',
+                            cursor        : 'pointer',
+                            boxShadow     : showCreate ? 'none' : '0 2px 6px rgba(92,0,31,0.2)',
                             whiteSpace    : 'nowrap',
+                            transition    : 'all 0.12s',
                         }}
                     >
-                        + Daftar Penerimaan Baru
-                    </Link>
+                        {showCreate ? '✕ Batal' : '+ Daftar Penerimaan Baru'}
+                    </button>
                 </div>
             }
         >
@@ -241,6 +367,11 @@ export default function ReceivingIndex({ receivings }) {
 
             <div style={{ background: UTM.gray50, minHeight: '100vh', padding: '28px 24px' }}>
                 <div style={{ maxWidth: 1280, margin: '0 auto' }}>
+
+                    {/* ── Inline Create Form ── */}
+                    {showCreate && (
+                        <CreateReceivingForm onDone={() => setShowCreate(false)} />
+                    )}
 
                     {/* ── Table Container (Scrollable) ── */}
                     <div style={{ background: UTM.white, borderRadius: 12,

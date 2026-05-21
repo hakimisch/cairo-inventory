@@ -229,6 +229,12 @@ export default function AuthenticatedLayout({ header, children }) {
                        UTAMA
                        ═══════════════════════════════════════════════════════ */}
                     <NavSection label="Utama">
+                        <NavLink
+                            href={route('kewpa.directory')}
+                            icon="📋"
+                            label="Direktori KEW.PA"
+                            active={route().current('kewpa.directory')}
+                        />
                         {user.role === 'admin' ? (
                             <NavLink
                                 href={route('admin.dashboard')}
@@ -376,6 +382,12 @@ export default function AuthenticatedLayout({ header, children }) {
                             icon="⚠️"
                             label="PA-28→32 Kehilangan"
                             active={isActive('loss-reports.index', 'assets.loss-reports.*')}
+                        />
+                        <NavLink
+                            href={route('committee-appointments.index')}
+                            icon="👥"
+                            label="PA-15/29 Pelantikan Jawatankuasa"
+                            active={isActive('committee-appointments.index', 'committee-appointments.*')}
                         />
                     </NavSection>
 

@@ -2,7 +2,12 @@
 .ebextensions
 .platform
 .DS_Store
-.env
+# Puppeteer / Chromium binaries
+/storage/puppeteer/
+/node_modules/.cache/puppeteer/
+
+# Environment
+/.env
 .env.example
 .env.backup
 .env.production

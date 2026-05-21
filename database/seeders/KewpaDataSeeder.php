@@ -9,9 +9,13 @@ use App\Models\AssetLossReport;
 use App\Models\AssetMaintenance;
 use App\Models\AssetPlacement;
 use App\Models\AssetTransfer;
+use App\Models\AssetUpgrade;
+use App\Models\CommitteeAppointment;
 use App\Models\DamageReport;
 use App\Models\DisposalSale;
+use App\Models\DisposalSaleItem;
 use App\Models\Receiving;
+use App\Models\SaleBid;
 use App\Models\User;
 use App\Models\VehicleDisposalAssessment;
 use Carbon\Carbon;
@@ -251,5 +255,100 @@ class KewpaDataSeeder extends Seeder
         }
 
         $this->command->info('✓ KewpaDataSeeder: 10+ records seeded for each KEWPA module.');
+
+        // ═══════════════════════════════════════════════════════════════════════
+        // PHASE 2: Previously-empty tables
+        // ═══════════════════════════════════════════════════════════════════════
+
+        // ─── 11. Asset Upgrades — 1 per existing asset ────────────────────────
+        $upgradeDesc     = ['Tambah RAM 16GB', 'Naik taraf SSD 512GB', 'Ganti bateri', 'Tambah storan HDD 1TB', 'Naik taraf OS', 'Ganti skrin LCD', 'Tambah GPU', 'Naik taraf CPU', 'Ganti papan kekunci', 'Tambah modul WiFi'];
+        $warrantyOptions = ['1 tahun', '2 tahun', '3 tahun', '6 bulan', '12 bulan'];
+        foreach ($assets as $i => $asset) {
+            AssetUpgrade::create([
+                'asset_id'       => $asset->id,
+                'date'           => Carbon::now()->subDays(rand(30, 365)),
+                'description'    => $upgradeDesc[$i % count($upgradeDesc)],
+                'warranty_period'=> $warrantyOptions[array_rand($warrantyOptions)],
+                'cost'           => fake()->randomFloat(2, 100, 3000),
+            ]);
+        }
+
+        // ─── 12. Disposal Sale Items — 2–3 items per sale ─────────────────────
+        $sales           = DisposalSale::whereIn('status', ['open', 'closed', 'draft'])->get();
+        $itemStatuses    = ['available', 'sold', 'unsold', 'withdrawn'];
+        foreach ($sales as $sale) {
+            $itemCount = rand(2, 3);
+            for ($j = 0; $j < $itemCount; $j++) {
+                $assetForItem = $assets->random();
+                DisposalSaleItem::create([
+                    'disposal_sale_id' => $sale->id,
+                    'asset_id'         => $assetForItem->id,
+                    'item_description' => fake()->sentence(4),
+                    'quantity'         => rand(1, 5),
+                    'reserve_price'    => fake()->randomFloat(2, 50, 5000),
+                    'estimated_value'  => fake()->randomFloat(2, 100, 8000),
+                    'lot_number'       => 'LOT-' . strtoupper(fake()->bothify('??###')),
+                    'status'           => $itemStatuses[array_rand($itemStatuses)],
+                    'notes'            => fake()->optional(0.4)->sentence(3),
+                ]);
+            }
+        }
+
+        // ─── 13. Sale Bids — 1–2 bids per sale item ───────────────────────────
+        $saleItems       = DisposalSaleItem::all();
+        $bidStatuses     = ['pending', 'accepted', 'rejected', 'paid', 'completed'];
+        $bidNames        = ['Ahmad Faizal', 'Siti Nurhaliza', 'Mohd Kamal', 'Norazlin Rahim', 'Tan Wei Ming', 'Rajesh Kumar', 'Lim Siew Ling', 'Abdul Rahman'];
+        foreach ($saleItems as $item) {
+            $bidPerItem = rand(1, 2);
+            for ($k = 0; $k < $bidPerItem; $k++) {
+                $isWinner = ($k === 0 && $bidPerItem === 1); // winner if only 1 bid
+                SaleBid::create([
+                    'disposal_sale_item_id' => $item->id,
+                    'bidder_name'           => $bidNames[array_rand($bidNames)],
+                    'bidder_ic'             => fake()->numerify('########-##-####'),
+                    'bidder_phone'          => '01' . rand(10000000, 99999999),
+                    'bidder_address'        => fake()->address(),
+                    'bid_amount'            => $item->reserve_price + fake()->randomFloat(2, 10, 2000),
+                    'bid_date'              => Carbon::now()->subDays(rand(1, 30)),
+                    'deposit_paid'          => (bool) rand(0, 1),
+                    'deposit_amount'        => fake()->randomFloat(2, 50, 500),
+                    'is_winner'             => $isWinner,
+                    'award_date'            => $isWinner ? Carbon::now()->subDays(rand(1, 14)) : null,
+                    'payment_date'          => $isWinner && rand(0, 1) ? Carbon::now()->subDays(rand(1, 7)) : null,
+                    'payment_received'      => $isWinner && rand(0, 1),
+                    'status'                => $bidStatuses[array_rand($bidStatuses)],
+                    'notes'                 => fake()->optional(0.3)->sentence(3),
+                ]);
+            }
+        }
+
+        // ─── 14. Committee Appointments — 2–3 per disposal (PA-15) ─────────────
+        $disposals       = AssetDisposal::whereIn('status', ['committee_review', 'approved', 'completed'])->get();
+        $committeeRoles  = ['chairman', 'member', 'secretary', 'member', 'member'];
+        foreach ($disposals as $disposal) {
+            $memberCount = rand(2, 3);
+            for ($m = 0; $m < $memberCount; $m++) {
+                $appointUser = ($m === 0) ? $admin : $staff; // chairman = admin
+                // Vary users to avoid duplicate user+disposal constraint if any
+                if ($m > 0) {
+                    $appointUser = User::inRandomOrder()->first() ?? $staff;
+                }
+                CommitteeAppointment::create([
+                    'user_id'          => $appointUser->id,
+                    'appointable_type' => AssetDisposal::class,
+                    'appointable_id'   => $disposal->id,
+                    'role'             => $committeeRoles[$m % count($committeeRoles)],
+                    'valid_from'       => Carbon::now()->subDays(rand(30, 90)),
+                    'valid_until'      => Carbon::now()->addDays(rand(30, 180)),
+                    'notes'            => fake()->optional(0.5)->sentence(4),
+                ]);
+            }
+        }
+
+        $this->command->info('✓ Phase 2 seeded: ' .
+            AssetUpgrade::count() . ' upgrades, ' .
+            DisposalSaleItem::count() . ' sale items, ' .
+            SaleBid::count() . ' bids, ' .
+            CommitteeAppointment::count() . ' committee appointments.');
     }
 }
