@@ -28,6 +28,7 @@ class AssetInspectionController extends Controller
         return inertia('Assets/Kewpa10Index', [
             'records' => $inspections,
             'filters' => $request->only(['search', 'status']),
+            'assets'  => Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
         ]);
     }
 
@@ -36,14 +37,41 @@ class AssetInspectionController extends Controller
         $validated = $request->validate([
             'inspection_date' => 'required|date',
             'status'          => 'required|string|max:255',
+            'inspector_name'  => 'nullable|string|max:255',
             'notes'           => 'nullable|string',
         ]);
 
-        // Automatically assign the logged-in user as the inspector
-        $validated['inspector_name'] = $request->user()->name;
+        $validated['inspector_name'] ??= $request->user()->name;
 
         $asset->inspections()->create($validated);
 
         return redirect()->back()->with('success', 'Rekod pemeriksaan berjaya ditambah.');
+    }
+
+    /**
+     * Update the specified inspection.
+     */
+    public function update(Request $request, Asset $asset, AssetInspection $inspection)
+    {
+        $validated = $request->validate([
+            'inspection_date' => 'required|date',
+            'status'          => 'required|string|max:255',
+            'inspector_name'  => 'nullable|string|max:255',
+            'notes'           => 'nullable|string',
+        ]);
+
+        $inspection->update($validated);
+
+        return redirect()->back()->with('success', 'Rekod pemeriksaan berjaya dikemaskini.');
+    }
+
+    /**
+     * Remove the specified inspection.
+     */
+    public function destroy(Asset $asset, AssetInspection $inspection)
+    {
+        $inspection->delete();
+
+        return redirect()->back()->with('success', 'Rekod pemeriksaan berjaya dipadam.');
     }
 }

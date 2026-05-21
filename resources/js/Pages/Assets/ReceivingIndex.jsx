@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, useForm } from '@inertiajs/react';
- 
+import { Head, Link, router, useForm } from '@inertiajs/react';
+
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
     maroon : '#5C001F',
@@ -11,11 +11,12 @@ const UTM = {
     white  : '#FFFFFF',
     gray50 : '#F9F7F5',
     gray100: '#EDE9E4',
+    gray200: '#D6D0C8',
     gray500: '#8A8480',
     gray700: '#4A4540',
     gray900: '#1E1B18',
 };
- 
+
 function StatusBadge({ status }) {
     const map = {
         pending : { bg: '#FEF3D6', color: UTM.goldDark, border: '#F5D890', label: 'Menunggu' },
@@ -39,7 +40,7 @@ function StatusBadge({ status }) {
         </span>
     );
 }
- 
+
 const inputStyle = {
     width       : '100%',
     padding     : '9px 12px',
@@ -51,7 +52,7 @@ const inputStyle = {
     outline     : 'none',
     boxSizing   : 'border-box',
 };
- 
+
 const labelStyle = {
     display      : 'block',
     fontSize     : '11px',
@@ -61,11 +62,105 @@ const labelStyle = {
     color        : UTM.gray500,
     marginBottom : 5,
 };
- 
+
+// ── Inline Edit Form ─────────────────────────────────────────────────────────
+
+function EditReceivingForm({ record, onDone }) {
+    const { data, setData, put, processing, errors } = useForm({
+        supplier_name:      record.supplier_name ?? '',
+        supplier_address:   record.supplier_address ?? '',
+        purchase_order_no:  record.purchase_order_no ?? '',
+        delivery_order_no:  record.delivery_order_no ?? '',
+        invoice_no:         record.invoice_no ?? '',
+        item_description:   record.item_description ?? '',
+        quantity_ordered:   String(record.quantity_ordered ?? ''),
+        quantity_received:  String(record.quantity_received ?? ''),
+        unit_price:         String(record.unit_price ?? ''),
+        notes:              record.notes ?? '',
+        damage_description: record.damage_description ?? '',
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        put(route('receivings.update', record.id), {
+            preserveScroll: true,
+            onSuccess: () => onDone(),
+        });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} style={{ padding: 16, background: '#FEF3C7', borderRadius: 8, border: `1px solid #FDE68A`, marginBottom: 8 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#92400E', marginBottom: 12 }}>Edit Penerimaan — {record.receive_no}</p>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div>
+                    <label style={labelStyle}>Nama Pembekal *</label>
+                    <input type="text" style={inputStyle} value={data.supplier_name} onChange={e => setData('supplier_name', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>No. PO *</label>
+                    <input type="text" style={inputStyle} value={data.purchase_order_no} onChange={e => setData('purchase_order_no', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>No. DO *</label>
+                    <input type="text" style={inputStyle} value={data.delivery_order_no} onChange={e => setData('delivery_order_no', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>No. Invois *</label>
+                    <input type="text" style={inputStyle} value={data.invoice_no} onChange={e => setData('invoice_no', e.target.value)} required />
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div>
+                    <label style={labelStyle}>Alamat Pembekal *</label>
+                    <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} value={data.supplier_address} onChange={e => setData('supplier_address', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>Butiran Item *</label>
+                    <textarea style={{ ...inputStyle, resize: 'vertical', minHeight: 60 }} value={data.item_description} onChange={e => setData('item_description', e.target.value)} required />
+                </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <div>
+                    <label style={labelStyle}>Kuantiti Dipesan *</label>
+                    <input type="number" min="1" style={inputStyle} value={data.quantity_ordered} onChange={e => setData('quantity_ordered', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>Kuantiti Diterima *</label>
+                    <input type="number" min="1" style={inputStyle} value={data.quantity_received} onChange={e => setData('quantity_received', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>Harga Seunit (RM) *</label>
+                    <input type="number" step="0.01" min="0" style={inputStyle} value={data.unit_price} onChange={e => setData('unit_price', e.target.value)} required />
+                </div>
+                <div>
+                    <label style={labelStyle}>Catatan</label>
+                    <input type="text" style={inputStyle} value={data.notes} onChange={e => setData('notes', e.target.value)} placeholder="Catatan (pilihan)..." />
+                </div>
+            </div>
+
+            <div style={{ marginBottom: 10 }}>
+                <label style={labelStyle}>Kerosakan (jika ada)</label>
+                <input type="text" style={inputStyle} value={data.damage_description} onChange={e => setData('damage_description', e.target.value)} placeholder="Huraian kerosakan (pilihan)..." />
+            </div>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={processing} style={{ padding: '7px 20px', borderRadius: 6, border: 'none', background: '#92400E', color: UTM.white, fontSize: 12, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer', opacity: processing ? 0.7 : 1 }}>{processing ? 'Menyimpan...' : 'Simpan'}</button>
+                <button type="button" onClick={onDone} style={{ padding: '7px 16px', borderRadius: 6, border: `1.5px solid ${UTM.gray100}`, background: UTM.white, color: UTM.gray600, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Batal</button>
+            </div>
+        </form>
+    );
+}
+
+// ── Main Page ────────────────────────────────────────────────────────────────
+
 export default function ReceivingIndex({ receivings }) {
     const [selectedItem, setSelectedItem] = useState(null);
-    const [expandedId, setExpandedId]     = useState(null); // State for expandable details row
- 
+    const [expandedId, setExpandedId]     = useState(null);
+    const [editingId, setEditingId]       = useState(null);
+
     const { data, setData, post, processing, errors, reset } = useForm({
         unit_price : '',
         category   : '',
@@ -81,19 +176,25 @@ export default function ReceivingIndex({ receivings }) {
         saga_id         : '',
         budget_vot      : '',
     });
- 
+
     const handleAcceptClick = (item) => {
         setSelectedItem(item);
         reset();
     };
- 
+
     const handleAcceptSubmit = (e) => {
         e.preventDefault();
         post(route('receivings.accept', selectedItem.id), {
             onSuccess: () => setSelectedItem(null),
         });
     };
- 
+
+    const handleDelete = (item) => {
+        if (window.confirm(`Padam penerimaan ${item.receive_no} (${item.supplier_name})? Tindakan ini tidak boleh dibatalkan.`)) {
+            router.delete(route('receivings.destroy', item.id), { preserveScroll: true });
+        }
+    };
+
     const thStyle = {
         padding      : '12px 20px',
         fontSize     : '11px',
@@ -106,7 +207,7 @@ export default function ReceivingIndex({ receivings }) {
         background   : UTM.gray50,
         whiteSpace   : 'nowrap',
     };
- 
+
     return (
         <AuthenticatedLayout
             header={
@@ -137,10 +238,10 @@ export default function ReceivingIndex({ receivings }) {
             }
         >
             <Head title="Senarai Penerimaan" />
- 
+
             <div style={{ background: UTM.gray50, minHeight: '100vh', padding: '28px 24px' }}>
                 <div style={{ maxWidth: 1280, margin: '0 auto' }}>
- 
+
                     {/* ── Table Container (Scrollable) ── */}
                     <div style={{ background: UTM.white, borderRadius: 12,
                                   boxShadow: '0 1px 4px rgba(92,0,31,0.07)', overflow: 'hidden' }}>
@@ -195,7 +296,7 @@ export default function ReceivingIndex({ receivings }) {
                                                 <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                                     {/* Expand Details Button */}
                                                     <button
-                                                        onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
+                                                        onClick={() => { setExpandedId(expandedId === item.id ? null : item.id); if (editingId === item.id) setEditingId(null); }}
                                                         style={{
                                                             display     : 'inline-block',
                                                             padding     : '5px 12px',
@@ -229,7 +330,7 @@ export default function ReceivingIndex({ receivings }) {
                                                     >
                                                         KEW.PA-1
                                                     </Link>
-    
+
                                                     {item.status === 'pending' && (
                                                         <>
                                                             <button
@@ -261,17 +362,61 @@ export default function ReceivingIndex({ receivings }) {
                                                                     color       : UTM.maroon,
                                                                     border      : 'none',
                                                                     cursor      : 'pointer',
+                                                                    marginRight : 8,
                                                                 }}
                                                            >
                                                                 Tolak
                                                             </Link>
+                                                            <button
+                                                                onClick={() => { setEditingId(editingId === item.id ? null : item.id); if (expandedId === item.id) setExpandedId(null); }}
+                                                                style={{
+                                                                    padding     : '5px 12px',
+                                                                    borderRadius: 6,
+                                                                    fontSize    : '12px',
+                                                                    fontWeight  : 700,
+                                                                    background  : editingId === item.id ? '#FDE68A' : '#E6F4EC',
+                                                                    color       : editingId === item.id ? '#92400E' : '#065F46',
+                                                                    border      : 'none',
+                                                                    cursor      : 'pointer',
+                                                                    marginRight : 8,
+                                                                }}
+                                                            >
+                                                                {editingId === item.id ? 'Batal' : 'Edit'}
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleDelete(item)}
+                                                                style={{
+                                                                    padding     : '5px 12px',
+                                                                    borderRadius: 6,
+                                                                    fontSize    : '12px',
+                                                                    fontWeight  : 700,
+                                                                    background  : '#FEE2E2',
+                                                                    color       : '#991B1B',
+                                                                    border      : 'none',
+                                                                    cursor      : 'pointer',
+                                                                }}
+                                                            >
+                                                                Hapus
+                                                            </button>
                                                         </>
                                                     )}
                                                 </td>
                                             </tr>
 
+                                            {/* ── Edit Form Row ── */}
+                                            {editingId === item.id && (
+                                                <tr style={{ background: '#FFFBEB' }}>
+                                                    <td colSpan={7} style={{ padding: 0 }}>
+                                                        <EditReceivingForm
+                                                            record={item}
+                                                            onDone={() => setEditingId(null)}
+                                                        />
+                                                    </td>
+                                                </tr>
+                                            )}
+
                                             {/* ── Collapsible Expandable Row ── */}
-                                            {expandedId === item.id && (
+                                            {expandedId === item.id && editingId !== item.id && (
                                                 <tr style={{ background: '#FAFAFA', borderBottom: `2px solid ${UTM.gray100}` }}>
                                                     <td colSpan={7} style={{ padding: 0 }}>
                                                         <div style={{ 
@@ -347,16 +492,16 @@ export default function ReceivingIndex({ receivings }) {
                                 </tbody>
                             </table>
                         </div>
- 
+
                         <div style={{ padding: '12px 20px', borderTop: `1px solid ${UTM.gray100}`,
                                       background: UTM.gray50, fontSize: '12px', color: UTM.gray500 }}>
                             <strong style={{ color: UTM.maroon }}>{receivings.length}</strong> rekod penerimaan
                         </div>
                     </div>
- 
+
                 </div>
             </div>
- 
+
             {/* ── Acceptance modal ── */}
             {selectedItem && (
                 <div style={{
@@ -386,7 +531,7 @@ export default function ReceivingIndex({ receivings }) {
                                 {selectedItem.item_description}
                             </p>
                         </div>
- 
+
                         {/* Modal body */}
                         <form onSubmit={handleAcceptSubmit} style={{ padding: '24px', maxHeight: '80vh', overflowY: 'auto' }}>
                             <p style={{ fontSize: '12px', color: UTM.gray500, marginBottom: 20 }}>
@@ -521,7 +666,7 @@ export default function ReceivingIndex({ receivings }) {
                             <div style={{ marginBottom: 20 }}>
                                 <label style={labelStyle}>Gambar Aset (Pilihan)</label>
                                 <div style={{
-                                    border: `1.5px dashed ${UTM.gray300}`,
+                                    border: `1.5px dashed ${UTM.gray200}`,
                                     borderRadius: 8,
                                     padding: '12px',
                                     background: UTM.white,
@@ -610,7 +755,7 @@ export default function ReceivingIndex({ receivings }) {
                                         borderRadius: 8,
                                         fontSize    : '13px',
                                         fontWeight  : 700,
-                                        background  : processing ? UTM.gray300 : UTM.maroon,
+                                        background  : processing ? UTM.gray200 : UTM.maroon,
                                         color       : UTM.white,
                                         border      : 'none',
                                         cursor      : processing ? 'not-allowed' : 'pointer',

@@ -3,10 +3,36 @@
 namespace App\Http\Controllers;
 
 use App\Models\CommitteeAppointment;
+use App\Models\User;
 use Illuminate\Http\Request;
 
 class CommitteeAppointmentController extends Controller
 {
+    /**
+     * Display a paginated list of committee appointments.
+     */
+    public function index(Request $request)
+    {
+        $appointments = CommitteeAppointment::with(['user', 'appointable'])
+            ->when($request->search, fn($q, $v) => $q->where(function($q) use ($v) {
+                $q->where('role', 'ILIKE', "%{$v}%")
+                  ->orWhereHas('user', fn($uq) => $uq->where('name', 'ILIKE', "%{$v}%"));
+            }))
+            ->orderBy('created_at', 'desc')
+            ->paginate(20)
+            ->withQueryString();
+
+        $users = User::select('id', 'name', 'email')
+            ->orderBy('name')
+            ->get();
+
+        return inertia('CommitteeAppointments/Index', [
+            'appointments' => $appointments,
+            'filters'      => $request->only(['search']),
+            'users'        => $users,
+        ]);
+    }
+
     /**
      * Store a new committee appointment (PA-15/29).
      */

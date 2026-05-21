@@ -28,6 +28,7 @@ class AssetDisposalController extends Controller
         return inertia('Assets/Kewpa17Index', [
             'records' => $disposals,
             'filters' => $request->only(['search', 'status']),
+            'assets'  => \App\Models\Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
         ]);
     }
 

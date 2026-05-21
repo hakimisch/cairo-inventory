@@ -29,6 +29,7 @@ class AssetTransferController extends Controller
         return inertia('Assets/Kewpa6Index', [
             'records' => $transfers,
             'filters' => $request->only(['search', 'status']),
+            'assets'  => \App\Models\Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
         ]);
     }
 

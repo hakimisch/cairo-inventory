@@ -37,6 +37,10 @@ class DisposalSaleController extends Controller
             'sales' => $sales,
             'filters' => $request->only(['sale_type', 'search', 'status']),
             'typeCounts' => $typeCounts,
+            'disposals' => \App\Models\AssetDisposal::with('asset')
+                ->select('id', 'asset_id', 'disposal_method', 'disposal_date')
+                ->orderBy('id', 'desc')
+                ->get(),
         ]);
     }
 
@@ -52,7 +56,8 @@ class DisposalSaleController extends Controller
         ]);
 
         return inertia('DisposalSales/Show', [
-            'sale' => $sale,
+            'sale'   => $sale,
+            'assets' => \App\Models\Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
         ]);
     }
 

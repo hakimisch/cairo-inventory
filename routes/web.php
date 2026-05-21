@@ -17,6 +17,7 @@ use App\Http\Controllers\AssetDisposalController;
 use App\Http\Controllers\CommitteeAppointmentController;
 use App\Http\Controllers\AssetLossReportController;
 use App\Http\Controllers\AssetTransferController;
+use App\Http\Controllers\AssetUpgradeController;
 use App\Http\Controllers\VehicleDisposalAssessmentController;
 use App\Http\Controllers\DisposalSaleController;
 use App\Http\Controllers\DisposalSaleItemController;
@@ -94,13 +95,20 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/disposals',          [AssetDisposalController::class, 'index'])->name('disposals.index');
     Route::get('/loss-reports',       [AssetLossReportController::class, 'index'])->name('loss-reports.index');
     Route::post('/assets', [AssetController::class, 'store'])->name('assets.store'); // For the Add Asset form
+    Route::get('/assets/{asset}/edit', [AssetController::class, 'edit'])->name('assets.edit');
+    Route::put('/assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
+    Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
     Route::post('/assets/{asset}/placements', [AssetController::class, 'storePlacement'])->name('assets.placements.store');
     Route::get('/assets/{asset}/kewpa2', [AssetController::class, 'kewpa2'])->name('assets.kewpa2');
     Route::get('/assets/{asset}/kewpa3', [AssetController::class, 'kewpa3'])->name('assets.kewpa3');
     // Aduan Kerosakan (KEW.PA-9)
     Route::post('/assets/{asset}/damage-reports', [DamageReportController::class, 'store'])->name('assets.damage-reports.store');
+    Route::put('/assets/{asset}/damage-reports/{damageReport}', [DamageReportController::class, 'update'])->name('assets.damage-reports.update');
+    Route::delete('/assets/{asset}/damage-reports/{damageReport}', [DamageReportController::class, 'destroy'])->name('assets.damage-reports.destroy');
     Route::get('/damage-reports/{damageReport}/kewpa9/download', [DamageReportController::class, 'downloadKewpa9'])->name('damage-reports.kewpa9.download');
     Route::post('/assets/{asset}/inspections', [AssetInspectionController::class, 'store'])->name('assets.inspections.store');
+    Route::put('/assets/{asset}/inspections/{inspection}', [AssetInspectionController::class, 'update'])->name('assets.inspections.update');
+    Route::delete('/assets/{asset}/inspections/{inspection}', [AssetInspectionController::class, 'destroy'])->name('assets.inspections.destroy');
 
     // ── Phase 2: New Routes ──────────────────────────────────────────────────
 
@@ -123,6 +131,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/assets/{asset}/transfers', [AssetTransferController::class, 'store'])->name('assets.transfers.store');
     Route::put('/assets/{asset}/transfers/{transfer}', [AssetTransferController::class, 'update'])->name('assets.transfers.update');
     Route::delete('/assets/{asset}/transfers/{transfer}', [AssetTransferController::class, 'destroy'])->name('assets.transfers.destroy');
+
+    // Naiktaraf (Upgrades) — Bahagian B on KEW.PA-2/PA-3
+    Route::post('/assets/{asset}/upgrades', [AssetUpgradeController::class, 'store'])->name('assets.upgrades.store');
+    Route::put('/assets/{asset}/upgrades/{upgrade}', [AssetUpgradeController::class, 'update'])->name('assets.upgrades.update');
+    Route::delete('/assets/{asset}/upgrades/{upgrade}', [AssetUpgradeController::class, 'destroy'])->name('assets.upgrades.destroy');
 
     // ── Phase 4: New View & Download Routes ──────────────────────────────────
 
@@ -154,6 +167,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // KEW.PA-16 — Perakuan Pelupusan Kenderaan
     Route::get('/assets/{asset}/vehicle-disposal', [VehicleDisposalAssessmentController::class, 'index'])->name('assets.vehicle-disposal.index');
     Route::post('/assets/{asset}/vehicle-disposal', [VehicleDisposalAssessmentController::class, 'store'])->name('assets.vehicle-disposal.store');
+    Route::delete('/assets/{asset}/vehicle-disposal', [VehicleDisposalAssessmentController::class, 'destroy'])->name('assets.vehicle-disposal.destroy');
     Route::get('/assets/{asset}/vehicle-disposal/kewpa16', [VehicleDisposalAssessmentController::class, 'kewpa16'])->name('assets.vehicle-disposal.kewpa16');
     Route::get('/assets/{asset}/vehicle-disposal/kewpa16/download', [VehicleDisposalAssessmentController::class, 'downloadKewpa16'])->name('assets.vehicle-disposal.kewpa16.download');
 });
@@ -204,6 +218,7 @@ Route::middleware(['auth', 'verified'])->prefix('disposal-sales')->name('disposa
 
 // KEW.PA-15/29 — Committee Appointments (standalone, polymorphic)
 Route::middleware(['auth', 'verified'])->group(function () {
+    Route::get('/committee-appointments', [CommitteeAppointmentController::class, 'index'])->name('committee-appointments.index');
     Route::post('/committee-appointments', [CommitteeAppointmentController::class, 'store'])->name('committee-appointments.store');
     Route::put('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'update'])->name('committee-appointments.update');
     Route::delete('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'destroy'])->name('committee-appointments.destroy');
@@ -229,6 +244,8 @@ Route::get('/receivings/create', [AssetController::class, 'createReceiving'])->n
 Route::post('/receivings', [AssetController::class, 'storeReceiving'])->name('receivings.store');
 
 Route::get('/receivings/{receiving}/kewpa1/download', [AssetController::class, 'downloadKewpa1'])->name('receivings.kewpa1.download');
+Route::put('/receivings/{receiving}', [AssetController::class, 'updateReceiving'])->name('receivings.update');
+Route::delete('/receivings/{receiving}', [AssetController::class, 'destroyReceiving'])->name('receivings.destroy');
 Route::get('/assets/{asset}/kewpa2/download', [AssetController::class, 'downloadKewpa2'])->name('assets.kewpa2.download');
 Route::get('/assets/{asset}/kewpa3/download', [AssetController::class, 'downloadKewpa3'])->name('assets.kewpa3.download');
 

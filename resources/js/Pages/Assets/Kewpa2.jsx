@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { router } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
-
 // ── Bahagian A — KEW.PA-2 (Harta Tetap) ──────────────────────────────────────
 function BahagianA({ asset }) {
     return (
@@ -482,8 +481,50 @@ function TransferTable({ asset }) {
 }
 
 // ── Bahagian B — Penambahan / Penggantian / Naiktaraf ─────────────────────────
-function BahagianB({ asset }) {
+// ── Naiktaraf (Upgrades) — Bahagian B on KEW.PA-2 ────────────────────────────
+function UpgradeTable({ asset }) {
     const upgrades = asset.upgrades || [];
+    const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState(null);
+    const [form, setForm] = useState({
+        date: new Date().toISOString().split('T')[0],
+        description: '',
+        warranty_period: '',
+        cost: '0',
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        router.post(route('assets.upgrades.store', asset.id), form, {
+            preserveScroll: true,
+            onSuccess: () => { setShowForm(false); setForm({ date: new Date().toISOString().split('T')[0], description: '', warranty_period: '', cost: '0' }); }
+        });
+    };
+
+    const handleEdit = (upgrade) => {
+        setEditingId(upgrade.id);
+        setForm({
+            date: upgrade.date ? upgrade.date.split('T')[0] : '',
+            description: upgrade.description,
+            warranty_period: upgrade.warranty_period || '',
+            cost: String(upgrade.cost || '0'),
+        });
+    };
+
+    const handleUpdate = (e) => {
+        e.preventDefault();
+        router.put(route('assets.upgrades.update', [asset.id, editingId]), form, {
+            preserveScroll: true,
+            onSuccess: () => { setEditingId(null); setForm({ date: new Date().toISOString().split('T')[0], description: '', warranty_period: '', cost: '0' }); }
+        });
+    };
+
+    const handleDelete = (upgrade) => {
+        if (window.confirm(`Padam rekod naiktaraf "${upgrade.description}" (RM ${Number(upgrade.cost).toFixed(2)})?`)) {
+            router.delete(route('assets.upgrades.destroy', [asset.id, upgrade.id]), { preserveScroll: true });
+        }
+    };
+
     return (
         <div className="mb-6">
             <div className="font-bold mb-1 uppercase">BAHAGIAN B : BUTIR-BUTIR PENAMBAHAN, PENGGANTIAN DAN NAIKTARAF</div>
@@ -495,30 +536,69 @@ function BahagianB({ asset }) {
                         <th className="border border-black p-1.5 text-left">Butiran</th>
                         <th className="border border-black p-1.5 w-20">Tempoh Jaminan</th>
                         <th className="border border-black p-1.5 w-20">Kos (RM)</th>
-                        <th className="border border-black p-1.5 w-28">Nama Peg. B/t/jawab &amp; Tandatangan</th>
+                        <th className="border border-black p-1.5 w-32">Tindakan</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {upgrades.length === 0 ? (
+                    {upgrades.length === 0 && editingId === null && (
                         <tr>
                             <td colSpan="6" className="border border-black p-4 italic text-gray-500 uppercase">
                                 Tiada rekod penambahan / naiktaraf
                             </td>
                         </tr>
-                    ) : (
-                        upgrades.map((u, i) => (
-                            <tr key={i} className="h-10">
+                    )}
+                    {upgrades.map((u, i) => (
+                        editingId === u.id ? (
+                            <tr key={u.id}>
+                                <td colSpan="6" className="border border-black p-2">
+                                    <form onSubmit={handleUpdate} className="flex flex-col gap-2 print:hidden">
+                                        <div className="flex gap-2 flex-wrap">
+                                            <input type="date" className="text-[10px] p-1 border rounded flex-1" value={form.date} onChange={e => setForm({...form, date: e.target.value})} required />
+                                            <input type="text" placeholder="Butiran" className="text-[10px] p-1 border rounded flex-[2]" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required />
+                                            <input type="text" placeholder="Tempoh Jaminan" className="text-[10px] p-1 border rounded flex-1" value={form.warranty_period} onChange={e => setForm({...form, warranty_period: e.target.value})} />
+                                            <input type="number" step="0.01" placeholder="Kos (RM)" className="text-[10px] p-1 border rounded w-24" value={form.cost} onChange={e => setForm({...form, cost: e.target.value})} required />
+                                            <button type="submit" className="bg-purple-600 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-purple-700">Simpan</button>
+                                            <button type="button" onClick={() => setEditingId(null)} className="bg-gray-400 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-gray-500">Batal</button>
+                                        </div>
+                                    </form>
+                                </td>
+                            </tr>
+                        ) : (
+                            <tr key={u.id} className="h-10">
                                 <td className="border border-black p-1.5">{i + 1}</td>
                                 <td className="border border-black p-1.5">{new Date(u.date).toLocaleDateString('ms-MY')}</td>
                                 <td className="border border-black p-1.5 text-left uppercase">{u.description}</td>
                                 <td className="border border-black p-1.5">{u.warranty_period || '-'}</td>
                                 <td className="border border-black p-1.5 text-right">{Number(u.cost).toFixed(2)}</td>
-                                <td className="border border-black p-1.5"></td>
+                                <td className="border border-black p-1.5 print:hidden">
+                                    <button onClick={() => handleEdit(u)} className="bg-blue-100 text-blue-700 text-[10px] font-bold py-1 px-2 rounded mr-1 border border-blue-200">Edit</button>
+                                    <button onClick={() => handleDelete(u)} className="bg-red-100 text-red-700 text-[10px] font-bold py-1 px-2 rounded border border-red-200">Padam</button>
+                                </td>
                             </tr>
-                        ))
-                    )}
+                        )
+                    ))}
                 </tbody>
             </table>
+            <div className="p-3 bg-purple-50 mt-auto border-t border-black print:hidden">
+                {!showForm ? (
+                    <button onClick={() => setShowForm(true)} className="bg-purple-600 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-purple-700">
+                        Tambah Rekod Naiktaraf
+                    </button>
+                ) : (
+                    <form onSubmit={handleSubmit} className="flex flex-col gap-2">
+                        <div className="flex gap-2 flex-wrap">
+                            <input type="date" className="text-[10px] p-1 border rounded flex-1" value={form.date} onChange={e => setForm({...form, date: e.target.value})} required />
+                            <input type="text" placeholder="Butiran Naiktaraf" className="text-[10px] p-1 border rounded flex-[2]" value={form.description} onChange={e => setForm({...form, description: e.target.value})} required />
+                            <input type="text" placeholder="Tempoh Jaminan" className="text-[10px] p-1 border rounded flex-1" value={form.warranty_period} onChange={e => setForm({...form, warranty_period: e.target.value})} />
+                            <input type="number" step="0.01" placeholder="Kos (RM)" className="text-[10px] p-1 border rounded w-24" value={form.cost} onChange={e => setForm({...form, cost: e.target.value})} required />
+                        </div>
+                        <div className="flex gap-2">
+                            <button type="submit" className="bg-purple-600 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-purple-700">Simpan</button>
+                            <button type="button" onClick={() => setShowForm(false)} className="bg-gray-400 text-white text-[10px] font-bold py-1 px-3 rounded hover:bg-gray-500">Batal</button>
+                        </div>
+                    </form>
+                )}
+            </div>
         </div>
     );
 }
@@ -659,7 +739,7 @@ export default function Kewpa2({ asset }) {
                         <div className="text-center font-bold text-[13px] mb-4 uppercase">
                             UNIVERSITI TEKNOLOGI MALAYSIA<br/>DAFTAR HARTA TETAP
                         </div>
-                        <BahagianB asset={asset} />
+                        <UpgradeTable asset={asset} />
                     </div>
 
                     {/* ── Actions ── */}

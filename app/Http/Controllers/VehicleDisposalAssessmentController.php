@@ -32,6 +32,7 @@ class VehicleDisposalAssessmentController extends Controller
         return inertia('Assets/Kewpa16Index', [
             'records' => $records,
             'filters' => $request->only(['search', 'status']),
+            'assets'  => Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
         ]);
     }
 
@@ -82,6 +83,20 @@ class VehicleDisposalAssessmentController extends Controller
         );
 
         return redirect()->back()->with('success', 'Vehicle disposal assessment saved.');
+    }
+
+    /**
+     * Destroy the vehicle disposal assessment.
+     */
+    public function destroy(Asset $asset)
+    {
+        $assessment = $asset->vehicleDisposalAssessment;
+
+        if ($assessment) {
+            $assessment->delete();
+        }
+
+        return redirect()->back()->with('success', 'Vehicle disposal assessment removed.');
     }
 
     /**

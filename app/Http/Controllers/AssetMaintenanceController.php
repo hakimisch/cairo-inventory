@@ -29,6 +29,7 @@ class AssetMaintenanceController extends Controller
         return inertia('Assets/Kewpa13Index', [
             'records' => $maintenances,
             'filters' => $request->only(['search', 'status']),
+            'assets'  => \App\Models\Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
         ]);
     }
 

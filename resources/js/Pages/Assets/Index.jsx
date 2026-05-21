@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
  
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -388,10 +388,52 @@ export default function Index({ assets, totalValue }) {
                                                             background  : UTM.maroon,
                                                             color       : UTM.white,
                                                             textDecoration: 'none',
+                                                            marginRight : 6,
                                                         }}
                                                     >
                                                         {asset.asset_type === 'fixed_asset' ? 'KEW.PA-2' : 'KEW.PA-3'}
                                                     </a>
+
+                                                    {/* Edit Button */}
+                                                    <Link
+                                                        href={route('assets.edit', asset.id)}
+                                                        style={{
+                                                            display     : 'inline-block',
+                                                            padding     : '5px 12px',
+                                                            borderRadius: 6,
+                                                            fontSize    : '12px',
+                                                            fontWeight  : 700,
+                                                            background  : '#EEF2FF',
+                                                            color       : '#4338CA',
+                                                            textDecoration: 'none',
+                                                            marginRight : 6,
+                                                            border      : '1px solid #C7D2FE',
+                                                        }}
+                                                    >
+                                                        Edit
+                                                    </Link>
+
+                                                    {/* Delete Button */}
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm(`Padam aset "${asset.name}" (${asset.asset_tag})?\nSemua rekod berkaitan akan turut dipadam.`)) {
+                                                                router.delete(route('assets.destroy', asset.id));
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            display     : 'inline-block',
+                                                            padding     : '5px 12px',
+                                                            borderRadius: 6,
+                                                            fontSize    : '12px',
+                                                            fontWeight  : 700,
+                                                            background  : '#FEF2F2',
+                                                            color       : '#DC2626',
+                                                            border      : '1px solid #FECACA',
+                                                            cursor      : 'pointer',
+                                                        }}
+                                                    >
+                                                        Hapus
+                                                    </button>
                                                 </td>
                                             </tr>
 

@@ -29,6 +29,7 @@ class AssetLossReportController extends Controller
         return inertia('Assets/Kewpa28Index', [
             'records' => $lossReports,
             'filters' => $request->only(['search', 'status']),
+            'assets'  => \App\Models\Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
         ]);
     }
 

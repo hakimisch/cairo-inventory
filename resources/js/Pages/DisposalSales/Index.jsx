@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, useForm } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 const UTM = {
@@ -9,6 +9,7 @@ const UTM = {
     white  : '#FFFFFF',
     gray50 : '#F9F7F5',
     gray100: '#EDE9E4',
+    gray200: '#D6D0C8',
     gray500: '#8A8480',
     gray700: '#4A4540',
     gray900: '#1E1B18',
@@ -36,6 +37,8 @@ const inputStyle = {
     transition   : 'border-color 0.15s',
     boxSizing    : 'border-box',
 };
+
+const selectStyle = { ...inputStyle, cursor: 'pointer' };
 
 function SaleTypeBadge({ type }) {
     const map = {
@@ -81,6 +84,150 @@ function StatusBadge({ status }) {
         </span>
     );
 }
+
+// ── Inline Form Helpers ────────────────────────────────────────────────────
+
+function InlineField({ label, value, editValue, onChange, type = 'text', options, step }) {
+    return (
+        <div>
+            <label style={{ fontSize: 10, fontWeight: 700, color: UTM.gray500, textTransform: 'uppercase', marginBottom: 2, display: 'block' }}>{label}</label>
+            {options ? (
+                <select style={selectStyle} value={editValue} onChange={e => onChange(e.target.value)}>
+                    {options.map(o => <option key={o.value ?? o} value={o.value ?? o}>{o.label ?? o}</option>)}
+                </select>
+            ) : (
+                <input type={type} step={step} style={inputStyle} value={editValue} onChange={e => onChange(e.target.value)} />
+            )}
+        </div>
+    );
+}
+
+// ── Add Sale Form ──────────────────────────────────────────────────────────
+
+function AddSaleForm({ disposals, onDone }) {
+    const { data, setData, post, processing, errors, reset } = useForm({
+        asset_disposal_id: '',
+        sale_type: '',
+        sale_reference: '',
+        sale_date: new Date().toISOString().split('T')[0],
+        sale_location: '',
+        sale_officer: '',
+        deposit_required: '',
+        status: 'draft',
+        description: '',
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        post(route('disposal-sales.store'), {
+            preserveScroll: true,
+            onSuccess: () => { reset(); onDone(); },
+        });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} style={{ padding: 16, background: '#FFFBEB', borderRadius: 8, border: `1px solid #FDE68A`, marginBottom: 16 }}>
+            <p style={{ fontSize: 12, fontWeight: 700, color: '#92400E', marginBottom: 12 }}>+ Jualan Baru</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <InlineField label="Pelupusan Aset" editValue={data.asset_disposal_id} onChange={v => setData('asset_disposal_id', v)}
+                    options={[{ value: '', label: '— Pilih Pelupusan —' }, ...disposals.map(d => ({
+                        value: String(d.id),
+                        label: `${d.asset?.asset_tag ?? '—'} — ${d.asset?.name ?? 'Aset #'+d.asset_id} (${d.disposal_method}, ${d.disposal_date ?? '—'})`
+                    }))]} />
+                <InlineField label="Jenis Jualan" editValue={data.sale_type} onChange={v => setData('sale_type', v)}
+                    options={[{ value: '', label: '— Pilih Jenis —' }, 'Tawaran', 'Sebutharga', 'Lelongan']} />
+                <InlineField label="Rujukan Jualan" editValue={data.sale_reference} onChange={v => setData('sale_reference', v)} />
+                <InlineField label="Tarikh Jualan" type="date" editValue={data.sale_date} onChange={v => setData('sale_date', v)} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 10, marginBottom: 10 }}>
+                <InlineField label="Lokasi" editValue={data.sale_location} onChange={v => setData('sale_location', v)} />
+                <InlineField label="Pegawai" editValue={data.sale_officer} onChange={v => setData('sale_officer', v)} />
+                <InlineField label="Deposit (RM)" type="number" step="0.01" editValue={data.deposit_required} onChange={v => setData('deposit_required', v)} />
+                <InlineField label="Status" editValue={data.status} onChange={v => setData('status', v)}
+                    options={['draft', 'active', 'completed', 'cancelled']} />
+            </div>
+            <div style={{ marginBottom: 10 }}>
+                <label style={{ fontSize: 10, fontWeight: 700, color: UTM.gray500, textTransform: 'uppercase', marginBottom: 2, display: 'block' }}>Penerangan</label>
+                <input type="text" style={inputStyle} value={data.description} onChange={e => setData('description', e.target.value)} placeholder="Penerangan jualan (pilihan)..." />
+            </div>
+            {errors.asset_disposal_id && <p style={{ fontSize: 11, color: '#DC2626', marginBottom: 8 }}>{errors.asset_disposal_id}</p>}
+            {errors.sale_reference && <p style={{ fontSize: 11, color: '#DC2626', marginBottom: 8 }}>{errors.sale_reference}</p>}
+            <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={processing} style={{ padding: '7px 20px', borderRadius: 6, border: 'none', background: '#92400E', color: UTM.white, fontSize: 12, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer', opacity: processing ? 0.7 : 1 }}>{processing ? 'Menyimpan...' : 'Tambah Jualan'}</button>
+                <button type="button" onClick={onDone} style={{ padding: '7px 16px', borderRadius: 6, border: `1.5px solid ${UTM.gray100}`, background: UTM.white, color: UTM.gray600, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Batal</button>
+            </div>
+        </form>
+    );
+}
+
+// ── Edit Sale Form ─────────────────────────────────────────────────────────
+
+function EditSaleForm({ sale, disposals, onDone }) {
+    const { data, setData, put, processing, errors } = useForm({
+        asset_disposal_id: String(sale.asset_disposal_id ?? ''),
+        sale_type: sale.sale_type ?? '',
+        sale_reference: sale.sale_reference ?? '',
+        sale_date: sale.sale_date ? sale.sale_date.split('T')[0] : '',
+        sale_location: sale.sale_location ?? '',
+        sale_officer: sale.sale_officer ?? '',
+        deposit_required: sale.deposit_required ?? '',
+        sale_status: sale.sale_status ?? '',
+        status: sale.status ?? 'draft',
+        description: sale.description ?? '',
+        notes: sale.notes ?? '',
+    });
+
+    const handleSubmit = (e) => {
+        e.preventDefault();
+        put(route('disposal-sales.update', sale.id), {
+            preserveScroll: true,
+            onSuccess: () => onDone(),
+        });
+    };
+
+    return (
+        <form onSubmit={handleSubmit} style={{ padding: 12, background: '#FEF3C7', borderRadius: 6, border: `1px solid #FDE68A`, marginBottom: 8 }}>
+            <p style={{ fontSize: 11, fontWeight: 700, color: '#92400E', marginBottom: 8 }}>Edit Jualan — {sale.sale_reference}</p>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <InlineField label="Pelupusan Aset" editValue={data.asset_disposal_id} onChange={v => setData('asset_disposal_id', v)}
+                    options={[{ value: '', label: '— Pilih Pelupusan —' }, ...disposals.map(d => ({
+                        value: String(d.id),
+                        label: `${d.asset?.asset_tag ?? '—'} — ${d.asset?.name ?? 'Aset #'+d.asset_id}`
+                    }))]} />
+                <InlineField label="Jenis" editValue={data.sale_type} onChange={v => setData('sale_type', v)}
+                    options={['Tawaran', 'Sebutharga', 'Lelongan']} />
+                <InlineField label="Rujukan" editValue={data.sale_reference} onChange={v => setData('sale_reference', v)} />
+                <InlineField label="Tarikh" type="date" editValue={data.sale_date} onChange={v => setData('sale_date', v)} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <InlineField label="Lokasi" editValue={data.sale_location} onChange={v => setData('sale_location', v)} />
+                <InlineField label="Pegawai" editValue={data.sale_officer} onChange={v => setData('sale_officer', v)} />
+                <InlineField label="Deposit (RM)" type="number" step="0.01" editValue={data.deposit_required} onChange={v => setData('deposit_required', v)} />
+                <InlineField label="Status Jualan" editValue={data.sale_status} onChange={v => setData('sale_status', v)}
+                    options={['', 'open', 'closed', 'cancelled', 'awarded']} />
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, marginBottom: 8 }}>
+                <InlineField label="Status" editValue={data.status} onChange={v => setData('status', v)}
+                    options={['draft', 'active', 'completed', 'cancelled']} />
+                <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: UTM.gray500, textTransform: 'uppercase', marginBottom: 2, display: 'block' }}>Penerangan</label>
+                    <input type="text" style={inputStyle} value={data.description} onChange={e => setData('description', e.target.value)} />
+                </div>
+                <div>
+                    <label style={{ fontSize: 10, fontWeight: 700, color: UTM.gray500, textTransform: 'uppercase', marginBottom: 2, display: 'block' }}>Catatan</label>
+                    <input type="text" style={inputStyle} value={data.notes} onChange={e => setData('notes', e.target.value)} />
+                </div>
+            </div>
+            {errors.sale_reference && <p style={{ fontSize: 11, color: '#DC2626', marginBottom: 8 }}>{errors.sale_reference}</p>}
+            <div style={{ display: 'flex', gap: 8 }}>
+                <button type="submit" disabled={processing} style={{ padding: '5px 14px', borderRadius: 6, border: 'none', background: '#92400E', color: UTM.white, fontSize: 11, fontWeight: 700, cursor: processing ? 'not-allowed' : 'pointer' }}>{processing ? 'Menyimpan...' : 'Simpan'}</button>
+                <button type="button" onClick={onDone} style={{ padding: '5px 12px', borderRadius: 6, border: `1px solid ${UTM.gray100}`, background: UTM.white, color: UTM.gray600, fontSize: 11, fontWeight: 600, cursor: 'pointer' }}>Batal</button>
+            </div>
+        </form>
+    );
+}
+
+// ── KEW.PA Forms Dropdown ──────────────────────────────────────────────────
 
 const KEWPA_FORMS = [
     { label: 'PA-21 Tawaran Jualan',       route: 'disposal-sales.kewpa21' },
@@ -162,11 +309,15 @@ function FormDropdown({ saleId, open, onToggle }) {
     );
 }
 
-export default function Index({ sales, filters, typeCounts }) {
+// ── Main Page ──────────────────────────────────────────────────────────────
+
+export default function Index({ sales, filters, typeCounts, disposals }) {
     const [search, setSearch]           = useState(filters?.search || '');
     const [saleTypeFilter, setSaleTypeFilter] = useState(filters?.sale_type || '');
     const [openFormId, setOpenFormId]   = useState(null);
     const [expandedId, setExpandedId]   = useState(null);
+    const [showAdd, setShowAdd]         = useState(false);
+    const [editingId, setEditingId]     = useState(null);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -191,6 +342,12 @@ export default function Index({ sales, filters, typeCounts }) {
         );
     };
 
+    const handleDelete = (sale) => {
+        if (window.confirm(`Padam jualan ${sale.sale_reference} (${sale.sale_type})? Tindakan ini tidak boleh dibatalkan.`)) {
+            router.delete(route('disposal-sales.destroy', sale.id), { preserveScroll: true });
+        }
+    };
+
     const thStyle = {
         padding     : '12px 16px',
         fontSize    : '11px',
@@ -213,11 +370,30 @@ export default function Index({ sales, filters, typeCounts }) {
     return (
         <AuthenticatedLayout
             header={
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ width: 4, height: 24, background: UTM.gold, borderRadius: 2 }} />
-                    <h2 style={{ fontSize: '18px', fontWeight: 700, color: UTM.maroon, margin: 0 }}>
-                        Disposal Sales — KEW.PA-21 to PA-27A
-                    </h2>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div style={{ width: 4, height: 24, background: UTM.gold, borderRadius: 2 }} />
+                        <h2 style={{ fontSize: '18px', fontWeight: 700, color: UTM.maroon, margin: 0 }}>
+                            Disposal Sales — KEW.PA-21 to PA-27A
+                        </h2>
+                    </div>
+                    <button
+                        onClick={() => { setShowAdd(!showAdd); setEditingId(null); }}
+                        style={{
+                            padding      : '9px 18px',
+                            borderRadius : 8,
+                            border       : 'none',
+                            background   : UTM.maroon,
+                            color        : UTM.white,
+                            fontSize     : '13px',
+                            fontWeight   : 700,
+                            cursor       : 'pointer',
+                            boxShadow    : '0 2px 6px rgba(92,0,31,0.2)',
+                            whiteSpace   : 'nowrap',
+                        }}
+                    >
+                        {showAdd ? '✕ Batal' : '+ Jualan Baru'}
+                    </button>
                 </div>
             }
         >
@@ -275,6 +451,14 @@ export default function Index({ sales, filters, typeCounts }) {
                             Reset
                         </button>
                     </form>
+
+                    {/* ── Inline Add Form ───────────────────────────────────── */}
+                    {showAdd && (
+                        <AddSaleForm
+                            disposals={disposals ?? []}
+                            onDone={() => setShowAdd(false)}
+                        />
+                    )}
 
                     {/* ── Table Card ───────────────────────────────────────── */}
                     <div style={{
@@ -390,16 +574,65 @@ sales.data?.map((sale, index) => (
                                                                 color       : expandedId === sale.id ? UTM.maroon : UTM.gray700,
                                                                 border      : 'none',
                                                                 cursor      : 'pointer',
+                                                                marginRight : 4,
                                                                 transition  : 'all 0.12s',
                                                             }}
                                                         >
                                                             {expandedId === sale.id ? 'Tutup' : 'Butiran'}
                                                         </button>
+                                                        <button
+                                                            onClick={() => { setEditingId(editingId === sale.id ? null : sale.id); setExpandedId(editingId === sale.id ? null : (expandedId || sale.id)); }}
+                                                            style={{
+                                                                display     : 'inline-block',
+                                                                padding     : '5px 12px',
+                                                                borderRadius: 6,
+                                                                fontSize    : '11px',
+                                                                fontWeight  : 600,
+                                                                background  : editingId === sale.id ? '#FDE68A' : '#E6F4EC',
+                                                                color       : editingId === sale.id ? '#92400E' : '#065F46',
+                                                                border      : 'none',
+                                                                cursor      : 'pointer',
+                                                                marginRight : 4,
+                                                                transition  : 'all 0.12s',
+                                                            }}
+                                                        >
+                                                            {editingId === sale.id ? 'Batal' : 'Edit'}
+                                                        </button>
+                                                        <button
+                                                            onClick={() => handleDelete(sale)}
+                                                            style={{
+                                                                display     : 'inline-block',
+                                                                padding     : '5px 12px',
+                                                                borderRadius: 6,
+                                                                fontSize    : '11px',
+                                                                fontWeight  : 600,
+                                                                background  : '#FEE2E2',
+                                                                color       : '#991B1B',
+                                                                border      : 'none',
+                                                                cursor      : 'pointer',
+                                                                transition  : 'all 0.12s',
+                                                            }}
+                                                        >
+                                                            Hapus
+                                                        </button>
                                                     </td>
                                                 </tr>
 
+                                                {/* ── Edit Form Row ── */}
+                                                {editingId === sale.id && (
+                                                    <tr style={{ background: '#FFFBEB' }}>
+                                                        <td colSpan={6} style={{ padding: 0 }}>
+                                                            <EditSaleForm
+                                                                sale={sale}
+                                                                disposals={disposals ?? []}
+                                                                onDone={() => setEditingId(null)}
+                                                            />
+                                                        </td>
+                                                    </tr>
+                                                )}
+
                                                 {/* ── Collapsible Expandable Row ── */}
-                                                {expandedId === sale.id && (
+                                                {expandedId === sale.id && editingId !== sale.id && (
                                                     <tr style={{ background: '#FAFAFA', borderBottom: `2px solid ${UTM.gray100}` }}>
                                                         <td colSpan={6} style={{ padding: 0 }}>
                                                             <div style={{ 

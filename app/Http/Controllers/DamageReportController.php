@@ -29,6 +29,7 @@ class DamageReportController extends Controller
         return inertia('Assets/Kewpa9Index', [
             'records' => $damageReports,
             'filters' => $request->only(['search', 'status']),
+            'assets'  => Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
         ]);
     }
 
@@ -50,6 +51,37 @@ class DamageReportController extends Controller
         $asset->update(['status' => 'repair']);
 
         return redirect()->back()->with('success', 'Aduan kerosakan berjaya direkodkan.');
+    }
+
+    /**
+     * Update the specified damage report.
+     */
+    public function update(Request $request, Asset $asset, DamageReport $damageReport)
+    {
+        $validated = $request->validate([
+            'damage_date'               => 'required|date',
+            'last_user'                 => 'required|string|max:255',
+            'previous_maintenance_cost' => 'nullable|numeric|min:0',
+            'damage_description'        => 'required|string',
+            'technical_notes'           => 'nullable|string',
+            'recommendation'            => 'nullable|string',
+            'hod_decision'              => 'nullable|string',
+            'status'                    => 'nullable|string|in:pending,approved,rejected,in_progress,resolved',
+        ]);
+
+        $damageReport->update($validated);
+
+        return redirect()->back()->with('success', 'Aduan kerosakan berjaya dikemaskini.');
+    }
+
+    /**
+     * Remove the specified damage report.
+     */
+    public function destroy(Asset $asset, DamageReport $damageReport)
+    {
+        $damageReport->delete();
+
+        return redirect()->back()->with('success', 'Aduan kerosakan berjaya dipadam.');
     }
 
     public function downloadKewpa9(DamageReport $damageReport)
