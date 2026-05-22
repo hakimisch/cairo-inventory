@@ -129,11 +129,6 @@ class AssetController extends Controller
         ]);
     }
 
-    public function createReceiving()
-    {
-        return Inertia::render('Assets/CreateReceiving');
-    }
-
     public function storeReceiving(Request $request)
     {
         $validated = $request->validate([

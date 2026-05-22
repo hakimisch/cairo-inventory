@@ -294,6 +294,18 @@ export default function Kewpa17Index({ records, filters, assets }) {
                     }}>
                         Reset
                     </button>
+                    <Link
+                        href={route('disposals.kewpa18')}
+                        style={{ padding: '9px 20px', borderRadius: 8, border: `1.5px solid #7B1FA2`, background: UTM.white, color: '#7B1FA2', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                    >
+                        ◈ PA-18 Sijil Pemusnahan
+                    </Link>
+                    <Link
+                        href={route('disposals.kewpa19')}
+                        style={{ padding: '9px 20px', borderRadius: 8, border: `1.5px solid #C62828`, background: UTM.white, color: '#C62828', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                    >
+                        ◈ PA-19 Sijil Pelupusan
+                    </Link>
                     <button type="button" onClick={() => { setShowAdd(!showAdd); setEditingId(null); }} style={{
                         padding      : '9px 24px',
                         borderRadius : 8,

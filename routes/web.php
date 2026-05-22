@@ -271,7 +271,6 @@ Route::get('/receivings/{receiving}/kewpa1', [AssetController::class, 'kewpa1'])
 Route::post('/receivings/{receiving}/accept', [AssetController::class, 'acceptReceiving'])->name('receivings.accept');
 Route::post('/receivings/{receiving}/reject', [AssetController::class, 'rejectReceiving'])->name('receivings.reject');
 
-Route::get('/receivings/create', [AssetController::class, 'createReceiving'])->name('receivings.create');
 Route::post('/receivings', [AssetController::class, 'storeReceiving'])->name('receivings.store');
 
 Route::get('/receivings/{receiving}/kewpa1/download', [AssetController::class, 'downloadKewpa1'])->name('receivings.kewpa1.download');

@@ -231,7 +231,7 @@ export default function AuthenticatedLayout({ header, children }) {
                     <NavSection label="Utama">
                         <NavLink
                             href={route('kewpa.directory')}
-                            icon="📋"
+                            icon="◈"
                             label="Direktori KEW.PA"
                             active={route().current('kewpa.directory')}
                         />
@@ -258,10 +258,10 @@ export default function AuthenticatedLayout({ header, children }) {
                     <NavSection label="Logistik & Penerimaan">
                         {user.role === 'admin' && (
                             <NavLink
-                                href={route('receivings.create')}
+                                href={route('receivings.index')}
                                 icon="＋"
-                                label="PA-1 Daftar Penerimaan"
-                                active={route().current('receivings.create')}
+                                label="PA-1 Senarai Penerimaan"
+                                active={isActive('receivings.index', 'receivings.kewpa1')}
                             />
                         )}
                         <NavLink
@@ -290,25 +290,31 @@ export default function AuthenticatedLayout({ header, children }) {
                         />
                         <NavLink
                             href={route('damage-reports.index')}
-                            icon="⚠️"
+                            icon="!"
                             label="PA-9 Aduan Kerosakan"
                             active={isActive('damage-reports.index', 'damage-reports.kewpa9.download')}
                         />
                         <NavLink
                             href={route('placements.index')}
-                            icon="📋"
+                            icon="◈"
                             label="PA-9A Pinjaman Aset"
                             active={isActive('placements.index', 'assets.kewpa9a', 'assets.placements.kewpa9a', 'assets.kewpa9a.download', 'assets.placements.kewpa9a.download')}
                         />
                         <NavLink
                             href={route('inspections.index')}
-                            icon="🔍"
+                            icon="◎"
                             label="PA-10 Pemeriksaan Aset"
-                            active={isActive('inspections.index', 'assets.kewpa10', 'assets.kewpa10.download')}
+                            active={isActive('inspections.index', 'inspections.kewpa10', 'inspections.kewpa10.download')}
+                        />
+                        <NavLink
+                            href={route('inspections.kewpa11')}
+                            icon="◈"
+                            label="PA-11 Pemeriksaan Inventori"
+                            active={isActive('inspections.kewpa11', 'inspections.kewpa11.download')}
                         />
                         <NavLink
                             href={route('reports.kewpa12')}
-                            icon="📄"
+                            icon="▤"
                             label="PA-12 Perakuan Tahunan"
                             active={isActive('reports.kewpa12', 'reports.kewpa12.download')}
                         />
@@ -320,9 +326,15 @@ export default function AuthenticatedLayout({ header, children }) {
                     <NavSection label="Penyelenggaraan">
                         <NavLink
                             href={route('maintenances.index')}
-                            icon="🔧"
-                            label="PA-13/14 Penyelenggaraan"
+                            icon="⚙"
+                            label="PA-13 Senarai Penyelenggaraan"
                             active={isActive('maintenances.index', 'assets.maintenances.*')}
+                        />
+                        <NavLink
+                            href={route('maintenances.kewpa14')}
+                            icon="◈"
+                            label="PA-14 Daftar Penyelenggaraan"
+                            active={isActive('maintenances.kewpa14', 'maintenances.kewpa14.download')}
                         />
                     </NavSection>
 
@@ -332,26 +344,54 @@ export default function AuthenticatedLayout({ header, children }) {
                     <NavSection label="Pelupusan & Jualan">
                         <NavLink
                             href={route('vehicle-disposals.index')}
-                            icon="🚗"
+                            icon="◈"
                             label="PA-16 Pelupusan Kenderaan"
                             active={isActive('vehicle-disposals.index', 'assets.vehicle-disposal.*')}
                         />
                         <NavLink
-                            href={route('disposals.index')}
-                            icon="🗑️"
-                            label="PA-17/18/19 Pelupusan"
-                            active={isActive('disposals.index', 'assets.disposals.*')}
+                            href={route('committee-appointments.index')}
+                            icon="◈"
+                            label="PA-15 Jawatankuasa Pelupusan"
+                            active={isActive('committee-appointments.index', 'committee-appointments.*')}
                         />
+
+                        {/* ── Collapsible: PA-17/18/19 Pelupusan ── */}
+                        <NavGroup
+                            icon="◈"
+                            label="PA-17/18/19 Pelupusan"
+                            defaultOpen={isActive(
+                                'disposals.*',
+                                'disposals.kewpa18', 'disposals.kewpa18.download',
+                                'disposals.kewpa19', 'disposals.kewpa19.download',
+                            )}
+                        >
+                            <SubNavLink
+                                href={route('disposals.index')}
+                                label="PA-17 Permohonan Pelupusan"
+                                active={isActive('disposals.index', 'assets.disposals.*')}
+                            />
+                            <SubNavLink
+                                href={route('disposals.kewpa18')}
+                                label="PA-18 Sijil Pemusnahan"
+                                active={isActive('disposals.kewpa18', 'disposals.kewpa18.download')}
+                            />
+                            <SubNavLink
+                                href={route('disposals.kewpa19')}
+                                label="PA-19 Sijil Pelupusan"
+                                active={isActive('disposals.kewpa19', 'disposals.kewpa19.download')}
+                            />
+                        </NavGroup>
+
                         <NavLink
                             href={route('reports.kewpa20')}
-                            icon="📊"
+                            icon="▤"
                             label="PA-20 Laporan Pelupusan"
                             active={isActive('reports.kewpa20', 'reports.kewpa20.download')}
                         />
 
                         {/* ── Collapsible: PA-21→27A Jualan Aset ── */}
                         <NavGroup
-                            icon="💰"
+                            icon="◈"
                             label="PA-21→27A Jualan Aset"
                             defaultOpen={isActive(
                                 'disposal-sales.*',
@@ -377,16 +417,36 @@ export default function AuthenticatedLayout({ header, children }) {
                        KEHILANGAN
                        ═══════════════════════════════════════════════════════ */}
                     <NavSection label="Kehilangan">
-                        <NavLink
-                            href={route('loss-reports.index')}
-                            icon="⚠️"
+                        {/* ── Collapsible: PA-28→32 Kehilangan ── */}
+                        <NavGroup
+                            icon="!"
                             label="PA-28→32 Kehilangan"
-                            active={isActive('loss-reports.index', 'assets.loss-reports.*')}
-                        />
+                            defaultOpen={isActive(
+                                'loss-reports.*',
+                                'loss-reports.kewpa31', 'loss-reports.kewpa31.download',
+                                'loss-reports.kewpa32', 'loss-reports.kewpa32.download',
+                            )}
+                        >
+                            <SubNavLink
+                                href={route('loss-reports.index')}
+                                label="PA-28 Laporan Awal"
+                                active={isActive('loss-reports.index', 'assets.loss-reports.*')}
+                            />
+                            <SubNavLink
+                                href={route('loss-reports.kewpa31')}
+                                label="PA-31 Sijil Hapuskira"
+                                active={isActive('loss-reports.kewpa31', 'loss-reports.kewpa31.download')}
+                            />
+                            <SubNavLink
+                                href={route('loss-reports.kewpa32')}
+                                label="PA-32 Tindakan Tahunan"
+                                active={isActive('loss-reports.kewpa32', 'loss-reports.kewpa32.download')}
+                            />
+                        </NavGroup>
                         <NavLink
                             href={route('committee-appointments.index')}
-                            icon="👥"
-                            label="PA-15/29 Pelantikan Jawatankuasa"
+                            icon="◈"
+                            label="PA-29 Jawatankuasa Siasatan"
                             active={isActive('committee-appointments.index', 'committee-appointments.*')}
                         />
                     </NavSection>

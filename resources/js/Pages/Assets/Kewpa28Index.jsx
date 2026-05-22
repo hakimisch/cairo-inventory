@@ -235,6 +235,18 @@ export default function Kewpa28Index({ records, filters, assets }) {
                         <button type="submit" style={{ padding: '7px 20px', borderRadius: 6, border: 'none', background: UTM.maroon, color: UTM.white, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>Cari</button>
                         <button type="button" onClick={handleReset} style={{ padding: '7px 16px', borderRadius: 6, border: `1.5px solid ${UTM.gray100}`, background: UTM.white, color: UTM.gray700, fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Reset</button>
                     </form>
+                    <Link
+                        href={route('loss-reports.kewpa31')}
+                        style={{ padding: '7px 14px', borderRadius: 6, border: `1.5px solid #1E40AF`, background: UTM.white, color: '#1E40AF', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                    >
+                        ▤ PA-31 Hapuskira
+                    </Link>
+                    <Link
+                        href={route('loss-reports.kewpa32')}
+                        style={{ padding: '7px 14px', borderRadius: 6, border: `1.5px solid #7B1FA2`, background: UTM.white, color: '#7B1FA2', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', textDecoration: 'none', display: 'inline-flex', alignItems: 'center' }}
+                    >
+                        ▤ PA-32 Tindakan
+                    </Link>
                     <button onClick={() => setShowAdd(!showAdd)} style={{ padding: '7px 20px', borderRadius: 6, border: 'none', background: showAdd ? UTM.gray100 : '#C2410C', color: showAdd ? UTM.gray700 : UTM.white, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
                         {showAdd ? 'Batal' : '+ Kehilangan Baru'}
                     </button>
