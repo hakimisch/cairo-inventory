@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class SaleBid extends Model
 {
+    use LogsActivity;
     protected $fillable = [
         'disposal_sale_item_id',
         'bidder_name',
@@ -42,5 +45,13 @@ class SaleBid extends Model
     public function disposalSaleItem(): BelongsTo
     {
         return $this->belongsTo(DisposalSaleItem::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
     }
 }

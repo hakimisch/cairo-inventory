@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class AssetPlacement extends Model
 {
+    use LogsActivity;
     protected $fillable = [
         'asset_id', 
         'custodian_name', 
@@ -31,4 +34,12 @@ class AssetPlacement extends Model
     ];
 
     public function asset() { return $this->belongsTo(Asset::class); }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 }

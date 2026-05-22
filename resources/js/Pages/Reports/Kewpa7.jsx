@@ -92,6 +92,13 @@ export default function Kewpa7({ assets, location, reportDate }) {
                     <div className="mt-6 flex justify-end gap-3 print:hidden">
                         <a
                             href={route('reports.kewpa7.download', { location: location || '', report_date: reportDate })}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                const copies = window.prompt('Bilangan salinan?', '3');
+                                if (copies && !isNaN(copies) && parseInt(copies) > 0) {
+                                    window.location.href = route('reports.kewpa7.download', { location: location || '', report_date: reportDate }) + `?copies=${parseInt(copies)}`;
+                                }
+                            }}
                             className="px-6 py-2 rounded font-bold shadow text-white"
                             style={{ background: '#5C001F' }}
                         >

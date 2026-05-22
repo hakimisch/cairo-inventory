@@ -246,6 +246,7 @@
     </div>
 
     <div class="section-title">PENGESAHAN JAWATANKUASA PENYIASAT</div>
+    {{-- Signatures could be stored on loss report model's signatures JSON --}}
 
     <table>
         <tr>

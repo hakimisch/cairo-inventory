@@ -10,8 +10,10 @@
 </head>
 <body class="p-8 text-[10px] leading-tight bg-white font-serif text-black">
 
+    @php $copies = (int) (request()->query('copies', 1)); @endphp
+    @for ($copy = 1; $copy <= $copies; $copy++)
     <div class="flex justify-between items-start mb-1">
-        <div></div>
+        <div class="text-[10px] italic">Salinan {{ $copy }} / {{ $copies }}</div>
         <div class="text-right">
             <div class="font-bold text-[14px]">KEW.PA-7</div>
         </div>
@@ -74,5 +76,9 @@
         </div>
     </div>
 
+    @if ($copy < $copies)
+        <div style="page-break-after: always;"></div>
+    @endif
 </body>
 </html>
+@endfor

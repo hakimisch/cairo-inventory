@@ -46,6 +46,7 @@ class AssetMaintenanceController extends Controller
             'cost'             => 'nullable|numeric|min:0',
             'status'           => 'nullable|string|in:pending,in_progress,completed',
             'notes'            => 'nullable|string|max:5000',
+            'signatures'       => 'nullable|json',
         ]);
 
         $maintenance = $asset->maintenances()->create($validated);
@@ -66,6 +67,7 @@ class AssetMaintenanceController extends Controller
             'cost'             => 'nullable|numeric|min:0',
             'status'           => 'nullable|string|in:pending,in_progress,completed',
             'notes'            => 'nullable|string|max:5000',
+            'signatures'       => 'nullable|json',
         ]);
 
         $maintenance->update($validated);

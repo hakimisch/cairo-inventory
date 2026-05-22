@@ -6,9 +6,12 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class AssetDisposal extends Model
 {
+    use LogsActivity;
     protected $fillable = [
         'asset_id',
         'request_reason',
@@ -18,10 +21,12 @@ class AssetDisposal extends Model
         'approval_reference',
         'status',          // draft, committee_review, approved, completed, cancelled
         'notes',
+        'signatures',
     ];
 
     protected $casts = [
         'disposal_date' => 'date',
+        'signatures'   => 'array',
     ];
 
     /**
@@ -46,5 +51,13 @@ class AssetDisposal extends Model
     public function disposalSales(): HasMany
     {
         return $this->hasMany(DisposalSale::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
     }
 }

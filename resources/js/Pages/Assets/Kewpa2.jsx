@@ -124,7 +124,7 @@ function KomponenTable({ asset }) {
     return (
         <div className="mb-6">
             <div className="font-bold mb-1">KOMPONEN / AKSESORI</div>
-            <table className="w-full border-collapse border border-black text-center">
+            <table className="w-full border-collapse border border-black text-center responsive-table">
                 <thead className="bg-gray-50">
                     <tr>
                         <th className="border border-black p-2 w-12">Bil</th>
@@ -145,12 +145,12 @@ function KomponenTable({ asset }) {
                     ) : (
                         components.map((c, i) => (
                             <tr key={i}>
-                                <td className="border border-black p-2">{i + 1}</td>
-                                <td className="border border-black p-2 text-left uppercase">{c.item || c.description}</td>
-                                <td className="border border-black p-2">{c.qty ?? 1}</td>
-                                <td className="border border-black p-2">{Number(c.price ?? c.cost ?? 0).toFixed(2)}</td>
-                                <td className="border border-black p-2">{c.serial_no || '-'}</td>
-                                <td className="border border-black p-2">{c.year_added || '-'}</td>
+                                <td data-label="Bil" className="border border-black p-2">{i + 1}</td>
+                                <td data-label="Butiran" className="border border-black p-2 text-left uppercase">{c.item || c.description}</td>
+                                <td data-label="Kuantiti" className="border border-black p-2">{c.qty ?? 1}</td>
+                                <td data-label="Harga (RM)" className="border border-black p-2">{Number(c.price ?? c.cost ?? 0).toFixed(2)}</td>
+                                <td data-label="Siri Komponen" className="border border-black p-2">{c.serial_no || '-'}</td>
+                                <td data-label="Tahun Tambah" className="border border-black p-2">{c.year_added || '-'}</td>
                             </tr>
                         ))
                     )}
@@ -166,7 +166,7 @@ function PenempatanTable({ asset, data, setData, processing, handleAddPlacement 
     return (
         <div className="border border-black mt-6">
             <div className="bg-gray-50 font-bold p-2 border-b border-black text-center">PENEMPATAN</div>
-            <table className="w-full text-center text-[10px]">
+            <table className="w-full text-center text-[10px] responsive-table">
                 <thead>
                     <tr className="border-b border-black">
                         <th className="p-2 border-r border-black">Lokasi</th>
@@ -184,11 +184,11 @@ function PenempatanTable({ asset, data, setData, processing, handleAddPlacement 
                     ) : (
                         placements.map(p => (
                             <tr key={p.id} className="border-b border-black">
-                                <td className="p-2 border-r border-black uppercase">{p.location}</td>
-                                <td className="p-2 border-r border-black">{new Date(p.assigned_date).toLocaleDateString('ms-MY')}</td>
-                                <td className="p-2 border-r border-black">{p.custodian_name}</td>
-                                <td className="p-2 border-r border-black">{p.staff_id || '-'}</td>
-                                <td className="p-2"></td>
+                                <td data-label="Lokasi" className="p-2 border-r border-black uppercase">{p.location}</td>
+                                <td data-label="Tarikh" className="p-2 border-r border-black">{new Date(p.assigned_date).toLocaleDateString('ms-MY')}</td>
+                                <td data-label="Nama Staf" className="p-2 border-r border-black">{p.custodian_name}</td>
+                                <td data-label="No. Pekerja" className="p-2 border-r border-black">{p.staff_id || '-'}</td>
+                                <td data-label="Tandatangan" className="p-2 empty-cell"></td>
                             </tr>
                         ))
                     )}
@@ -245,7 +245,7 @@ function PemeriksaanTable({ asset, data, setData, post, processing }) {
     return (
         <div className="border border-black mt-6">
             <div className="bg-gray-50 font-bold p-2 border-b border-black text-center">PEMERIKSAAN</div>
-            <table className="w-full text-center text-[10px]">
+            <table className="w-full text-center text-[10px] responsive-table">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-black">
                         <th className="p-2 border-r border-black w-[15%]">Tarikh</th>
@@ -261,11 +261,11 @@ function PemeriksaanTable({ asset, data, setData, post, processing }) {
                     ) : (
                         inspections.map(insp => (
                             <tr key={insp.id} className="border-b border-black">
-                                <td className="p-2 border-r border-black">{new Date(insp.inspection_date).toLocaleDateString('ms-MY')}</td>
-                                <td className="p-2 border-r border-black uppercase">{insp.status}</td>
-                                <td className="p-2 border-r border-black">{insp.inspector_name}</td>
-                                <td className="p-2 border-r border-black text-left">{insp.notes || '-'}</td>
-                                <td className="p-2"></td>
+                                <td data-label="Tarikh" className="p-2 border-r border-black">{new Date(insp.inspection_date).toLocaleDateString('ms-MY')}</td>
+                                <td data-label="Status Aset" className="p-2 border-r border-black uppercase">{insp.status}</td>
+                                <td data-label="Nama Pemeriksa" className="p-2 border-r border-black">{insp.inspector_name}</td>
+                                <td data-label="Catatan" className="p-2 border-r border-black text-left">{insp.notes || '-'}</td>
+                                <td data-label="Tandatangan" className="p-2 empty-cell"></td>
                             </tr>
                         ))
                     )}
@@ -297,7 +297,7 @@ function PelupusanTable({ asset }) {
     return (
         <div className="border border-black mt-6">
             <div className="bg-gray-50 font-bold p-2 border-b border-black text-center">PELUPUSAN / HAPUS KIRA (KEW.PA-17/18/19)</div>
-            <table className="w-full text-center text-[10px]">
+            <table className="w-full text-center text-[10px] responsive-table">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-black">
                         <th className="p-2 border-r border-black w-[18%]">Tarikh</th>
@@ -313,11 +313,11 @@ function PelupusanTable({ asset }) {
                     ) : (
                         disposals.map(d => (
                             <tr key={d.id} className="border-b border-black">
-                                <td className="p-2 border-r border-black">{d.disposal_date ? new Date(d.disposal_date).toLocaleDateString('ms-MY') : '-'}</td>
-                                <td className="p-2 border-r border-black">{d.approval_reference || '-'}</td>
-                                <td className="p-2 border-r border-black">{d.disposal_method || '-'}</td>
-                                <td className="p-2 border-r border-black uppercase">{d.status}</td>
-                                <td className="p-2"></td>
+                                <td data-label="Tarikh" className="p-2 border-r border-black">{d.disposal_date ? new Date(d.disposal_date).toLocaleDateString('ms-MY') : '-'}</td>
+                                <td data-label="Rujukan Kelulusan" className="p-2 border-r border-black">{d.approval_reference || '-'}</td>
+                                <td data-label="Kaedah Pelupusan" className="p-2 border-r border-black">{d.disposal_method || '-'}</td>
+                                <td data-label="Status" className="p-2 border-r border-black uppercase">{d.status}</td>
+                                <td data-label="Tandatangan" className="p-2 empty-cell"></td>
                             </tr>
                         ))
                     )}
@@ -351,7 +351,7 @@ function MaintenanceTable({ asset }) {
     return (
         <div className="border border-black mt-6">
             <div className="bg-gray-50 font-bold p-2 border-b border-black text-center">PENYELENGGARAAN (KEW.PA-13/14)</div>
-            <table className="w-full text-center text-[10px]">
+            <table className="w-full text-center text-[10px] responsive-table">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-black">
                         <th className="p-2 border-r border-black w-[12%]">Tarikh</th>
@@ -368,12 +368,12 @@ function MaintenanceTable({ asset }) {
                     ) : (
                         maintenances.map(m => (
                             <tr key={m.id} className="border-b border-black">
-                                <td className="p-2 border-r border-black">{new Date(m.maintenance_date).toLocaleDateString('ms-MY')}</td>
-                                <td className="p-2 border-r border-black text-left">{m.description}</td>
-                                <td className="p-2 border-r border-black">{m.company_name || '-'}</td>
-                                <td className="p-2 border-r border-black text-right">{Number(m.cost).toFixed(2)}</td>
-                                <td className="p-2 border-r border-black uppercase">{m.status}</td>
-                                <td className="p-2"></td>
+                                <td data-label="Tarikh" className="p-2 border-r border-black">{new Date(m.maintenance_date).toLocaleDateString('ms-MY')}</td>
+                                <td data-label="Perihal" className="p-2 border-r border-black text-left">{m.description}</td>
+                                <td data-label="Kontraktor" className="p-2 border-r border-black">{m.company_name || '-'}</td>
+                                <td data-label="Kos (RM)" className="p-2 border-r border-black text-right">{Number(m.cost).toFixed(2)}</td>
+                                <td data-label="Status" className="p-2 border-r border-black uppercase">{m.status}</td>
+                                <td data-label="Tandatangan" className="p-2 empty-cell"></td>
                             </tr>
                         ))
                     )}
@@ -427,7 +427,7 @@ function TransferTable({ asset }) {
     return (
         <div className="border border-black mt-6">
             <div className="bg-gray-50 font-bold p-2 border-b border-black text-center">DAFTAR PERGERAKAN (KEW.PA-6)</div>
-            <table className="w-full text-center text-[10px]">
+            <table className="w-full text-center text-[10px] responsive-table">
                 <thead className="bg-gray-50">
                     <tr className="border-b border-black">
                         <th className="p-2 border-r border-black w-[12%]">Tarikh</th>
@@ -444,12 +444,12 @@ function TransferTable({ asset }) {
                     ) : (
                         transfers.map(t => (
                             <tr key={t.id} className="border-b border-black">
-                                <td className="p-2 border-r border-black">{new Date(t.transfer_date).toLocaleDateString('ms-MY')}</td>
-                                <td className="p-2 border-r border-black">{t.from_location || asset.location || '-'}</td>
-                                <td className="p-2 border-r border-black">{t.to_location}</td>
-                                <td className="p-2 border-r border-black">{t.to_custodian}</td>
-                                <td className="p-2 border-r border-black uppercase">{t.status}</td>
-                                <td className="p-2"></td>
+                                <td data-label="Tarikh" className="p-2 border-r border-black">{new Date(t.transfer_date).toLocaleDateString('ms-MY')}</td>
+                                <td data-label="Dari" className="p-2 border-r border-black">{t.from_location || asset.location || '-'}</td>
+                                <td data-label="Ke" className="p-2 border-r border-black">{t.to_location}</td>
+                                <td data-label="Penjaga" className="p-2 border-r border-black">{t.to_custodian}</td>
+                                <td data-label="Status" className="p-2 border-r border-black uppercase">{t.status}</td>
+                                <td data-label="Tandatangan" className="p-2 empty-cell"></td>
                             </tr>
                         ))
                     )}
@@ -528,7 +528,7 @@ function UpgradeTable({ asset }) {
     return (
         <div className="mb-6">
             <div className="font-bold mb-1 uppercase">BAHAGIAN B : BUTIR-BUTIR PENAMBAHAN, PENGGANTIAN DAN NAIKTARAF</div>
-            <table className="w-full border-collapse border border-black text-center text-[10px]">
+            <table className="w-full border-collapse border border-black text-center text-[10px] responsive-table">
                 <thead className="bg-gray-50 font-bold">
                     <tr>
                         <th className="border border-black p-1.5 w-8">Bil</th>
@@ -565,12 +565,12 @@ function UpgradeTable({ asset }) {
                             </tr>
                         ) : (
                             <tr key={u.id} className="h-10">
-                                <td className="border border-black p-1.5">{i + 1}</td>
-                                <td className="border border-black p-1.5">{new Date(u.date).toLocaleDateString('ms-MY')}</td>
-                                <td className="border border-black p-1.5 text-left uppercase">{u.description}</td>
-                                <td className="border border-black p-1.5">{u.warranty_period || '-'}</td>
-                                <td className="border border-black p-1.5 text-right">{Number(u.cost).toFixed(2)}</td>
-                                <td className="border border-black p-1.5 print:hidden">
+                                <td data-label="Bil" className="border border-black p-1.5">{i + 1}</td>
+                                <td data-label="Tarikh" className="border border-black p-1.5">{new Date(u.date).toLocaleDateString('ms-MY')}</td>
+                                <td data-label="Butiran" className="border border-black p-1.5 text-left uppercase">{u.description}</td>
+                                <td data-label="Tempoh Jaminan" className="border border-black p-1.5">{u.warranty_period || '-'}</td>
+                                <td data-label="Kos (RM)" className="border border-black p-1.5 text-right">{Number(u.cost).toFixed(2)}</td>
+                                <td data-label="Tindakan" className="border border-black p-1.5 print:hidden">
                                     <button onClick={() => handleEdit(u)} className="bg-blue-100 text-blue-700 text-[10px] font-bold py-1 px-2 rounded mr-1 border border-blue-200">Edit</button>
                                     <button onClick={() => handleDelete(u)} className="bg-red-100 text-red-700 text-[10px] font-bold py-1 px-2 rounded border border-red-200">Padam</button>
                                 </td>
@@ -684,6 +684,33 @@ export default function Kewpa2({ asset }) {
                     .print\\:hidden { display: none !important; }
                     body { margin: 0; }
                 }
+                @media (max-width: 767px) {
+                    .responsive-table thead { display: none; }
+                    .responsive-table tr {
+                        display: block;
+                        margin-bottom: 10px;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
+                        padding: 10px;
+                        background: white;
+                    }
+                    .responsive-table td {
+                        display: block;
+                        text-align: right;
+                        padding: 5px 0;
+                        border: none !important;
+                    }
+                    .responsive-table td::before {
+                        content: attr(data-label);
+                        float: left;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        font-size: 9px;
+                        color: #8A8480;
+                        letter-spacing: 0.06em;
+                    }
+                    .responsive-table .empty-cell::before { content: none; }
+                }
             `}</style>
 
             <div className="py-8 bg-gray-100 min-h-screen">
@@ -758,6 +785,13 @@ export default function Kewpa2({ asset }) {
                         </button>
                         <a
                             href={route('assets.kewpa2.download', asset.id)}
+                            onClick={(e) => {
+                                e.preventDefault();
+                                const copies = window.prompt('Bilangan salinan?', '3');
+                                if (copies && !isNaN(copies) && parseInt(copies) > 0) {
+                                    window.location.href = route('assets.kewpa2.download', asset.id) + `?copies=${parseInt(copies)}`;
+                                }
+                            }}
                             className="px-6 py-2 rounded font-bold shadow text-white"
                             style={{ background: '#5C001F' }}
                         >

@@ -160,9 +160,26 @@ export default function Kewpa19({ disposals }) {
                                                     color         : UTM.white,
                                                     textDecoration: 'none',
                                                     whiteSpace    : 'nowrap',
+                                                    marginRight   : 4,
                                                 }}
                                             >
                                                 PDF KEW.PA-19
+                                            </a>
+                                            <a
+                                                href={route('disposals.kewpa15.download', disposal.id)}
+                                                style={{
+                                                    display       : 'inline-block',
+                                                    padding       : '4px 12px',
+                                                    borderRadius  : 4,
+                                                    fontSize      : 10,
+                                                    fontWeight    : 700,
+                                                    background    : '#1E40AF',
+                                                    color         : UTM.white,
+                                                    textDecoration: 'none',
+                                                    whiteSpace    : 'nowrap',
+                                                }}
+                                            >
+                                                PA-15 JK
                                             </a>
                                         </td>
                                     </tr>

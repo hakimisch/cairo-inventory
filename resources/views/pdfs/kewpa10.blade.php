@@ -46,7 +46,12 @@
                     <td class="border border-black p-1.5 uppercase">{{ $insp->inspector_name }}</td>
                     <td class="border border-black p-1.5 uppercase">{{ $insp->status }}</td>
                     <td class="border border-black p-1.5 text-left">{{ $insp->notes ?? '-' }}</td>
-                    <td class="border border-black p-1.5"></td>
+                    <td class="border border-black p-1.5">
+                        @php $isigs = json_decode($insp->signatures ?? '{}', true); @endphp
+                        @if(!empty($isigs['inspector']))
+                            <img src="{{ $isigs['inspector'] }}" style="height:28px; vertical-align:middle;">
+                        @endif
+                    </td>
                 </tr>
             @empty
                 <tr class="h-8">
@@ -57,6 +62,7 @@
     </table>
 
     <div class="mt-8">
+        {{-- Signatures come from inspection model's signatures JSON --}}
         <div class="mt-16 border-t border-black pt-1 text-center font-bold w-64 mx-auto">Tandatangan Pemeriksa</div>
         <div class="mt-2 text-center">Nama : ........................................</div>
         <div class="text-center">Jawatan : ........................................</div>

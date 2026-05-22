@@ -209,6 +209,40 @@ export default function Kewpa28Index({ records, filters, assets }) {
     return (
         <AuthenticatedLayout>
             <Head title="KEW.PA-28→32 — Laporan Kehilangan Aset" />
+            <style>{`
+                @media (max-width: 767px) {
+                    .resp-table thead { display: none; }
+                    .resp-table tr {
+                        display: block;
+                        margin-bottom: 12px;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 8px;
+                        padding: 12px;
+                        background: white;
+                    }
+                    .resp-table td {
+                        display: block;
+                        text-align: right;
+                        padding: 6px 0;
+                        border: none !important;
+                    }
+                    .resp-table td::before {
+                        content: attr(data-label);
+                        float: left;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        font-size: 10px;
+                        color: #8A8480;
+                        letter-spacing: 0.07em;
+                    }
+                    .resp-table .actions-wrap {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 4px;
+                        justify-content: flex-end;
+                    }
+                }
+            `}</style>
             <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 24px' }}>
                 <div style={{ marginBottom: 28 }}>
                     <h1 style={{ fontSize: 22, fontWeight: 800, color: UTM.maroon, margin: 0 }}>KEW.PA-28→32 — Laporan Kehilangan Aset</h1>
@@ -257,7 +291,7 @@ export default function Kewpa28Index({ records, filters, assets }) {
                 {/* Table */}
                 <div style={{ background: UTM.white, borderRadius: 12, border: `1px solid ${UTM.gray100}`, overflow: 'hidden' }}>
                     <div style={{ overflowX: 'auto' }}>
-                        <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse' }}>
+                        <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse' }} className="resp-table">
                             <thead><tr style={{ background: UTM.gray50 }}>
                                 <th style={thStyle}>Aset</th>
                                 <th style={thStyle}>Tag</th>
@@ -282,18 +316,19 @@ export default function Kewpa28Index({ records, filters, assets }) {
                                         <tr key={record.id} style={{ background: idx % 2 === 0 ? UTM.white : UTM.gray50, transition: 'background 0.12s' }}
                                             onMouseEnter={e => { e.currentTarget.style.background = '#FFF5E8'; }}
                                             onMouseLeave={e => { e.currentTarget.style.background = idx % 2 === 0 ? UTM.white : UTM.gray50; }}>
-                                            <td style={tdStyle}>
+                                            <td style={tdStyle} data-label="Aset">
                                                 <Link href={route('assets.kewpa3', record.asset_id)} style={{ color: UTM.maroon, fontWeight: 600, textDecoration: 'none' }}>
                                                     {record.asset?.name || '—'}
                                                 </Link>
                                             </td>
-                                            <td style={tdStyle}><span style={{ fontFamily: 'monospace', fontSize: 12, color: UTM.gray500 }}>{record.asset?.asset_tag || '—'}</span></td>
-                                            <td style={tdStyle}>{record.police_report_no || '—'}</td>
-                                            <td style={tdStyle}>{record.incident_location || '—'}</td>
-                                            <td style={tdStyle}>{record.approval_reference || '—'}</td>
-                                            <td style={tdStyle}><StatusBadge status={record.status} /></td>
-                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{record.loss_date ? new Date(record.loss_date).toLocaleDateString('ms-MY') : (record.created_at ? new Date(record.created_at).toLocaleDateString('ms-MY') : '—')}</td>
-                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                                            <td style={tdStyle} data-label="Tag"><span style={{ fontFamily: 'monospace', fontSize: 12, color: UTM.gray500 }}>{record.asset?.asset_tag || '—'}</span></td>
+                                            <td style={tdStyle} data-label="No. Laporan Polis">{record.police_report_no || '—'}</td>
+                                            <td style={tdStyle} data-label="Lokasi Kejadian">{record.incident_location || '—'}</td>
+                                            <td style={tdStyle} data-label="Rujukan Kelulusan">{record.approval_reference || '—'}</td>
+                                            <td style={tdStyle} data-label="Status"><StatusBadge status={record.status} /></td>
+                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' }} data-label="Tarikh">{record.loss_date ? new Date(record.loss_date).toLocaleDateString('ms-MY') : (record.created_at ? new Date(record.created_at).toLocaleDateString('ms-MY') : '—')}</td>
+                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' }} data-label="Tindakan">
+                                                <div className="actions-wrap" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                                 <Link href={route('assets.kewpa2', record.asset_id)}
                                                     style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#EDE9E4', color: UTM.gray700, textDecoration: 'none', marginRight: 4 }}>
                                                     Borang
@@ -302,8 +337,13 @@ export default function Kewpa28Index({ records, filters, assets }) {
                                                     style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: UTM.maroon, color: UTM.white, textDecoration: 'none', marginRight: 4 }}>
                                                     KEW.PA-28
                                                 </a>
+                                                <a href={route('loss-reports.kewpa29.download', record.id)}
+                                                    style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#1E40AF', color: UTM.white, textDecoration: 'none', marginRight: 4 }}>
+                                                    PA-29 JK
+                                                </a>
                                                 <button onClick={() => setEditingId(record.id)} style={{ padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#F5F3FF', color: '#5B21B6', border: 'none', cursor: 'pointer', marginRight: 4 }}>Edit</button>
                                                 <button onClick={() => handleDelete(record)} style={{ padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF2F2', color: '#DC2626', border: 'none', cursor: 'pointer' }}>Padam</button>
+                                                </div>
                                             </td>
                                         </tr>
                                     )

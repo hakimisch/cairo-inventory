@@ -168,6 +168,7 @@
     </table>
     @endif
 
+    {{-- Signatures stored in $sale->signatures JSON --}}
     <div class="footer">
         <p>KEW.PA-21 — Kenyataan Tawaran Tender Pelupusan Aset Alih Universiti | Universiti Teknologi Malaysia</p>
         <p>Dokumen ini sah dan lengkap. Document is valid and complete.</p>

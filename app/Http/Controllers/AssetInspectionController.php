@@ -39,6 +39,7 @@ class AssetInspectionController extends Controller
             'status'          => 'required|string|max:255',
             'inspector_name'  => 'nullable|string|max:255',
             'notes'           => 'nullable|string',
+            'signatures'      => 'nullable|json',
         ]);
 
         $validated['inspector_name'] ??= $request->user()->name;
@@ -58,6 +59,7 @@ class AssetInspectionController extends Controller
             'status'          => 'required|string|max:255',
             'inspector_name'  => 'nullable|string|max:255',
             'notes'           => 'nullable|string',
+            'signatures'      => 'nullable|json',
         ]);
 
         $inspection->update($validated);

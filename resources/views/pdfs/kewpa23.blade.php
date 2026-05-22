@@ -150,6 +150,7 @@
     </div>
 
     <!-- Committee Signature -->
+    {{-- Signatures stored in $sale->signatures JSON --}}
     <table>
         <tr>
             <th colspan="3">E. JAWATANKUASA PEMBUKA TENDER / TENDER OPENING COMMITTEE</th>
@@ -158,19 +159,40 @@
             <td style="width:33%;">
                 <strong>Pengerusi / Chairman</strong><br><br>
                 Nama / Name:<br>
-                Tandatangan / Signature:<br>
+                Tandatangan / Signature:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['pengerusi']))
+                    <br><img src="{{ $sigs['pengerusi'] }}" style="height:40px; vertical-align:middle; display:block;">
+                @else
+                    <br>_____________________
+                @endif
+                <br>
                 Tarikh / Date:
             </td>
             <td style="width:33%;">
                 <strong>Ahli 1 / Member 1</strong><br><br>
                 Nama / Name:<br>
-                Tandatangan / Signature:<br>
+                Tandatangan / Signature:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['ahli1']))
+                    <br><img src="{{ $sigs['ahli1'] }}" style="height:40px; vertical-align:middle; display:block;">
+                @else
+                    <br>_____________________
+                @endif
+                <br>
                 Tarikh / Date:
             </td>
             <td style="width:33%;">
                 <strong>Ahli 2 / Member 2</strong><br><br>
                 Nama / Name:<br>
-                Tandatangan / Signature:<br>
+                Tandatangan / Signature:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['ahli2']))
+                    <br><img src="{{ $sigs['ahli2'] }}" style="height:40px; vertical-align:middle; display:block;">
+                @else
+                    <br>_____________________
+                @endif
+                <br>
                 Tarikh / Date:
             </td>
         </tr>

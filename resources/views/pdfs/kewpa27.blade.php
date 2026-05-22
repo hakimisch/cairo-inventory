@@ -150,6 +150,7 @@
     @endif
 
     <!-- Signatures -->
+    {{-- Signatures stored in $sale->signatures JSON --}}
     <table>
         <tr>
             <th colspan="3">F. PENGESAHAN / ENDORSEMENT</th>
@@ -160,21 +161,39 @@
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
-                Tandatangan: __________________
+                Tandatangan:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['pegawai_pelupusan']))
+                    <br><img src="{{ $sigs['pegawai_pelupusan'] }}" style="height:35px; vertical-align:middle; display:block;">
+                @else
+                    __________________
+                @endif
             </td>
             <td style="width:33%;">
                 <strong>Pengerusi Jawatankuasa:</strong><br>
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
-                Tandatangan: __________________
+                Tandatangan:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['pengerusi']))
+                    <br><img src="{{ $sigs['pengerusi'] }}" style="height:35px; vertical-align:middle; display:block;">
+                @else
+                    __________________
+                @endif
             </td>
             <td style="width:33%;">
                 <strong>Pendaftar:</strong><br>
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
-                Tandatangan: __________________
+                Tandatangan:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['pendaftar']))
+                    <br><img src="{{ $sigs['pendaftar'] }}" style="height:35px; vertical-align:middle; display:block;">
+                @else
+                    __________________
+                @endif
             </td>
         </tr>
     </table>

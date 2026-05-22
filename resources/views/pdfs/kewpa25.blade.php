@@ -125,7 +125,13 @@
                 <table>
                     <tr>
                         <td style="border: none; width: 50%;">
-                            <strong>Tandatangan:</strong> _________________________<br><br>
+                            <strong>Tandatangan:</strong>
+                            @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                            @if(!empty($sigs['bidder']))
+                                <br><img src="{{ $sigs['bidder'] }}" style="height:40px; vertical-align:middle; display:block;">
+                            @else
+                                _________________________<br><br>
+                            @endif
                             <strong>Nama:</strong> _________________________<br><br>
                             <strong>Tarikh:</strong> _________________________<br>
                         </td>

@@ -4,9 +4,12 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class AssetMaintenance extends Model
 {
+    use LogsActivity;
     protected $fillable = [
         'asset_id',
         'maintenance_date',
@@ -16,11 +19,13 @@ class AssetMaintenance extends Model
         'cost',
         'status',
         'notes',
+        'signatures',
     ];
 
     protected $casts = [
         'maintenance_date' => 'date',
         'cost'             => 'decimal:2',
+        'signatures'       => 'array',
     ];
 
     /**
@@ -29,5 +34,13 @@ class AssetMaintenance extends Model
     public function asset(): BelongsTo
     {
         return $this->belongsTo(Asset::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
     }
 }

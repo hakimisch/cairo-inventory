@@ -83,7 +83,13 @@ class AssetLossReportController extends Controller
             'notes'                => 'nullable|string|max:5000',
         ]);
 
+        $oldStatus = $lossReport->status;
         $lossReport->update($validated);
+
+        // Fire event if status changed
+        if ($lossReport->wasChanged('status')) {
+            event(new \App\Events\LossReportStatusChanged($lossReport->fresh(), $oldStatus, $lossReport->status));
+        }
 
         return redirect()->back()->with('success', 'Loss report updated successfully.');
     }
@@ -106,6 +112,28 @@ class AssetLossReportController extends Controller
         $asset->load('lossReports');
         return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa28', ['asset' => $asset])
             ->format('a4')->name("KEW-PA-28-{$asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
+    }
+
+    // ─── PA-29: Appointment Letter for Loss Investigation Committee ──
+
+    /**
+     * Download KEW.PA-29 — Surat Pelantikan JK Penyiasat Kehilangan.
+     */
+    public function downloadKewpa29(AssetLossReport $lossReport)
+    {
+        $lossReport->load('asset', 'committeeAppointments.user');
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa29', ['lossReport' => $lossReport])
+            ->format('a4')->name("KEW-PA-29-{$lossReport->asset->asset_tag}.pdf")
             ->withBrowsershot(function ($b) {
                 if (PHP_OS_FAMILY === 'Windows') {
                     $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');

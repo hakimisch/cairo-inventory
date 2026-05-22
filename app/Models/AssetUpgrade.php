@@ -3,9 +3,12 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class AssetUpgrade extends Model
 {
+    use LogsActivity;
     protected $fillable = [
         'asset_id', 
         'date', 
@@ -22,5 +25,13 @@ class AssetUpgrade extends Model
     public function asset()
     {
         return $this->belongsTo(Asset::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
     }
 }

@@ -79,6 +79,7 @@
     </div>
 
     <!-- Single signature: Pegawai Aset -->
+    {{-- Signatures could be stored on loss report model's signatures JSON --}}
     <div class="section-title">PENGESAHAN PEGAWAI ASET</div>
 
     <table>

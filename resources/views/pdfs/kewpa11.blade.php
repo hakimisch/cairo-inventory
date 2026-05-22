@@ -65,12 +65,14 @@
 
     <div class="mt-8 grid grid-cols-2 gap-8">
         <div>
+            {{-- Signatures come from inspection model's signatures JSON --}}
             <div class="mt-16 border-t border-black pt-1 text-center font-bold">Pemeriksa 1</div>
             <div class="mt-2">Nama : ........................................</div>
             <div>Jawatan : ........................................</div>
             <div>Tarikh : ........................................</div>
         </div>
         <div>
+            {{-- Signatures come from inspection model's signatures JSON --}}
             <div class="mt-16 border-t border-black pt-1 text-center font-bold">Pemeriksa 2</div>
             <div class="mt-2">Nama : ........................................</div>
             <div>Jawatan : ........................................</div>

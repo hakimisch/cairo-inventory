@@ -161,6 +161,7 @@
     </table>
 
     <!-- Signature -->
+    {{-- Signatures stored in $sale->signatures JSON --}}
     <table>
         <tr>
             <th colspan="2">TANDATANGAN / SIGNATURE</th>
@@ -168,12 +169,26 @@
         <tr class="signature-row">
             <td style="width:50%;">
                 <strong>Nama / Name:</strong><br>
-                <strong>Tandatangan / Signature:</strong><br>
+                <strong>Tandatangan / Signature:</strong>
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['bidder1']))
+                    <br><img src="{{ $sigs['bidder1'] }}" style="height:40px; vertical-align:middle; display:block;">
+                @else
+                    <br>______________________________
+                @endif
+                <br>
                 <strong>Tarikh / Date:</strong>
             </td>
             <td style="width:50%;">
                 <strong>Nama / Name:</strong><br>
-                <strong>Tandatangan / Signature:</strong><br>
+                <strong>Tandatangan / Signature:</strong>
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['bidder2']))
+                    <br><img src="{{ $sigs['bidder2'] }}" style="height:40px; vertical-align:middle; display:block;">
+                @else
+                    <br>______________________________
+                @endif
+                <br>
                 <strong>Tarikh / Date:</strong>
             </td>
         </tr>

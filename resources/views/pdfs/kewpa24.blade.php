@@ -100,6 +100,7 @@
     </table>
     @endif
 
+{{-- Signatures stored in $sale->signatures JSON --}}
     <div class="footer">
         <p>KEW.PA-24 — Kenyataan Tawaran Sebutharga Pelupusan Aset Alih | Universiti Teknologi Malaysia</p>
         <p>Dokumen ini sah dan lengkap. Document is valid and complete.</p>

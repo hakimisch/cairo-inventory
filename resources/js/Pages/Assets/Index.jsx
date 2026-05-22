@@ -394,6 +394,24 @@ export default function Index({ assets, totalValue }) {
                                                         {asset.asset_type === 'fixed_asset' ? 'KEW.PA-2' : 'KEW.PA-3'}
                                                     </a>
 
+                                                    {/* Label Download Button */}
+                                                    <a
+                                                        href={route('assets.label', asset.id)}
+                                                        style={{
+                                                            display     : 'inline-block',
+                                                            padding     : '5px 12px',
+                                                            borderRadius: 6,
+                                                            fontSize    : '12px',
+                                                            fontWeight  : 700,
+                                                            background  : '#7B1FA2',
+                                                            color       : UTM.white,
+                                                            textDecoration: 'none',
+                                                            marginRight : 6,
+                                                        }}
+                                                    >
+                                                        Label
+                                                    </a>
+
                                                     {/* Edit Button */}
                                                     <Link
                                                         href={route('assets.edit', asset.id)}

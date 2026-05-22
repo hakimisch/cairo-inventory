@@ -32,6 +32,33 @@ export default function Kewpa1({ receiving }) {
                     .print\\:hidden { display: none !important; }
                     body { margin: 0; }
                 }
+                @media (max-width: 767px) {
+                    .responsive-table thead { display: none; }
+                    .responsive-table tr {
+                        display: block;
+                        margin-bottom: 10px;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
+                        padding: 10px;
+                        background: white;
+                    }
+                    .responsive-table td {
+                        display: block;
+                        text-align: right;
+                        padding: 5px 0;
+                        border: none !important;
+                    }
+                    .responsive-table td::before {
+                        content: attr(data-label);
+                        float: left;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        font-size: 9px;
+                        color: #8A8480;
+                        letter-spacing: 0.06em;
+                    }
+                    .responsive-table .empty-cell::before { content: none; }
+                }
             `}</style>
 
             <div className="py-8 bg-gray-100 min-h-screen">
@@ -84,7 +111,7 @@ export default function Kewpa1({ receiving }) {
                     </table>
 
                     {/* ── Items table ── */}
-                    <table className="w-full border-collapse border border-black mb-8 text-center text-[10px]">
+                    <table className="w-full border-collapse border border-black mb-8 text-center text-[10px] responsive-table">
                         <thead>
                             <tr className="font-bold bg-gray-50">
                                 <th className="border border-black p-2 w-8" rowSpan="2">Bil</th>
@@ -105,23 +132,23 @@ export default function Kewpa1({ receiving }) {
                                 const diff = (item.quantity_ordered ?? 0) - (item.quantity_received ?? 0);
                                 return (
                                     <tr key={idx} className="h-16 align-top">
-                                        <td className="border border-black p-2">{idx + 1}</td>
-                                        <td className="border border-black p-2 font-mono">
+                                        <td data-label="Bil" className="border border-black p-2">{idx + 1}</td>
+                                        <td data-label="Nota Hantaran" className="border border-black p-2 font-mono">
                                             {item.delivery_order_no}<br/>
                                             {new Date(item.delivery_order_date ?? receiving.created_at).toLocaleDateString('ms-MY')}
                                         </td>
-                                        <td className="border border-black p-2 text-left uppercase font-medium">
+                                        <td data-label="Nama Aset" className="border border-black p-2 text-left uppercase font-medium">
                                             {item.item_description}
                                         </td>
-                                        <td className="border border-black p-2 font-bold">{item.quantity_ordered}</td>
-                                        <td className="border border-black p-2 font-bold">{item.quantity_received}</td>
-                                        <td className={`border border-black p-2 font-bold ${diff !== 0 ? 'text-red-600' : ''}`}>
+                                        <td data-label="Dipesan" className="border border-black p-2 font-bold">{item.quantity_ordered}</td>
+                                        <td data-label="Diterima" className="border border-black p-2 font-bold">{item.quantity_received}</td>
+                                        <td data-label="Perselisihan" className={`border border-black p-2 font-bold ${diff !== 0 ? 'text-red-600' : ''}`}>
                                             {diff !== 0 ? diff : '-'}
                                         </td>
-                                        <td className="border border-black p-2 uppercase text-red-600">
+                                        <td data-label="Kerosakan" className="border border-black p-2 uppercase text-red-600">
                                             {item.damage_description || '-'}
                                         </td>
-                                        <td className="border border-black p-2">{item.notes || '-'}</td>
+                                        <td data-label="Catatan" className="border border-black p-2">{item.notes || '-'}</td>
                                     </tr>
                                 );
                             })}

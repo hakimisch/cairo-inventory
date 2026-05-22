@@ -107,7 +107,13 @@
 
     <div class="signature-row">
         <div class="signature-box">
-            <div class="sig-line">Tandatangan</div>
+            @php $sigs = json_decode($disposal->signatures ?? '{}', true); @endphp
+            <div class="sig-line">
+                Tandatangan
+                @if(!empty($sigs['pegawai1']))
+                    <br><img src="{{ $sigs['pegawai1'] }}" style="height:40px; vertical-align:middle; display:block; margin:4px auto;">
+                @endif
+            </div>
             <div class="sig-label">
                 Nama: ........................................<br>
                 Jawatan: ........................................<br>
@@ -115,7 +121,13 @@
             </div>
         </div>
         <div class="signature-box">
-            <div class="sig-line">Tandatangan</div>
+            @php $sigs = json_decode($disposal->signatures ?? '{}', true); @endphp
+            <div class="sig-line">
+                Tandatangan
+                @if(!empty($sigs['pegawai2']))
+                    <br><img src="{{ $sigs['pegawai2'] }}" style="height:40px; vertical-align:middle; display:block; margin:4px auto;">
+                @endif
+            </div>
             <div class="sig-label">
                 Nama: ........................................<br>
                 Jawatan: ........................................<br>

@@ -3,9 +3,13 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class Receiving extends Model
 {
+    use LogsActivity;
+
     protected $fillable = [
         'receive_no',
         'supplier_name',
@@ -33,4 +37,12 @@ class Receiving extends Model
         'unit_price'  => 'decimal:2',
         'total_price' => 'decimal:2',
     ];
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
+    }
 }

@@ -145,6 +145,7 @@
     </table>
 
     <!-- Signatures -->
+    {{-- Signatures could be stored on assessment model's signatures JSON --}}
     <table>
         <tr>
             <th colspan="3">E. PENGESAHAN / ENDORSEMENT</th>

@@ -398,6 +398,40 @@ export default function Index({ sales, filters, typeCounts, disposals }) {
             }
         >
             <Head title="Disposal Sales" />
+            <style>{`
+                @media (max-width: 767px) {
+                    .resp-table thead { display: none; }
+                    .resp-table tr {
+                        display: block;
+                        margin-bottom: 12px;
+                        border: 1px solid #e5e7eb;
+                        border-radius: 8px;
+                        padding: 12px;
+                        background: white;
+                    }
+                    .resp-table td {
+                        display: block;
+                        text-align: right;
+                        padding: 6px 0;
+                        border: none !important;
+                    }
+                    .resp-table td::before {
+                        content: attr(data-label);
+                        float: left;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        font-size: 10px;
+                        color: #8A8480;
+                        letter-spacing: 0.07em;
+                    }
+                    .resp-table .actions-wrap {
+                        display: flex;
+                        flex-wrap: wrap;
+                        gap: 4px;
+                        justify-content: flex-end;
+                    }
+                }
+            `}</style>
 
             <div style={{ background: UTM.gray50, minHeight: '100vh', padding: '28px 24px' }}>
                 <div style={{ maxWidth: 1280, margin: '0 auto' }}>
@@ -518,7 +552,7 @@ export default function Index({ sales, filters, typeCounts, disposals }) {
 
                         {/* ── Table ────────────────────────────────────────── */}
                         <div style={{ overflowX: 'auto', width: '100%' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 800 }} className="resp-table">
                                 <thead>
                                     <tr>
                                         <th style={thStyle}>Rujukan</th>
@@ -547,21 +581,22 @@ sales.data?.map((sale, index) => (
                                                     onMouseEnter={e => { if(expandedId !== sale.id) e.currentTarget.style.background = '#FFF5E8' }}
                                                     onMouseLeave={e => { if(expandedId !== sale.id) e.currentTarget.style.background = index % 2 === 0 ? UTM.white : UTM.gray50 }}
                                                 >
-                                                    <td style={tdStyle}>
+                                                    <td style={tdStyle} data-label="Rujukan">
                                                         <span style={{ fontWeight: 600, color: UTM.maroon }}>{sale.sale_reference}</span>
                                                     </td>
-                                                    <td style={tdStyle}><SaleTypeBadge type={sale.sale_type} /></td>
-                                                    <td style={tdStyle}>
+                                                    <td style={tdStyle} data-label="Jenis"><SaleTypeBadge type={sale.sale_type} /></td>
+                                                    <td style={tdStyle} data-label="Aset">
                                                         {sale.asset_disposal?.asset?.name ?? '—'}
                                                         <span style={{ fontFamily: 'monospace', fontSize: 11, color: UTM.gray500, marginLeft: 6 }}>
                                                             ({sale.asset_disposal?.asset?.asset_tag ?? '—'})
                                                         </span>
                                                     </td>
-                                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }} data-label="Tarikh">
                                                         {sale.sale_date ?? '—'}
                                                     </td>
-                                                    <td style={tdStyle}><StatusBadge status={sale.status} /></td>
-                                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                                                    <td style={tdStyle} data-label="Status"><StatusBadge status={sale.status} /></td>
+                                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', textAlign: 'right' }} data-label="Tindakan">
+                                                        <div className="actions-wrap" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                                         <button
                                                             onClick={() => setExpandedId(expandedId === sale.id ? null : sale.id)}
                                                             style={{
@@ -615,6 +650,7 @@ sales.data?.map((sale, index) => (
                                                         >
                                                             Hapus
                                                         </button>
+                                                            </div>
                                                     </td>
                                                 </tr>
 

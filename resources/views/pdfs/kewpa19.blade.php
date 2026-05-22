@@ -100,21 +100,42 @@
 
     <div class="signature-row">
         <div class="signature-box">
+            @php $sigs = json_decode($disposal->signatures ?? '{}', true); @endphp
             <div class="sig-label">Pengerusi</div>
             <div class="sig-name">{{ $pengerusi?->user?->name ?? '________________________' }}</div>
-            <div class="sig-line">Tandatangan: ........................................</div>
+            <div class="sig-line">Tandatangan:
+                @if(!empty($sigs['pengerusi']))
+                    <br><img src="{{ $sigs['pengerusi'] }}" style="height:40px; vertical-align:middle; display:block; margin:4px auto;">
+                @else
+                    ........................................
+                @endif
+            </div>
             <div class="sig-line">Tarikh: ........................................</div>
         </div>
         <div class="signature-box">
+            @php $sigs = json_decode($disposal->signatures ?? '{}', true); @endphp
             <div class="sig-label">Ahli 1</div>
             <div class="sig-name">{{ $ahli1?->user?->name ?? '________________________' }}</div>
-            <div class="sig-line">Tandatangan: ........................................</div>
+            <div class="sig-line">Tandatangan:
+                @if(!empty($sigs['ahli1']))
+                    <br><img src="{{ $sigs['ahli1'] }}" style="height:40px; vertical-align:middle; display:block; margin:4px auto;">
+                @else
+                    ........................................
+                @endif
+            </div>
             <div class="sig-line">Tarikh: ........................................</div>
         </div>
         <div class="signature-box">
+            @php $sigs = json_decode($disposal->signatures ?? '{}', true); @endphp
             <div class="sig-label">Ahli 2</div>
             <div class="sig-name">{{ $ahli2?->user?->name ?? '________________________' }}</div>
-            <div class="sig-line">Tandatangan: ........................................</div>
+            <div class="sig-line">Tandatangan:
+                @if(!empty($sigs['ahli2']))
+                    <br><img src="{{ $sigs['ahli2'] }}" style="height:40px; vertical-align:middle; display:block; margin:4px auto;">
+                @else
+                    ........................................
+                @endif
+            </div>
             <div class="sig-line">Tarikh: ........................................</div>
         </div>
     </div>

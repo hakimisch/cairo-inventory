@@ -10,9 +10,11 @@
 </head>
 <body class="p-8 text-[10px] leading-tight bg-white font-serif text-black">
 
+    @php $copies = (int) (request()->query('copies', 1)); @endphp
+    @for ($copy = 1; $copy <= $copies; $copy++)
     {{-- ── Header ── --}}
     <div class="flex justify-between items-start mb-1">
-        <div></div>
+        <div class="text-[10px] italic">Salinan {{ $copy }} / {{ $copies }}</div>
         <div class="text-right">
             <div class="font-bold text-[14px]">KEW.PA-2</div>
             <div class="text-[10px]">(No. Siri Pendaftaran : {{ $asset->asset_tag }})</div>
@@ -37,7 +39,15 @@
                 <td class="border border-black p-1.5 font-bold bg-gray-50 w-[22%]">Kategori</td>
                 <td class="border border-black p-1.5 w-[28%] uppercase">{{ $asset->category }}</td>
                 <td class="border border-black p-1.5 font-bold bg-gray-50 w-[22%]">No. Bar Kod</td>
-                <td class="border border-black p-1.5 w-[28%] font-mono">{{ $asset->national_code ?? $asset->asset_tag }}</td>
+                <td class="border border-black p-1.5 w-[28%]">
+                    @php
+                        $barcodeVal = $asset->national_code ?? $asset->asset_tag;
+                        $barcodePng = (new \Picqer\Barcode\BarcodeGeneratorPNG())->getBarcode($barcodeVal, \Picqer\Barcode\BarcodeGeneratorPNG::TYPE_CODE_128, 2, 50);
+                        $barcodeB64 = base64_encode($barcodePng);
+                    @endphp
+                    <img src="data:image/png;base64,{{ $barcodeB64 }}" alt="{{ $barcodeVal }}" style="height: 30px; vertical-align: middle;">
+                    <span style="font-family: monospace; font-size: 9px; margin-left: 4px;">{{ $barcodeVal }}</span>
+                </td>
             </tr>
             {{-- Row 2: Jenis Vot / No. Baucer Bayaran + Jumlah --}}
             <tr>
@@ -287,5 +297,9 @@
         Nota: Sila sediakan dalam 3 salinan (1-Unit Makmal; 1-Pejabat Pentadbiran; 1-Pejabat Bendahari)
     </div>
 
+    @if ($copy < $copies)
+        <div style="page-break-after: always;"></div>
+    @endif
 </body>
 </html>
+@endfor

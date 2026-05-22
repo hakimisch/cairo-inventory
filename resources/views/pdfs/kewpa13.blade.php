@@ -48,7 +48,12 @@
                     <td class="border border-black p-1.5">{{ $m->contract_no ?? '-' }}</td>
                     <td class="border border-black p-1.5 uppercase">{{ $m->company_name ?? '-' }}</td>
                     <td class="border border-black p-1.5 text-right">{{ number_format($m->cost, 2) }}</td>
-                    <td class="border border-black p-1.5"></td>
+                    <td class="border border-black p-1.5">
+                        @php $msigs = json_decode($m->signatures ?? '{}', true); @endphp
+                        @if(!empty($msigs['officer']))
+                            <img src="{{ $msigs['officer'] }}" style="height:28px; vertical-align:middle;">
+                        @endif
+                    </td>
                 </tr>
             @empty
                 <tr class="h-8">
@@ -59,6 +64,7 @@
     </table>
 
     <div class="mt-8">
+        {{-- Signatures come from maintenance model's signatures JSON --}}
         <div class="mt-16 border-t border-black pt-1 text-center font-bold w-64 mx-auto">Tandatangan Pegawai Bertanggungjawab</div>
         <div class="mt-2 text-center">Nama : ........................................</div>
         <div class="text-center">Tarikh : ........................................</div>

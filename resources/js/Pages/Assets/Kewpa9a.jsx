@@ -16,6 +16,39 @@ export default function Kewpa9a({ asset, placement }) {
                     .print\\:hidden { display: none !important; }
                     body { margin: 0; }
                 }
+                @media (max-width: 767px) {
+                    .responsive-table,
+                    .responsive-table tbody,
+                    .responsive-table tr,
+                    .responsive-table td {
+                        display: block;
+                        width: 100%;
+                        box-sizing: border-box;
+                    }
+                    .responsive-table thead { display: none; }
+                    .responsive-table tr {
+                        margin-bottom: 10px;
+                        border: 1px solid #d1d5db;
+                        border-radius: 6px;
+                        padding: 8px 10px;
+                        background: white;
+                    }
+                    .responsive-table td {
+                        text-align: right;
+                        padding: 4px 0;
+                        border: none !important;
+                    }
+                    .responsive-table td::before {
+                        content: attr(data-label);
+                        float: left;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        font-size: 9px;
+                        color: #8A8480;
+                        letter-spacing: 0.06em;
+                    }
+                    .responsive-table .empty-cell::before { content: none; }
+                }
             `}</style>
 
             <div className="py-8 bg-gray-100 min-h-screen">
@@ -37,131 +70,131 @@ export default function Kewpa9a({ asset, placement }) {
                     </div>
 
                     {/* ── Asset Info ── */}
-                    <table className="w-full border-collapse border border-black mb-6">
+                    <table className="w-full border-collapse border border-black mb-6 responsive-table">
                         <tbody>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50 w-[25%]">No. Siri Pendaftaran</td>
-                                <td className="border border-black p-2 font-mono uppercase">{asset.asset_tag}</td>
-                                <td className="border border-black p-2 font-bold bg-gray-50 w-[20%]">Kategori</td>
-                                <td className="border border-black p-2 uppercase">{asset.category}</td>
+                                <td data-label="No. Siri Pendaftaran" className="border border-black p-2 font-bold bg-gray-50 w-[25%]">No. Siri Pendaftaran</td>
+                                <td data-label="" className="border border-black p-2 font-mono uppercase">{asset.asset_tag}</td>
+                                <td data-label="Kategori" className="border border-black p-2 font-bold bg-gray-50 w-[20%]">Kategori</td>
+                                <td data-label="" className="border border-black p-2 uppercase">{asset.category}</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Nama Aset</td>
-                                <td className="border border-black p-2 uppercase" colSpan="3">{asset.name}</td>
+                                <td data-label="Nama Aset" className="border border-black p-2 font-bold bg-gray-50">Nama Aset</td>
+                                <td data-label="" className="border border-black p-2 uppercase" colSpan="3">{asset.name}</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Jenama / Model</td>
-                                <td className="border border-black p-2 uppercase" colSpan="3">{asset.brand} / {asset.model}</td>
+                                <td data-label="Jenama / Model" className="border border-black p-2 font-bold bg-gray-50">Jenama / Model</td>
+                                <td data-label="" className="border border-black p-2 uppercase" colSpan="3">{asset.brand} / {asset.model}</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">No. Siri</td>
-                                <td className="border border-black p-2 font-mono">{asset.serial_number || '—'}</td>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Lokasi</td>
-                                <td className="border border-black p-2 uppercase">{asset.location}</td>
+                                <td data-label="No. Siri" className="border border-black p-2 font-bold bg-gray-50">No. Siri</td>
+                                <td data-label="" className="border border-black p-2 font-mono">{asset.serial_number || '—'}</td>
+                                <td data-label="Lokasi" className="border border-black p-2 font-bold bg-gray-50">Lokasi</td>
+                                <td data-label="" className="border border-black p-2 uppercase">{asset.location}</td>
                             </tr>
                         </tbody>
                     </table>
 
                     {/* ── Peminjam (Borrower) Section ── */}
                     <div className="font-bold mb-2 uppercase">MAKLUMAT PEMINJAM</div>
-                    <table className="w-full border-collapse border border-black mb-6">
+                    <table className="w-full border-collapse border border-black mb-6 responsive-table">
                         <tbody>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50 w-[30%]">Nama</td>
-                                <td className="border border-black p-2 uppercase">{placement?.custodian_name || '........................................'}</td>
+                                <td data-label="Nama" className="border border-black p-2 font-bold bg-gray-50 w-[30%]">Nama</td>
+                                <td data-label="" className="border border-black p-2 uppercase">{placement?.custodian_name || '........................................'}</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">No. Staf / Matrik</td>
-                                <td className="border border-black p-2">{placement?.matric_no || '........................................'}</td>
+                                <td data-label="No. Staf / Matrik" className="border border-black p-2 font-bold bg-gray-50">No. Staf / Matrik</td>
+                                <td data-label="" className="border border-black p-2">{placement?.matric_no || '........................................'}</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">No. Tel. Bimbit</td>
-                                <td className="border border-black p-2">{placement?.borrower_phone || '........................................'}</td>
+                                <td data-label="No. Tel. Bimbit" className="border border-black p-2 font-bold bg-gray-50">No. Tel. Bimbit</td>
+                                <td data-label="" className="border border-black p-2">{placement?.borrower_phone || '........................................'}</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">PTJ / Unit</td>
-                                <td className="border border-black p-2 uppercase">CAIRO UTM</td>
+                                <td data-label="PTJ / Unit" className="border border-black p-2 font-bold bg-gray-50">PTJ / Unit</td>
+                                <td data-label="" className="border border-black p-2 uppercase">CAIRO UTM</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Tujuan Pinjaman</td>
-                                <td className="border border-black p-2">{placement?.purpose || '................................................................................'}</td>
+                                <td data-label="Tujuan Pinjaman" className="border border-black p-2 font-bold bg-gray-50">Tujuan Pinjaman</td>
+                                <td data-label="" className="border border-black p-2">{placement?.purpose || '................................................................................'}</td>
                             </tr>
                         </tbody>
                     </table>
 
                     {/* ── Loan Details ── */}
                     <div className="font-bold mb-2 uppercase">TEMPOH PINJAMAN</div>
-                    <table className="w-full border-collapse border border-black mb-6">
+                    <table className="w-full border-collapse border border-black mb-6 responsive-table">
                         <tbody>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50 w-[25%]">Tarikh Mula</td>
-                                <td className="border border-black p-2 w-[25%]">
+                                <td data-label="Tarikh Mula" className="border border-black p-2 font-bold bg-gray-50 w-[25%]">Tarikh Mula</td>
+                                <td data-label="" className="border border-black p-2 w-[25%]">
                                     {placement?.assigned_date
                                         ? new Date(placement.assigned_date).toLocaleDateString('ms-MY')
                                         : '................................'}
                                 </td>
-                                <td className="border border-black p-2 font-bold bg-gray-50 w-[25%]">Tarikh Pulang</td>
-                                <td className="border border-black p-2 w-[25%]">
+                                <td data-label="Tarikh Pulang" className="border border-black p-2 font-bold bg-gray-50 w-[25%]">Tarikh Pulang</td>
+                                <td data-label="" className="border border-black p-2 w-[25%]">
                                     {placement?.expected_return_date
                                         ? new Date(placement.expected_return_date).toLocaleDateString('ms-MY')
                                         : '................................'}
                                 </td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Kuantiti</td>
-                                <td className="border border-black p-2">{placement?.quantity_placed || 1}</td>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Lokasi Pinjaman</td>
-                                <td className="border border-black p-2 uppercase">{placement?.location || asset.location}</td>
+                                <td data-label="Kuantiti" className="border border-black p-2 font-bold bg-gray-50">Kuantiti</td>
+                                <td data-label="" className="border border-black p-2">{placement?.quantity_placed || 1}</td>
+                                <td data-label="Lokasi Pinjaman" className="border border-black p-2 font-bold bg-gray-50">Lokasi Pinjaman</td>
+                                <td data-label="" className="border border-black p-2 uppercase">{placement?.location || asset.location}</td>
                             </tr>
                         </tbody>
                     </table>
 
                     {/* ── Authorizer / Pemberi Pinjam ── */}
                     <div className="font-bold mb-2 uppercase">MAKLUMAT PENYERAH / PEMBERI PINJAM</div>
-                    <table className="w-full border-collapse border border-black mb-6">
+                    <table className="w-full border-collapse border border-black mb-6 responsive-table">
                         <tbody>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50 w-[30%]">Nama</td>
-                                <td className="border border-black p-2 uppercase">{placement?.authorizer_name || '........................................'}</td>
+                                <td data-label="Nama" className="border border-black p-2 font-bold bg-gray-50 w-[30%]">Nama</td>
+                                <td data-label="" className="border border-black p-2 uppercase">{placement?.authorizer_name || '........................................'}</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Jawatan</td>
-                                <td className="border border-black p-2">........................................</td>
+                                <td data-label="Jawatan" className="border border-black p-2 font-bold bg-gray-50">Jawatan</td>
+                                <td data-label="" className="border border-black p-2">........................................</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Tandatangan</td>
-                                <td className="border border-black p-2">........................................</td>
+                                <td data-label="Tandatangan" className="border border-black p-2 font-bold bg-gray-50">Tandatangan</td>
+                                <td data-label="" className="border border-black p-2">........................................</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Tarikh</td>
-                                <td className="border border-black p-2">........................................</td>
+                                <td data-label="Tarikh" className="border border-black p-2 font-bold bg-gray-50">Tarikh</td>
+                                <td data-label="" className="border border-black p-2">........................................</td>
                             </tr>
                         </tbody>
                     </table>
 
                     {/* ── Return Confirmation ── */}
                     <div className="font-bold mb-2 uppercase">PENGESAHAN PEMULANGAN</div>
-                    <table className="w-full border-collapse border border-black mb-6">
+                    <table className="w-full border-collapse border border-black mb-6 responsive-table">
                         <tbody>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50 w-[30%]">Tarikh Pulang</td>
-                                <td className="border border-black p-2">
+                                <td data-label="Tarikh Pulang" className="border border-black p-2 font-bold bg-gray-50 w-[30%]">Tarikh Pulang</td>
+                                <td data-label="" className="border border-black p-2">
                                     {placement?.returned_date
                                         ? new Date(placement.returned_date).toLocaleDateString('ms-MY')
                                         : '........................................'}
                                 </td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Status Aset</td>
-                                <td className="border border-black p-2 uppercase">........................................</td>
+                                <td data-label="Status Aset" className="border border-black p-2 font-bold bg-gray-50">Status Aset</td>
+                                <td data-label="" className="border border-black p-2 uppercase">........................................</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Tandatangan Penerima</td>
-                                <td className="border border-black p-2">........................................</td>
+                                <td data-label="Tandatangan Penerima" className="border border-black p-2 font-bold bg-gray-50">Tandatangan Penerima</td>
+                                <td data-label="" className="border border-black p-2">........................................</td>
                             </tr>
                             <tr>
-                                <td className="border border-black p-2 font-bold bg-gray-50">Tarikh</td>
-                                <td className="border border-black p-2">........................................</td>
+                                <td data-label="Tarikh" className="border border-black p-2 font-bold bg-gray-50">Tarikh</td>
+                                <td data-label="" className="border border-black p-2">........................................</td>
                             </tr>
                         </tbody>
                     </table>

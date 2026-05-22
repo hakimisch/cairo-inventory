@@ -84,6 +84,7 @@ class DisposalSaleController extends Controller
             'deposit_required'  => 'nullable|numeric|min:0',
             'status'            => 'nullable|string|in:draft,active,completed,cancelled',
             'notes'             => 'nullable|string',
+            'signatures'        => 'nullable|json',
         ]);
 
         DisposalSale::create($validated);
@@ -121,6 +122,7 @@ class DisposalSaleController extends Controller
             'certificate_reference' => 'nullable|string|max:100',
             'status'            => 'nullable|string|in:draft,active,completed,cancelled',
             'notes'             => 'nullable|string',
+            'signatures'        => 'nullable|json',
         ]);
 
         $sale->update($validated);

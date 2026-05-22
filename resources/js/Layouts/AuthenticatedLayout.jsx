@@ -250,6 +250,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                 active={route().current('dashboard')}
                             />
                         )}
+                        <NavLink
+                            href={route('audit-log.index')}
+                            icon="!"
+                            label="Log Audit"
+                            active={route().current('audit-log*')}
+                        />
                     </NavSection>
 
                     {/* ═══════════════════════════════════════════════════════

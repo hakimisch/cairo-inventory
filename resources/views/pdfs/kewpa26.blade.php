@@ -108,6 +108,7 @@
     </table>
 
     <!-- Signatures -->
+    {{-- Signatures stored in $sale->signatures JSON --}}
     <table>
         <tr>
             <th colspan="4">D. JAWATANKUASA PEMBUKAAN / OPENING COMMITTEE</th>
@@ -118,28 +119,52 @@
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
-                Tandatangan: __________________
+                Tandatangan:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['pengerusi']))
+                    <br><img src="{{ $sigs['pengerusi'] }}" style="height:35px; vertical-align:middle; display:block;">
+                @else
+                    __________________
+                @endif
             </td>
             <td style="width:25%;">
                 <strong>Ahli 1:</strong><br>
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
-                Tandatangan: __________________
+                Tandatangan:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['ahli1']))
+                    <br><img src="{{ $sigs['ahli1'] }}" style="height:35px; vertical-align:middle; display:block;">
+                @else
+                    __________________
+                @endif
             </td>
             <td style="width:25%;">
                 <strong>Ahli 2:</strong><br>
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
-                Tandatangan: __________________
+                Tandatangan:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['ahli2']))
+                    <br><img src="{{ $sigs['ahli2'] }}" style="height:35px; vertical-align:middle; display:block;">
+                @else
+                    __________________
+                @endif
             </td>
             <td style="width:25%;">
                 <strong>Setiausaha:</strong><br>
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
-                Tandatangan: __________________
+                Tandatangan:
+                @php $sigs = json_decode($sale->signatures ?? '{}', true); @endphp
+                @if(!empty($sigs['setiausaha']))
+                    <br><img src="{{ $sigs['setiausaha'] }}" style="height:35px; vertical-align:middle; display:block;">
+                @else
+                    __________________
+                @endif
             </td>
         </tr>
     </table>

@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class DisposalSaleItem extends Model
 {
+    use LogsActivity;
     protected $fillable = [
         'disposal_sale_id',
         'asset_id',
@@ -48,5 +51,13 @@ class DisposalSaleItem extends Model
     public function saleBids(): HasMany
     {
         return $this->hasMany(SaleBid::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
     }
 }

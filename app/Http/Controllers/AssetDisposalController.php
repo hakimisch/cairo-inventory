@@ -47,6 +47,7 @@ class AssetDisposalController extends Controller
             'approval_reference' => 'nullable|string|max:255',
             'status'             => 'nullable|string|in:draft,committee_review,approved,completed,cancelled',
             'notes'              => 'nullable|string|max:5000',
+            'signatures'         => 'nullable|json',
         ]);
 
         $disposal = $asset->disposals()->create($validated);
@@ -67,9 +68,16 @@ class AssetDisposalController extends Controller
             'approval_reference' => 'nullable|string|max:255',
             'status'             => 'nullable|string|in:draft,committee_review,approved,completed,cancelled',
             'notes'              => 'nullable|string|max:5000',
+            'signatures'         => 'nullable|json',
         ]);
 
+        $oldStatus = $disposal->status;
         $disposal->update($validated);
+
+        // Fire event if status changed
+        if ($disposal->wasChanged('status')) {
+            event(new \App\Events\DisposalStatusChanged($disposal->fresh(), $oldStatus, $disposal->status));
+        }
 
         return redirect()->back()->with('success', 'Disposal record updated successfully.');
     }
@@ -127,6 +135,28 @@ class AssetDisposalController extends Controller
         $disposal->load('asset');
         return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa18', ['disposal' => $disposal])
             ->format('a4')->name("KEW-PA-18-{$disposal->asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
+    }
+
+    // ─── PA-15: Appointment Letter for Disposal Inspection Committee ──
+
+    /**
+     * Download KEW.PA-15 — Surat Lantikan JK Pemeriksa Pelupusan.
+     */
+    public function downloadKewpa15(AssetDisposal $disposal)
+    {
+        $disposal->load('asset', 'committeeAppointments.user');
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa15', ['disposal' => $disposal])
+            ->format('a4')->name("KEW-PA-15-{$disposal->asset->asset_tag}.pdf")
             ->withBrowsershot(function ($b) {
                 if (PHP_OS_FAMILY === 'Windows') {
                     $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');

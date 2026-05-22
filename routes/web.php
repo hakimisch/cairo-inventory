@@ -83,6 +83,11 @@ Route::get('/kewpa', [KewpaDirectoryController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('kewpa.directory');
 
+// ─── Audit Log ───
+Route::get('/audit-log', [AuditLogController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('audit-log.index');
+
 // Asset Management Group (Protected)
 Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/assets', [AssetController::class, 'index'])->name('assets.index');
@@ -142,6 +147,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/loss-reports/kewpa32',          [AssetLossReportController::class, 'kewpa32'])->name('loss-reports.kewpa32');
     Route::get('/loss-reports/kewpa32/download', [AssetLossReportController::class, 'downloadKewpa32'])->name('loss-reports.kewpa32.download');
 
+    // KEW.PA-29 — Surat Pelantikan JK Penyiasat Kehilangan
+    Route::get('/loss-reports/{lossReport}/kewpa29/download', [AssetLossReportController::class, 'downloadKewpa29'])->name('loss-reports.kewpa29.download');
+
     // KEW.PA-6 — Daftar Pergerakan (Transfer/Movement)
     Route::post('/assets/{asset}/transfers', [AssetTransferController::class, 'store'])->name('assets.transfers.store');
     Route::put('/assets/{asset}/transfers/{transfer}', [AssetTransferController::class, 'update'])->name('assets.transfers.update');
@@ -189,6 +197,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // KEW.PA-19 — Sijil Pelupusan (Disposal Certificate)
     Route::get('/disposals/kewpa19',          [AssetDisposalController::class, 'kewpa19'])->name('disposals.kewpa19');
     Route::get('/disposals/{disposal}/kewpa19/download', [AssetDisposalController::class, 'downloadKewpa19'])->name('disposals.kewpa19.download');
+
+    // KEW.PA-15 — Surat Lantikan JK Pemeriksa Pelupusan
+    Route::get('/disposals/{disposal}/kewpa15/download', [AssetDisposalController::class, 'downloadKewpa15'])->name('disposals.kewpa15.download');
 
     // KEW.PA-28→32 — Laporan Kehilangan (PDF download)
     Route::get('/assets/{asset}/loss-reports/kewpa28/download', [AssetLossReportController::class, 'downloadKewpa28'])->name('assets.loss-reports.kewpa28.download');
@@ -278,5 +289,6 @@ Route::put('/receivings/{receiving}', [AssetController::class, 'updateReceiving'
 Route::delete('/receivings/{receiving}', [AssetController::class, 'destroyReceiving'])->name('receivings.destroy');
 Route::get('/assets/{asset}/kewpa2/download', [AssetController::class, 'downloadKewpa2'])->name('assets.kewpa2.download');
 Route::get('/assets/{asset}/kewpa3/download', [AssetController::class, 'downloadKewpa3'])->name('assets.kewpa3.download');
+Route::get('/assets/{asset}/label', [AssetController::class, 'downloadLabel'])->name('assets.label');
 
 require __DIR__.'/auth.php';

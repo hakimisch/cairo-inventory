@@ -5,9 +5,12 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Traits\LogsActivity;
 
 class DisposalSale extends Model
 {
+    use LogsActivity;
     protected $fillable = [
         'asset_disposal_id',
         'sale_type',
@@ -34,6 +37,7 @@ class DisposalSale extends Model
         'certificate_reference',
         'status',
         'notes',
+        'signatures',
     ];
 
     protected $casts = [
@@ -45,6 +49,7 @@ class DisposalSale extends Model
         'report_date'      => 'date',
         'certificate_date' => 'date',
         'deposit_required' => 'decimal:2',
+        'signatures'       => 'array',
     ];
 
     /**
@@ -61,5 +66,13 @@ class DisposalSale extends Model
     public function disposalSaleItems(): HasMany
     {
         return $this->hasMany(DisposalSaleItem::class);
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()
+            ->logAll()
+            ->logOnlyDirty()
+            ->dontSubmitEmptyLogs();
     }
 }

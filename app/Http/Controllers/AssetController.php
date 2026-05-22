@@ -364,7 +364,7 @@ class AssetController extends Controller
             ->format('a4')->name("KEW-PA-3-{$asset->asset_tag}.pdf")
             ->withBrowsershot(function ($b) {
                 if (PHP_OS_FAMILY === 'Windows') {
-                    $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
+                    $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
                 } else {
                     $b->noSandbox()
                       ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
@@ -373,6 +373,23 @@ class AssetController extends Controller
                 $b->setTimeout(120);
             });
     }
+
+    public function downloadLabel(Asset $asset)
+    {
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.label', ['asset' => $asset])
+            ->format('a4')->name("Label-{$asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
+    }
+
     // ── Phase 4: New View & Download Methods ─────────────────────────────────
 
     /**
