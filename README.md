@@ -1,240 +1,259 @@
-# CAIRO Inventory — Sistem Pengurusan Aset UTM
+# CAIRO Inventory — UTM Asset Management System
 
-> **Sistem Pengurusan Aset Alih dan Tak Alih** berasaskan web untuk pengurusan kitaran hayat aset Universiti Teknologi Malaysia (UTM), merangkumi 32 borang KEW.PA piawaian Kementerian Kewangan Malaysia.
-
----
-
-## 📋 Senarai Kandungan
-
-- [Ringkasan](#ringkasan)
-- [Tech Stack](#tech-stack)
-- [Modul Sistem (16 Modul)](#modul-sistem-16-modul)
-- [Peta Borang KEW.PA (32 Borang)](#peta-borang-kewpa-32-borang)
-- [Ciri-ciri Utama](#ciri-ciri-utama)
-- [Panduan Log Masuk](#panduan-log-masuk)
-- [Pemasangan & Persediaan](#pemasangan--persediaan)
-- [Struktur Kod](#struktur-kod)
-- [Arkitektur](#arkitektur)
-- [Status Pembangunan](#status-pembangunan)
-- [Pertimbangan Masa Depan](#pertimbangan-masa-depan)
+> **A Comprehensive Web-Based Asset Management Platform** for managing the full lifecycle of movable and immovable assets at Universiti Teknologi Malaysia (UTM), covering all 32 KEW.PA forms mandated by the Malaysian Ministry of Finance.
 
 ---
 
-## Ringkasan
+## Executive Summary
 
-CAIRO Inventory ialah sistem pengurusan aset komprehensif yang dibina khusus untuk **Pusat Pengurusan Aset UTM**. Sistem ini menguruskan kitaran hayat penuh aset UTM — dari penerimaan, pendaftaran, pergerakan, penyelenggaraan, pemeriksaan, pelupusan, sehinggalah ke jualan dan pelaporan kehilangan.
-
-**Objektif:**
-- Mendigitalkan kesemua 32 borang KEW.PA piawaian kerajaan
-- Menyediakan platform berpusat untuk pengurusan aset kampus UTM JB dan UTM KL
-- Membolehkan penjanaan laporan tahunan dan PDF borang secara automatik
-- Memudahkan proses audit aset dengan rekod digital yang lengkap
+| Attribute | Detail |
+|-----------|--------|
+| **Project** | CAIRO Inventory — Digital Asset Lifecycle Management |
+| **Target** | UTM Asset Management Centre (Pusat Pengurusan Aset) |
+| **Scope** | 32 KEW.PA government forms × 16 functional modules |
+| **Campus Coverage** | UTM Johor Bahru & UTM Kuala Lumpur |
+| **Status** | **100% Complete** — All modules built, seeded, and verified |
+| **Purpose** | Thesis demonstration & pilot deployment |
 
 ---
 
 ## Tech Stack
 
-| Lapisan | Teknologi |
-|---------|-----------|
-| **Frontend** | React 19 + Inertia.js + Vite |
-| **Backend** | Laravel 11 (PHP 8.4) |
-| **Database** | PostgreSQL 18 |
-| **PDF Generation** | Spatie Laravel-PDF + Browsershot (Chromium) |
-| **Charts** | Chart.js |
-| **CSS** | Inline styles + UTM brand palette |
-| **Environment** | WSL (dev) / Windows Herd (prod) |
+| Layer | Technology |
+|-------|-----------|
+| **Frontend** | React 18 + Inertia.js + Vite + Chart.js |
+| **Backend** | Laravel 12 (PHP 8.4) |
+| **Database** | PostgreSQL |
+| **PDF Engine** | Spatie Laravel-PDF + Browsershot (Chromium) — 22 Blade templates |
+| **UI Components** | Headless UI + Tailwind CSS |
+| **Brand Identity** | UTM maroon (`#5C001F`) & gold (`#F8A617`) |
+| **Auth** | Laravel Breeze (session-based, 2 roles) |
+| **Assets** | Vite build pipeline |
 
-**Kelebihan Inertia.js:** Membolehkan pembangunan aplikasi React single-page tanpa API. Data dihantar terus dari Laravel ke komponen React, menyediakan pengalaman UX yang lancar tanpa memerlukan API endpoints yang berasingan.
+### Why Inertia.js?
 
----
-
-## Modul Sistem (16 Modul)
-
-| # | Modul | KEW.PA | Penerangan | CRUD |
-|---|-------|--------|------------|------|
-| 1 | **Penerimaan Aset** | PA-1 / PA-1A | Terima aset baru, daftar pembekal, dokumen PO/DO/Invois | ✅ Lengkap |
-| 2 | **Pendaftaran Aset** | PA-2 / PA-3 | Daftar aset dengan 34 medan, gambar, spesifikasi | ✅ Lengkap |
-| 3 | **Pergerakan Aset** | PA-6 | Pindah aset antara lokasi dan pemegang | ✅ Lengkap |
-| 4 | **Penempatan/Pinjaman** | PA-9A | Pinjam aset kepada kakitangan/pelajar | ✅ Lengkap |
-| 5 | **Pemeriksaan Aset** | PA-10 / PA-11 | Rekod pemeriksaan berkala aset | ✅ Lengkap |
-| 6 | **Aduan Kerosakan** | PA-9 | Laporan kerosakan dan tindakan pembaikan | ✅ Lengkap |
-| 7 | **Penyelenggaraan** | PA-13 / PA-14 | Rekod penyelenggaraan kontrak dan kos | ✅ Lengkap |
-| 8 | **Naik Taraf Aset** | Bahagian B (PA-2) | Tambah RAM/SSD/komponen lain pada aset sedia ada | ✅ Lengkap |
-| 9 | **Pelupusan Aset** | PA-17 / PA-18 / PA-19 | Cadangan dan keputusan pelupusan aset | ✅ Lengkap |
-| 10 | **Pelupusan Kenderaan** | PA-16 | Penilaian kenderaan untuk dilupuskan | ✅ Lengkap |
-| 11 | **Jualan Aset (Tender)** | PA-21 → PA-27A | Jualan melalui tawaran, sebutharga, lelongan | ✅ Lengkap |
-| 12 | **Kehilangan Aset** | PA-28 → PA-32 | Laporan kehilangan, siasatan, keputusan | ✅ Lengkap |
-| 13 | **Jawatankuasa** | PA-15 / PA-29 | Pelantikan jawatankuasa pelupusan/siasatan | ✅ Lengkap |
-| 14 | **Dashboard Admin** | — | Statistik, carta, makluman sistem | ✅ Dibina |
-| 15 | **Laporan Tahunan** | PA-4/5/7/8/12/20 | 6 laporan tahunan (admin sahaja) | ✅ Dibina |
-| 16 | **Direktori KEW.PA** | /kewpa | Carian grid semua 32 borang KEW.PA | ✅ Dibina |
-
-**Kesemua 16 modul — CRUD penuh, tiada gap.**
+Inertia.js bridges Laravel and React without a separate API layer. Data flows directly from Laravel Controllers to React components via `Inertia::render()`, eliminating the need for REST API endpoints while preserving a true single-page application experience.
 
 ---
 
-## Peta Borang KEW.PA (32 Borang)
+## System Architecture
 
-### Logistik & Penerimaan
-| Borang | Nama | Status |
-|--------|------|--------|
-| KEW.PA-1 / PA-1A | Penerimaan Aset (Asset Receiving) | ✅ Sedia |
+```
+┌───────────────────────────────────────────────────────────────┐
+│                    Browser — React SPA (50 pages)              │
+│    Inertia.js ─── React Components ─── User Interactions       │
+└──────────────────────┬────────────────────────────────────────┘
+                       │ Data + Routing (Inertia)
+                       ▼
+┌───────────────────────────────────────────────────────────────┐
+│                     Laravel Backend                            │
+│  ┌──────────┐  ┌──────────────┐  ┌────────────────────────┐  │
+│  │ Routes   │  │ Controllers  │  │ Eloquent Models        │  │
+│  │ web.php  │──│ (20 biz +    │──│ (16 models)            │  │
+│  │ ~246 rts │  │  10 auth)    │  │                        │  │
+│  └──────────┘  └──────────────┘  └───────────┬────────────┘  │
+│                                              │                │
+│  ┌───────────────────────────────────────────┘                │
+│  │  PostgreSQL (25+ tables from 35 migrations)                │
+│  └───────────────────────────────────────────────────────────┘
+│                              │
+│  ┌───────────────────────────┘
+│  │  Spatie Laravel-PDF + Browsershot (Chromium)
+│  │  → 22 KEW.PA form templates (Blade)
+│  └───────────────────────────────────────────────────────────┘
+└───────────────────────────────────────────────────────────────┘
+```
 
-### Pendaftaran Aset
-| Borang | Nama | Status |
-|--------|------|--------|
-| KEW.PA-2 | Pendaftaran Aset (Asset Registration) | ✅ Sedia |
-| KEW.PA-3 | Kad Aset (Asset Card) | ✅ Sedia |
+### Data Flow
 
-### Pergerakan & Pemeriksaan
-| Borang | Nama | Status |
-|--------|------|--------|
-| KEW.PA-6 | Daftar Pergerakan (Asset Movement) | ✅ Sedia |
-| KEW.PA-9 | Aduan Kerosakan (Damage Report) | ✅ Sedia |
-| KEW.PA-9A | Pinjaman Aset (Asset Loan) | ✅ Sedia |
-| KEW.PA-10 / PA-11 | Pemeriksaan Aset (Asset Inspection) | ✅ Sedia |
-| KEW.PA-12 | Perakuan Pemeriksaan Tahunan | ✅ Sedia |
-
-### Penyelenggaraan
-| Borang | Nama | Status |
-|--------|------|--------|
-| KEW.PA-13 / PA-14 | Rekod Penyelenggaraan (Maintenance) | ✅ Sedia |
-
-### Pelupusan & Jualan
-| Borang | Nama | Status |
-|--------|------|--------|
-| KEW.PA-15 / PA-29 | Pelantikan Jawatankuasa | ✅ Sedia |
-| KEW.PA-16 | Perakuan Pelupusan Kenderaan | ✅ Sedia |
-| KEW.PA-17 / PA-18 / PA-19 | Laporan Pelupusan (Disposal) | ✅ Sedia |
-| KEW.PA-20 | Laporan Pelupusan Aset Tahunan | ✅ Sedia |
-| KEW.PA-21 | Notis Jualan (Sale Notification) | ✅ Sedia |
-| KEW.PA-22 | Iklan Jualan (Sale Advertisement) | ✅ Sedia |
-| KEW.PA-23 | Surat Tawaran Jualan (Award Letter) | ✅ Sedia |
-| KEW.PA-24 | Sijil Jualan (Sale Certificate) | ✅ Sedia |
-| KEW.PA-25 | Pindah Milik Jualan (Asset Transfer) | ✅ Sedia |
-| KEW.PA-26 | D.O. Jualan (Delivery Order) | ✅ Sedia |
-| KEW.PA-27 | Laporan Jualan (Sale Report) | ✅ Sedia |
-| KEW.PA-27A | Ringkasan Jualan (Sale Summary) | ✅ Sedia |
-
-### Kehilangan
-| Borang | Nama | Status |
-|--------|------|--------|
-| KEW.PA-28 → PA-32 | Laporan Kehilangan (Loss Report) | ✅ Sedia |
-
-### Laporan Tahunan (Admin)
-| Borang | Nama | Status |
-|--------|------|--------|
-| KEW.PA-4 | Senarai Harta Tetap | ✅ Sedia |
-| KEW.PA-5 | Senarai Inventori | ✅ Sedia |
-| KEW.PA-7 | Laporan Kedudukan Aset | ✅ Sedia |
-| KEW.PA-8 | Laporan Tahunan | ✅ Sedia |
-
-> 🌐 **Direktori interaktif:** Layari `/kewpa` selepas log masuk untuk carian dan penapis semua 32 borang.
+1. **Request** → User navigates a URL → Laravel route resolves
+2. **Data** → Controller fetches/validates data → passes via `Inertia::render()`
+3. **Render** → React renders full page (sidebar, header, content) from received props
+4. **CRUD** → Inline forms submit PUT/POST/DELETE through Inertia — no page reload
+5. **PDF** → Controller renders Blade template → Spatie/Browsershot generates PDF → download response
 
 ---
 
-## Ciri-ciri Utama
+## 16 Modules — Full CRUD Coverage
 
-### Untuk Pengguna Biasa (Staf)
+| # | Module | KEW.PA Forms | Description | Status |
+|---|--------|--------------|-------------|--------|
+| 1 | **Asset Receiving** | PA-1 / PA-1A | Receive new assets, register suppliers, PO/DO/Invoice docs | ✅ Complete |
+| 2 | **Asset Registration** | PA-2 / PA-3 | Register assets (34 fields), photos, specifications | ✅ Complete |
+| 3 | **Asset Movement** | PA-6 | Transfer assets between locations and custodians | ✅ Complete |
+| 4 | **Asset Placement/Loan** | PA-9A | Loan assets to staff or students | ✅ Complete |
+| 5 | **Asset Inspection** | PA-10 / PA-11 | Periodic asset inspection records | ✅ Complete |
+| 6 | **Damage Reports** | PA-9 | Fault reporting and repair actions | ✅ Complete |
+| 7 | **Maintenance** | PA-13 / PA-14 | Contract maintenance and cost records | ✅ Complete |
+| 8 | **Asset Upgrades** | PA-2 (Section B) | Add RAM/SSD/components to existing assets | ✅ Complete |
+| 9 | **Asset Disposal** | PA-17 / PA-18 / PA-19 | Dispose proposal and decision workflow | ✅ Complete |
+| 10 | **Vehicle Disposal** | PA-16 | Vehicle valuation for disposal | ✅ Complete |
+| 11 | **Asset Sale (Tender)** | PA-21 → PA-27A | Sale via tender, quotations, auction | ✅ Complete |
+| 12 | **Asset Loss** | PA-28 → PA-32 | Loss report, investigation, decision | ✅ Complete |
+| 13 | **Committees** | PA-15 / PA-29 | Appointment of disposal/investigation committees | ✅ Complete |
+| 14 | **Admin Dashboard** | — | Statistics, charts, system alerts | ✅ Complete |
+| 15 | **Annual Reports** | PA-4/5/7/8/12/20 | 6 annual reports (admin only) | ✅ Complete |
+| 16 | **KEW.PA Directory** | /kewpa | Searchable grid of all 32 KEW.PA forms | ✅ Complete |
 
-- **Dashboard peribadi** — lihat ringkasan aset dan tindakan
-- **CRUD sebaris** — semua borang mempunyai borang tambah/sepadam/rekod terus pada halaman senarai (tiada halaman berasingan)
-- **Carian & penapis** pada setiap halaman senarai modul
-- **Muat turun PDF** untuk setiap borang KEW.PA
-- **Paparan borang KEW.PA** lengkap dengan header/footer UTM
-- **Navigasi sidebar** lengkap dengan 7 bahagian kitaran hayat aset
-
-### Untuk Admin
-
-- **Semua ciri pengguna biasa** + akses penuh
-- **Dashboard admin** dengan:
-  - Statistik sistem (jumlah aset, jumlah nilai, aset aktif/baik pulih)
-  - Makluman pintar (penerimaan belum selesai, penyelenggaraan perlu, waranti tamat)
-  - Carta pai taburan aset mengikut kategori dan jenis
-  - Carta perbandingan kampus (UTM JB vs UTM KL)
-  - Ranking aset bernilai tinggi
-  - Grid akses pantas KEW.PA
-- **6 laporan tahunan** dengan muat turun PDF
-- **Pengurusan pengguna** — tambah, edit, padam, tukar peranan
-- **Data penuh semua modul** — 10 aset contoh + 100+ rekod modul
-
-### Antara Muka
-
-- **Jenama UTM** — warna maroon (#5C001F) dan emas (#F8A617)
-- **Susun atur responsif** — sesuai untuk desktop dan tablet
-- **Sidebar boleh navigasi** dengan 7 bahagian kitaran hayat
-- **Toast notifications** untuk maklum balas tindakan
-- **Konfirmasi sebelum hapus** — dialog pengesahan untuk tindakan padam
+> **All 16 modules — full CRUD with zero gaps.**
 
 ---
 
-## Panduan Log Masuk
+## 32 KEW.PA Form Map
 
-| Peranan | Emel | Kata Laluan |
-|---------|------|-------------|
+### Logistics & Receiving
+| Form | Name | Status |
+|------|------|--------|
+| KEW.PA-1 / PA-1A | Asset Receiving | ✅ Ready |
+
+### Asset Registration
+| Form | Name | Status |
+|------|------|--------|
+| KEW.PA-2 | Asset Registration | ✅ Ready |
+| KEW.PA-3 | Asset Card | ✅ Ready |
+
+### Movement & Inspection
+| Form | Name | Status |
+|------|------|--------|
+| KEW.PA-6 | Asset Movement Register | ✅ Ready |
+| KEW.PA-9 | Damage Report | ✅ Ready |
+| KEW.PA-9A | Asset Loan | ✅ Ready |
+| KEW.PA-10 / PA-11 | Asset Inspection | ✅ Ready |
+| KEW.PA-12 | Annual Inspection Certificate | ✅ Ready |
+
+### Maintenance
+| Form | Name | Status |
+|------|------|--------|
+| KEW.PA-13 / PA-14 | Maintenance Record | ✅ Ready |
+
+### Disposal & Sale
+| Form | Name | Status |
+|------|------|--------|
+| KEW.PA-15 / PA-29 | Committee Appointment | ✅ Ready |
+| KEW.PA-16 | Vehicle Disposal Certificate | ✅ Ready |
+| KEW.PA-17 / PA-18 / PA-19 | Disposal Report | ✅ Ready |
+| KEW.PA-20 | Annual Asset Disposal Report | ✅ Ready |
+| KEW.PA-21 | Sale Notification | ✅ Ready |
+| KEW.PA-22 | Sale Advertisement | ✅ Ready |
+| KEW.PA-23 | Award Letter | ✅ Ready |
+| KEW.PA-24 | Sale Certificate | ✅ Ready |
+| KEW.PA-25 | Asset Ownership Transfer | ✅ Ready |
+| KEW.PA-26 | Sale Delivery Order | ✅ Ready |
+| KEW.PA-27 | Sale Report | ✅ Ready |
+| KEW.PA-27A | Sale Summary | ✅ Ready |
+
+### Loss
+| Form | Name | Status |
+|------|------|--------|
+| KEW.PA-28 → PA-32 | Loss Report (Chain) | ✅ Ready |
+
+### Annual Reports (Admin)
+| Form | Name | Status |
+|------|------|--------|
+| KEW.PA-4 | Fixed Asset Register | ✅ Ready |
+| KEW.PA-5 | Inventory List | ✅ Ready |
+| KEW.PA-7 | Asset Position Report | ✅ Ready |
+| KEW.PA-8 | Annual Report | ✅ Ready |
+
+> 🌐 **Interactive Directory:** Visit `/kewpa` after login to browse, search, and filter all 32 KEW.PA forms.
+
+---
+
+## Key Features
+
+### For Regular Staff
+
+- **Personal Dashboard** — asset summary and quick actions at a glance
+- **Inline CRUD** — all forms support add/edit/delete directly on the list page (no separate pages)
+- **Search & Filter** on every module list page
+- **PDF Download** for every KEW.PA form
+- **Full KEW.PA Layout** with UTM header/footer
+- **Sidebar Navigation** — 7 lifecycle categories for easy discovery
+
+### For Administrators
+
+- **Everything in Staff** + full access
+- **Admin Dashboard** with:
+  - System statistics (total assets, total value, active/under-repair counts)
+  - Smart alerts (pending receiving, due maintenance, expiring warranties)
+  - Pie charts (asset distribution by category and type)
+  - Campus comparison (UTM JB vs. UTM KL)
+  - High-value asset rankings
+  - KEW.PA quick-access grid
+- **6 Annual Reports** with PDF download
+- **User Management** — add, edit, delete, change roles
+
+### User Interface
+
+- **UTM Branding** — maroon (#5C001F) and gold (#F8A617) colour palette
+- **Responsive Layout** — optimised for desktop and tablet
+- **7-Section Sidebar** — asset lifecycle organised by phase
+- **Toast Notifications** — instant action feedback
+- **Delete Confirmation** — modal dialogs before destructive actions
+
+---
+
+## Login Reference
+
+| Role | Email | Password |
+|------|-------|----------|
 | **Admin** | `admin@cairo.utm` | `password` |
-| **Staf** | `user@gmail.com` | `password` |
+| **Staff** | `user@gmail.com` | `password` |
 
-**Admin** boleh mengakses:
-- Dashboard admin
-- Laporan tahunan (PA-4/5/7/8/12/20)
-- Pengurusan pengguna
-- Daftar penerimaan baru
-- Semua modul pengurusan aset
+**Admin** can access:
+- Admin dashboard, annual reports (PA-4/5/7/8/12/20), user management, new receiving registration, all asset modules
 
-**Staf** boleh mengakses:
-- Dashboard peribadi
-- Semua modul pengurusan aset (kecuali laporan tahunan dan pengurusan pengguna)
-- Direktori KEW.PA
+**Staff** can access:
+- Personal dashboard, all asset management modules (except annual reports and user management), KEW.PA directory
 
 ---
 
-## Pemasangan & Persediaan
+## Installation & Setup
 
-### Prasyarat
+### Prerequisites
 
-| Keperluan | Versi |
-|-----------|-------|
-| PHP | ≥ 8.1 |
+| Requirement | Version |
+|-------------|---------|
+| PHP | ≥ 8.2 |
 | Composer | ≥ 2.0 |
 | Node.js | ≥ 18 |
 | PostgreSQL | ≥ 15 |
-| Chromium | (untuk PDF) |
+| Chromium | (for PDF generation) |
 
-### Langkah Pemasangan
+### Steps
 
 ```bash
-# 1. Clone repositori
+# 1. Clone the repository
 git clone <repo-url>
 cd cairo-inventory
 
-# 2. Pasang kebergantungan PHP
+# 2. Install PHP dependencies
 composer install
 
-# 3. Pasang kebergantungan Node
+# 3. Install Node dependencies
 npm install
 
-# 4. Salin fail persekitaran
+# 4. Copy environment configuration
 cp .env.example .env
-# Edit .env — tetapkan DB_CONNECTION=pgsql dan maklumat PostgreSQL
+# Edit .env — set DB_CONNECTION=pgsql and your PostgreSQL credentials
 
-# 5. Jana kunci aplikasi
+# 5. Generate application key
 php artisan key:generate
 
-# 6. Jalankan migrasi dan seeder
+# 6. Run migrations and seeders
 php artisan migrate --seed
 
-# 7. Bina aset frontend
+# 7. Build frontend assets
 npm run build
 
-# 8. Jalankan pelayan pembangunan
+# 8. Start development server
 php artisan serve
-# atau gunakan Herd/Valet
+# Or use Herd / Valet for production-like setup
 ```
 
-### Konfigurasi PDF
+### PDF Configuration
 
-Sistem menggunakan **Spatie Laravel-PDF** dengan **Browsershot** (Chromium) untuk penjanaan PDF. Tetapkan laluan Chromium dalam `.env`:
+The system uses **Spatie Laravel-PDF** with **Browsershot** (Chromium). Set the Chromium binary path in `.env`:
 
 ```
 LARAVEL_PDF_CHROME_PATH=/path/to/chrome
@@ -243,154 +262,117 @@ LARAVEL_PDF_NO_SANDBOX=true
 
 ---
 
-## Struktur Kod
+## Project Structure
 
 ```
 cairo-inventory/
 ├── app/
 │   ├── Http/
-│   │   ├── Controllers/
+│   │   ├── Controllers/               # 30 controllers (20 business + 10 auth)
 │   │   │   ├── Admin/
-│   │   │   │   ├── AdminDashboardController.php   # Dashboard admin
-│   │   │   │   └── UserController.php             # Pengurusan pengguna
-│   │   │   ├── AssetController.php                # Aset + Penerimaan + Penempatan
-│   │   │   ├── AssetDisposalController.php         # Pelupusan
-│   │   │   ├── AssetInspectionController.php       # Pemeriksaan
-│   │   │   ├── AssetLossReportController.php       # Kehilangan
-│   │   │   ├── AssetMaintenanceController.php      # Penyelenggaraan
-│   │   │   ├── AssetTransferController.php         # Pergerakan
-│   │   │   ├── AssetUpgradeController.php          # Naik taraf
-│   │   │   ├── CommitteeAppointmentController.php  # Jawatankuasa
-│   │   │   ├── DamageReportController.php          # Kerosakan
-│   │   │   ├── DisposalSaleController.php          # Jualan aset
-│   │   │   ├── DisposalSaleItemController.php      # Item jualan
-│   │   │   ├── KewpaDirectoryController.php        # Direktori KEW.PA
-│   │   │   ├── ReportController.php                # Laporan tahunan
-│   │   │   ├── SaleBidController.php               # Bidaan jualan
+│   │   │   │   ├── AdminDashboardController.php
+│   │   │   │   └── UserController.php
+│   │   │   ├── AssetController.php              # Assets + Receiving + Placement
+│   │   │   ├── AssetDisposalController.php      # Disposal workflows
+│   │   │   ├── AssetInspectionController.php    # Inspections
+│   │   │   ├── AssetLossReportController.php    # Loss chain
+│   │   │   ├── AssetMaintenanceController.php   # Maintenance records
+│   │   │   ├── AssetTransferController.php      # Movement
+│   │   │   ├── AssetUpgradeController.php       # Upgrades
+│   │   │   ├── CommitteeAppointmentController.php
+│   │   │   ├── DamageReportController.php
+│   │   │   ├── DisposalSaleController.php       # Asset sales
+│   │   │   ├── DisposalSaleItemController.php   # Sale items
+│   │   │   ├── KewpaDirectoryController.php     # KEW.PA directory
+│   │   │   ├── ReportController.php             # Annual reports
+│   │   │   ├── SaleBidController.php            # Sale bids
 │   │   │   └── VehicleDisposalAssessmentController.php
 │   │   └── Requests/
-│   ├── Models/
-│   │   ├── Asset.php
-│   │   ├── AssetDisposal.php
-│   │   ├── AssetInspection.php
-│   │   ├── AssetLossReport.php
-│   │   ├── AssetMaintenance.php
-│   │   ├── AssetPlacement.php
-│   │   ├── AssetTransfer.php
-│   │   ├── AssetUpgrade.php
-│   │   ├── CommitteeAppointment.php
-│   │   ├── DamageReport.php
-│   │   ├── DisposalSale.php
-│   │   ├── DisposalSaleItem.php
-│   │   ├── Receiving.php
-│   │   ├── SaleBid.php
-│   │   ├── User.php
-│   │   └── VehicleDisposalAssessment.php
+│   ├── Models/                         # 16 Eloquent models
 │   └── ...
 ├── database/
-│   ├── migrations/
+│   ├── migrations/                     # 35 migration files
 │   └── seeders/
 │       ├── DatabaseSeeder.php
-│       └── KewpaDataSeeder.php                    # Data contoh 15 modul
+│       └── KewpaDataSeeder.php         # Sample data (10+ records/module)
 ├── resources/
-│   ├── js/Pages/                                   # 60 komponen React
+│   ├── js/Pages/                       # 50 React page components
 │   │   ├── Admin/
 │   │   ├── Assets/
 │   │   ├── CommitteeAppointments/
 │   │   ├── DisposalSales/
-│   │   ├── Kewpa/                                  # Direktori KEW.PA
+│   │   ├── Kewpa/
 │   │   ├── Profile/
 │   │   ├── Reports/
-│   │   └── ...
+│   │   └── Auth/
 │   ├── js/Layouts/
-│   │   ├── AuthenticatedLayout.jsx                 # Sidebar + header
+│   │   ├── AuthenticatedLayout.jsx     # Sidebar + header
 │   │   └── GuestLayout.jsx
-│   ├── js/Components/                              # 15 komponen guna semula
-│   └── views/pdfs/                                 # 22 templat PDF Blade
+│   ├── js/Components/                  # 15 reusable components
+│   └── views/pdfs/                     # 22 KEW.PA PDF Blade templates
 ├── routes/
-│   └── web.php                                     # ~246 laluan
-└── public/build/                                   # Aset yang telah dibina
+│   └── web.php                         # ~246 routes
+└── public/build/                       # Compiled frontend assets
 ```
 
 ---
 
-## Arkitektur
+## Development Status
 
-```
-┌─────────────────────────────────────────────────────┐
-│                    Browser (React SPA)               │
-│  Inertia.js ─── Komponen React ─── Interaksi UI     │
-└──────────────────┬──────────────────────────────────┘
-                   │ Data + Routing (Inertia)
-                   ▼
-┌─────────────────────────────────────────────────────┐
-│                   Laravel Backend                    │
-│  ┌──────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │ Routes   │  │Controllers│  │ Models (Eloquent)│  │
-│  │ web.php  │─▶│ (20 biz)  │─▶│ (15 model)      │  │
-│  └──────────┘  └──────────┘  └────────┬─────────┘  │
-│                                       │             │
-│  ┌────────────────────────────────────┘             │
-│  │   PostgreSQL 18 (25 jadual)                      │
-│  └──────────────────────────────────────────────────┘
-│                                       │
-│  ┌────────────────────────────────────┘
-│  │   Spatie Laravel-PDF + Browsershot (Chromium)
-│  │   → PDF borang KEW.PA (22 templat Blade)
-│  └──────────────────────────────────────────────────┘
-└─────────────────────────────────────────────────────┘
-```
+| Component | Status |
+|-----------|--------|
+| CRUD Frontend (16 modules) | ✅ 100% Complete |
+| Sidebar Navigation | ✅ 100% Complete |
+| PDF Generation (22 templates) | ✅ Configured & Verified |
+| Admin Dashboard | ✅ Fully Built |
+| Annual Reports (6) | ✅ Fully Built |
+| KEW.PA Directory | ✅ Fully Built |
+| Seed Data (10+ records/module) | ✅ Complete |
+| Mobile Responsiveness | ⚠️ Basic (desktop-first priority) |
+| Automated Tests | 📋 Not yet started |
+| Activity Logging | 📋 Not yet started |
 
-### Aliran Data
-
-1. Pengguna melayari URL → Laravel route → Controller menghantar data ke komponen React melalui `Inertia::render()`
-2. React merender halaman lengkap (termasuk sidebar dan header) berdasarkan data
-3. Interaksi CRUD → Borang React menghantar permintaan PUT/POST/DELETE melalui Inertia
-4. Inertia menguruskan navigasi tanpa muat semula halaman penuh
-5. PDF → Controller menggunakan Spatie Laravel-PDF untuk menjana PDF dari templat Blade, kemudian menghantar respons muat turun
+**Summary:** All 16 development milestones completed. System is ready for thesis demonstration and pilot deployment.
 
 ---
 
-## Status Pembangunan
+## Future Considerations
 
-| Komponen | Status |
-|----------|--------|
-| CRUD Frontend (16 modul) | ✅ 100% Lengkap |
-| Sidebar Navigasi | ✅ 100% Lengkap |
-| PDF Generation | ✅ Dikonfigurasi & Disahkan |
-| Dashboard Admin | ✅ Dibina Sepenuhnya |
-| Laporan Tahunan (6) | ✅ Dibina Sepenuhnya |
-| Direktori KEW.PA | ✅ Dibina Sepenuhnya |
-| Data Benih (10+ rekod/modul) | ✅ Lengkap |
-| Responsif Mudah Alih | ⚠️ Asas (keutamaan desktop) |
-| Ujian Automatik | 📋 Belum dimulakan |
-| Pengelogan Aktiviti | 📋 Belum dimulakan |
-
-**Ringkasan:** Kesemua 14 langkah pembangunan telah selesai. Sistem bersedia untuk demonstrasi tesis dan penggunaan percubaan.
+| Item | Notes |
+|------|-------|
+| **Docker Deployment** | Currently WSL-only; containerise for reproducible environments |
+| **Granular Permissions** | Add read-only, editor, admin roles |
+| **PDF Fallback** | If Browsershot proves unstable, switch to DomPDF |
+| **i18n / Bilingual Support** | Current UI is mixed BM/EN; add full language toggle |
+| **Barcode/QR Labels** | Print scannable labels from KEW.PA-2 registration |
+| **Audit Log** | Record every asset change for traceability |
+| **SAGA Integration** | Sync asset data with Malaysia's national SAGA system |
+| **E2E Testing** | Automated end-to-end tests for all CRUD workflows |
 
 ---
 
-## Pertimbangan Masa Depan
+## Codebase Statistics
 
-| Item | Catatan |
-|------|---------|
-| **Docker deployment** | WSL-only; kontainer untuk persekitaran boleh ulang |
-| **Kebenaran pengguna** | Tambah peranan granular (baca sahaja, editor, admin) |
-| **Pemantauan PDF** | Jika Browsershot tidak stabil, guna DomPDF sebagai ganti |
-| **i18n / dwibahasa** | UI campuran BM/ING; pertimbangkan suis bahasa penuh |
-| **Label barcode/QR** | Cetak label KEW.PA-2 dengan kod boleh imbas |
-| **Log audit** | Rekod setiap perubahan aset untuk kebolehkesanan |
-| **Integrasi SAGA** | Segerakkan data aset dengan sistem SAGA kebangsaan |
-| **Ujian E2E** | Ujian hujung-ke-hujung automatik untuk semua aliran CRUD |
-
----
-
-## Lesen
-
-Hak Cipta © 2026 CAIRO Lab, Universiti Teknologi Malaysia.
-
-Dibina untuk tujuan tesis dan penyelidikan akademik.
+| Metric | Count |
+|--------|-------|
+| React Pages | 50 |
+| Reusable Components | 15 |
+| Eloquent Models | 16 |
+| Business Controllers | 20 |
+| Total Controllers | 30 |
+| Database Migrations | 35 |
+| PDF Blade Templates | 22 |
+| Application Routes | ~246 |
+| Seed Records | 10+ per module |
 
 ---
 
-> *"Sistem Pengurusan Aset UTM yang menyeluruh, digital, dan mesra pengguna."*
+## License
+
+Copyright © 2026 CAIRO Lab, Universiti Teknologi Malaysia.
+
+Built for thesis and academic research purposes.
+
+---
+
+> *"A comprehensive, digital, and user-friendly asset management system for Universiti Teknologi Malaysia."*
