@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>KEW.PA-27A — Perakuan Lupus</title>
+    <title>KEW.PA-27A — Senarai Aset Yang Dilelong</title>
     <style>
         body { font-family: 'Times New Roman', Times, serif; font-size: 12px; line-height: 1.5; color: #000; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -24,8 +24,8 @@
 
     <div class="header">
         <h1>KEW.PA-27A</h1>
-        <h2>PERAKUAN LUPUS</h2>
-        <p>(Write-off Certificate)</p>
+        <h2>SENARAI ASET YANG DILELONG</h2>
+        <p>(Auction Asset List)</p>
         <p>Universiti Teknologi Malaysia</p>
     </div>
 

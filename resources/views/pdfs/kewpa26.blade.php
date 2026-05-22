@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>KEW.PA-26 — Perakuan Tawaran/Sebutharga/Lelongan</title>
+    <title>KEW.PA-26 — Jadual Buka Sebutharga Pelupusan Aset Alih Universiti</title>
     <style>
         body { font-family: 'Times New Roman', Times, serif; font-size: 12px; line-height: 1.5; color: #000; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -24,115 +24,118 @@
 
     <div class="header">
         <h1>KEW.PA-26</h1>
-        <h2>PERAKUAN ({{ strtoupper($sale->sale_type) }})</h2>
-        <p>({{ $sale->sale_type }} Certificate)</p>
+        <h2>JADUAL BUKA SEBUTHARGA PELUPUSAN ASET ALIH UNIVERSITI</h2>
+        <p>(Quotation Opening Schedule for Disposal of Movable Assets — University)</p>
         <p>Universiti Teknologi Malaysia</p>
     </div>
 
-    <!-- Sale Information -->
+    <!-- Opening Information -->
     <table>
         <tr>
-            <th colspan="4">A. MAKLUMAT JUALAN / SALE INFORMATION</th>
+            <th colspan="4">A. MAKLUMAT PEMBUKAAN / OPENING INFORMATION</th>
         </tr>
         <tr>
-            <td class="label-cell">Rujukan</td>
+            <td class="label-cell">Rujukan Sebutharga</td>
             <td>{{ $sale->sale_reference }}</td>
-            <td class="label-cell">Jenis</td>
-            <td>{{ $sale->sale_type }}</td>
+            <td class="label-cell">No. Sebutharga</td>
+            <td>{{ $sale->sealed_envelope_ref ?? '-' }}</td>
         </tr>
         <tr>
-            <td class="label-cell">Tarikh Jualan</td>
-            <td>{{ $sale->sale_date ? $sale->sale_date->format('d/m/Y') : '-' }}</td>
-            <td class="label-cell">Lokasi</td>
-            <td>{{ $sale->sale_location ?? '-' }}</td>
+            <td class="label-cell">Tarikh Buka</td>
+            <td>{{ now()->format('d/m/Y') }}</td>
+            <td class="label-cell">Masa Buka</td>
+            <td>{{ $sale->closing_datetime ? $sale->closing_datetime->format('h:i A') : '12:00 PM' }}</td>
         </tr>
         <tr>
-            <td class="label-cell">Pegawai Bertanggungjawab</td>
-            <td>{{ $sale->sale_officer ?? '-' }}</td>
-            <td class="label-cell">Status</td>
-            <td>{{ $sale->status ?? '-' }}</td>
+            <td class="label-cell">Tempat</td>
+            <td colspan="3">{{ $sale->sale_location ?? 'Pejabat Pendaftar, UTM' }}</td>
         </tr>
     </table>
 
-    <!-- Asset Disposal Information -->
+    <!-- Bids by Item -->
     <table>
         <tr>
-            <th colspan="4">B. MAKLUMAT PELUPUSAN / DISPOSAL INFORMATION</th>
+            <th colspan="6">B. BUKAAN BIDAAN / BID OPENING RECORD</th>
         </tr>
         <tr>
-            <td class="label-cell">Tag Aset</td>
-            <td>{{ $sale->assetDisposal->asset->asset_tag ?? '-' }}</td>
-            <td class="label-cell">Nama Aset</td>
-            <td>{{ $sale->assetDisposal->asset->name ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td class="label-cell">Kategori</td>
-            <td>{{ $sale->assetDisposal->asset->category ?? '-' }}</td>
-            <td class="label-cell">No. Siri</td>
-            <td>{{ $sale->assetDisposal->asset->serial_number ?? '-' }}</td>
-        </tr>
-        <tr>
-            <td class="label-cell">Kaedah Pelupusan</td>
-            <td>{{ $sale->assetDisposal->disposal_method ?? '-' }}</td>
-            <td class="label-cell">Sebab Pelupusan</td>
-            <td>{{ $sale->assetDisposal->disposal_reason ?? '-' }}</td>
-        </tr>
-    </table>
-
-    <!-- Winning Items -->
-    <table>
-        <tr>
-            <th colspan="5">C. ITEM YANG DIMENANGKAN / AWARDED ITEMS</th>
-        </tr>
-        <tr>
-            <th style="width:8%;">Bil.</th>
-            <th style="width:10%;">Lot</th>
-            <th style="width:32%;">Perkara</th>
-            <th style="width:25%;">Pembida Menang</th>
-            <th style="width:25%;">Jumlah Bidaan (RM)</th>
+            <th style="width:5%;">Bil.</th>
+            <th style="width:8%;">Lot</th>
+            <th style="width:22%;">Perkara</th>
+            <th style="width:22%;">Kod Pembida / Bidder Code</th>
+            <th style="width:18%;">Harga Bidaan (RM)</th>
+            <th style="width:25%;">Catatan</th>
         </tr>
         @forelse ($sale->disposalSaleItems as $itemIndex => $item)
-            @php
-                $winningBid = $item->saleBids->firstWhere('is_winner', true);
-            @endphp
-            @if($winningBid)
+            @forelse ($item->saleBids as $bidIndex => $bid)
+            <tr>
+                <td style="text-align:center;">{{ $itemIndex + 1 }}.{{ $bidIndex + 1 }}</td>
+                <td style="text-align:center;">{{ $item->lot_number ?? '-' }}</td>
+                <td>{{ $item->item_description }}</td>
+                <td>{{ $bid->bidder_name ?? 'Bida-' . ($bidIndex + 1) }}</td>
+                <td style="text-align:right;">{{ isset($bid->bid_amount) ? number_format($bid->bid_amount, 2) : '-' }}</td>
+                <td>{{ $bid->status ?? '-' }}</td>
+            </tr>
+            @empty
             <tr>
                 <td style="text-align:center;">{{ $itemIndex + 1 }}</td>
                 <td style="text-align:center;">{{ $item->lot_number ?? '-' }}</td>
                 <td>{{ $item->item_description }}</td>
-                <td>{{ $winningBid->bidder_name }}</td>
-                <td style="text-align:right;">{{ number_format($winningBid->bid_amount, 2) }}</td>
+                <td colspan="3" style="text-align:center;">Tiada bidaan / No bids received</td>
             </tr>
-            @endif
+            @endforelse
         @empty
         <tr>
-            <td colspan="5" style="text-align:center;">Tiada item / No items listed</td>
+            <td colspan="6" style="text-align:center;">Tiada item / No items listed</td>
         </tr>
         @endforelse
+    </table>
+
+    <!-- Disclaimer -->
+    <table>
+        <tr>
+            <th>C. PERAKUAN PEMBUKAAN / OPENING CERTIFICATION</th>
+        </tr>
+        <tr>
+            <td style="padding: 10px;">
+                <p><strong>Nota Penting / Important Note:</strong></p>
+                <p>Universiti tidak terikat untuk menerima bidaan yang terendah atau mana-mana bidaan yang dikemukakan. 
+                Keputusan universiti adalah muktamad.</p>
+                <p><em>The university is not bound to accept the lowest or any bid submitted. 
+                The university's decision is final.</em></p>
+                <p>Bidaan ini sah untuk tempoh <strong>{{ $sale->bid_validity_days ?? 60 }} hari</strong> dari tarikh tutup sebutharga.</p>
+            </td>
+        </tr>
     </table>
 
     <!-- Signatures -->
     <table>
         <tr>
-            <th colspan="3">D. PENGESAHAN / ENDORSEMENT</th>
+            <th colspan="4">D. JAWATANKUASA PEMBUKAAN / OPENING COMMITTEE</th>
         </tr>
         <tr class="signature-row">
-            <td style="width:33%;">
-                <strong>Pegawai Pelupusan:</strong><br>
+            <td style="width:25%;">
+                <strong>Pengerusi:</strong><br>
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
                 Tandatangan: __________________
             </td>
-            <td style="width:33%;">
-                <strong>Pengerusi Jawatankuasa:</strong><br>
+            <td style="width:25%;">
+                <strong>Ahli 1:</strong><br>
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
                 Tandatangan: __________________
             </td>
-            <td style="width:33%;">
-                <strong>Pendaftar:</strong><br>
+            <td style="width:25%;">
+                <strong>Ahli 2:</strong><br>
+                Nama: _________________________<br>
+                Jawatan: ______________________<br>
+                Tarikh: _______________________<br>
+                Tandatangan: __________________
+            </td>
+            <td style="width:25%;">
+                <strong>Setiausaha:</strong><br>
                 Nama: _________________________<br>
                 Jawatan: ______________________<br>
                 Tarikh: _______________________<br>
@@ -142,7 +145,7 @@
     </table>
 
     <div class="footer">
-        <p>KEW.PA-26 — Perakuan ({{ $sale->sale_type }}) | Universiti Teknologi Malaysia</p>
+        <p>KEW.PA-26 — Jadual Buka Sebutharga Pelupusan Aset Alih | Universiti Teknologi Malaysia</p>
         <p>Dokumen ini sah dan lengkap. Document is valid and complete.</p>
     </div>
 

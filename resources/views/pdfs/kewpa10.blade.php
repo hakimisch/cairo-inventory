@@ -19,7 +19,7 @@
     </div>
 
     <div class="text-center font-bold text-[14px] mb-1 uppercase">UNIVERSITI TEKNOLOGI MALAYSIA</div>
-    <div class="text-center font-bold text-[13px] mb-6 uppercase">LAPORAN PEMERIKSAAN ASET</div>
+    <div class="text-center font-bold text-[13px] mb-6 uppercase">LAPORAN PEMERIKSAAN HARTA TETAP</div>
 
     <div class="mb-4 space-y-1">
         <p><strong>Fakulti/PTJ :</strong> CAIRO UTM</p>

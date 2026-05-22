@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>KEW.PA-23 — Lelongan Jualan Aset</title>
+    <title>KEW.PA-23 — Jadual Buka Tender Pelupusan Aset Alih Universiti</title>
     <style>
         body { font-family: 'Times New Roman', Times, serif; font-size: 12px; line-height: 1.5; color: #000; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -18,39 +18,46 @@
         .signature-row td { height: 60px; vertical-align: bottom; }
         .footer { text-align: center; font-size: 10px; margin-top: 20px; padding-top: 10px; border-top: 1px solid #000; }
         .page-break { page-break-after: always; }
+        .note { font-size: 10px; font-style: italic; margin-bottom: 15px; padding: 8px; border: 1px solid #000; background-color: #fafafa; text-align: justify; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h1>KEW.PA-23</h1>
-        <h2>LELONGAN JUALAN ASET</h2>
-        <p>(Asset Auction)</p>
+        <h2>JADUAL BUKA TENDER PELUPUSAN ASET ALIH UNIVERSITI</h2>
+        <p>(University Movable Asset Disposal Tender Opening Schedule)</p>
         <p>Universiti Teknologi Malaysia</p>
     </div>
 
-    <!-- Sale Information -->
+    <!-- Tender Opening Information -->
     <table>
         <tr>
-            <th colspan="4">A. MAKLUMAT LELONGAN / AUCTION INFORMATION</th>
+            <th colspan="4">A. MAKLUMAT BUKA TENDER / TENDER OPENING INFORMATION</th>
         </tr>
         <tr>
-            <td class="label-cell">Rujukan Lelongan</td>
+            <td class="label-cell">Rujukan Tender</td>
             <td>{{ $sale->sale_reference }}</td>
-            <td class="label-cell">Jenis</td>
+            <td class="label-cell">Jenis Tender</td>
             <td>{{ $sale->sale_type }}</td>
         </tr>
         <tr>
-            <td class="label-cell">Tarikh Lelongan</td>
+            <td class="label-cell">Tarikh Buka Tender</td>
             <td>{{ $sale->sale_date ? $sale->sale_date->format('d/m/Y') : '-' }}</td>
             <td class="label-cell">Lokasi</td>
             <td>{{ $sale->sale_location ?? '-' }}</td>
         </tr>
         <tr>
-            <td class="label-cell">Pegawai Lelong</td>
+            <td class="label-cell">Pegawai Bertanggungjawab</td>
             <td>{{ $sale->sale_officer ?? '-' }}</td>
             <td class="label-cell">Status</td>
             <td>{{ $sale->status ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="label-cell">Tarikh/Masa Tutup</td>
+            <td>{{ $sale->closing_datetime ? $sale->closing_datetime->format('d/m/Y') . ' (jam 12.00 tengahari)' : '-' }}</td>
+            <td class="label-cell">Rujukan Sampul Bertutup</td>
+            <td>{{ $sale->sealed_envelope_ref ?? '-' }}</td>
         </tr>
     </table>
 
@@ -79,10 +86,10 @@
         </tr>
     </table>
 
-    <!-- Sale Items -->
+    <!-- List of Items / Lots -->
     <table>
         <tr>
-            <th colspan="5">C. SENARAI LOT LELONGAN / LIST OF AUCTION LOTS</th>
+            <th colspan="5">C. SENARAI LOT TENDER / LIST OF TENDER LOTS</th>
         </tr>
         <tr>
             <th style="width:8%;">Bil.</th>
@@ -106,11 +113,74 @@
         @endforelse
     </table>
 
+    <!-- Public Display of Bids -->
+    <table>
+        <tr>
+            <th colspan="6">D. PAPARAN BIDAAN / BID DISPLAY</th>
+        </tr>
+        <tr>
+            <th style="width:8%;">Lot</th>
+            <th style="width:15%;">Kod Bidaan</th>
+            <th style="width:32%;">Perkara / Description</th>
+            <th style="width:10%;">Kuantiti</th>
+            <th style="width:17%;">Harga Rizab (RM)</th>
+            <th style="width:18%;">Harga Bidaan (RM)</th>
+        </tr>
+        @forelse ($sale->disposalSaleItems as $index => $item)
+        <tr>
+            <td style="text-align:center;">{{ $item->lot_number ?? $index + 1 }}</td>
+            <td style="text-align:center;">&nbsp;</td>
+            <td>{{ $item->item_description }}</td>
+            <td style="text-align:center;">{{ $item->quantity }}</td>
+            <td style="text-align:right;">{{ $item->reserve_price ? number_format($item->reserve_price, 2) : '-' }}</td>
+            <td style="text-align:right;">&nbsp;</td>
+        </tr>
+        @empty
+        <tr>
+            <td colspan="6" style="text-align:center;">Tiada data / No data available</td>
+        </tr>
+        @endforelse
+    </table>
+
+    <!-- Disclaimer Note -->
+    <div class="note">
+        <strong>Nota / Note:</strong> Harga adalah seperti yang dinyatakan sebelum semakan terperinci. Universiti tidak terikat untuk menerima bidaan.
+        <br>
+        <em>Prices are as stated prior to detailed review. The University is not obligated to accept any bid.</em>
+    </div>
+
+    <!-- Committee Signature -->
+    <table>
+        <tr>
+            <th colspan="3">E. JAWATANKUASA PEMBUKA TENDER / TENDER OPENING COMMITTEE</th>
+        </tr>
+        <tr class="signature-row">
+            <td style="width:33%;">
+                <strong>Pengerusi / Chairman</strong><br><br>
+                Nama / Name:<br>
+                Tandatangan / Signature:<br>
+                Tarikh / Date:
+            </td>
+            <td style="width:33%;">
+                <strong>Ahli 1 / Member 1</strong><br><br>
+                Nama / Name:<br>
+                Tandatangan / Signature:<br>
+                Tarikh / Date:
+            </td>
+            <td style="width:33%;">
+                <strong>Ahli 2 / Member 2</strong><br><br>
+                Nama / Name:<br>
+                Tandatangan / Signature:<br>
+                Tarikh / Date:
+            </td>
+        </tr>
+    </table>
+
     <!-- Terms & Conditions -->
     @if($sale->terms_conditions)
     <table>
         <tr>
-            <th>D. SYARAT & KETENTUAN / TERMS & CONDITIONS</th>
+            <th>F. SYARAT & KETENTUAN / TERMS & CONDITIONS</th>
         </tr>
         <tr>
             <td>{{ $sale->terms_conditions }}</td>
@@ -122,7 +192,7 @@
     @if($sale->deposit_required)
     <table>
         <tr>
-            <th>E. DEPOSIT</th>
+            <th>G. DEPOSIT</th>
         </tr>
         <tr>
             <td>Deposit diperlukan: RM {{ number_format($sale->deposit_required, 2) }}</td>
@@ -131,7 +201,7 @@
     @endif
 
     <div class="footer">
-        <p>KEW.PA-23 — Lelongan Jualan Aset | Universiti Teknologi Malaysia</p>
+        <p>KEW.PA-23 — Jadual Buka Tender Pelupusan Aset Alih Universiti | Universiti Teknologi Malaysia</p>
         <p>Dokumen ini sah dan lengkap. Document is valid and complete.</p>
     </div>
 

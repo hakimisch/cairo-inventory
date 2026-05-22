@@ -18,7 +18,7 @@
     </div>
 
     <div class="text-center font-bold text-[14px] mb-1 uppercase">UNIVERSITI TEKNOLOGI MALAYSIA</div>
-    <div class="text-center font-bold text-[13px] mb-6 uppercase">BORANG PINJAMAN ASET</div>
+    <div class="text-center font-bold text-[13px] mb-6 uppercase">BORANG PENYERAHAN/PINJAMAN PERALATAN MILIK UTM</div>
 
     {{-- Asset Info --}}
     <table class="w-full border-collapse border border-black mb-6">

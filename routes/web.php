@@ -129,6 +129,19 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/assets/{asset}/loss-reports/{lossReport}', [AssetLossReportController::class, 'update'])->name('assets.loss-reports.update');
     Route::delete('/assets/{asset}/loss-reports/{lossReport}', [AssetLossReportController::class, 'destroy'])->name('assets.loss-reports.destroy');
 
+    // KEW.PA-30 — Laporan Akhir Kehilangan (Final Loss Investigation)
+    Route::get('/assets/{asset}/loss-reports/{lossReport}/kewpa30',        [AssetLossReportController::class, 'kewpa30'])->name('assets.loss-reports.kewpa30');
+    Route::post('/assets/{asset}/loss-reports/{lossReport}/kewpa30',       [AssetLossReportController::class, 'storeFinalReport'])->name('assets.loss-reports.kewpa30.store');
+    Route::get('/assets/{asset}/loss-reports/{lossReport}/kewpa30/download', [AssetLossReportController::class, 'downloadKewpa30'])->name('assets.loss-reports.kewpa30.download');
+
+    // KEW.PA-31 — Sijil Hapuskira (Write-off Certificate)
+    Route::get('/loss-reports/kewpa31',          [AssetLossReportController::class, 'kewpa31'])->name('loss-reports.kewpa31');
+    Route::get('/loss-reports/{lossReport}/kewpa31/download', [AssetLossReportController::class, 'downloadKewpa31'])->name('loss-reports.kewpa31.download');
+
+    // KEW.PA-32 — Laporan Tindakan Kehilangan Tahunan (Annual Loss Action Report)
+    Route::get('/loss-reports/kewpa32',          [AssetLossReportController::class, 'kewpa32'])->name('loss-reports.kewpa32');
+    Route::get('/loss-reports/kewpa32/download', [AssetLossReportController::class, 'downloadKewpa32'])->name('loss-reports.kewpa32.download');
+
     // KEW.PA-6 — Daftar Pergerakan (Transfer/Movement)
     Route::post('/assets/{asset}/transfers', [AssetTransferController::class, 'store'])->name('assets.transfers.store');
     Route::put('/assets/{asset}/transfers/{transfer}', [AssetTransferController::class, 'update'])->name('assets.transfers.update');
@@ -158,8 +171,24 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // KEW.PA-13/14 — Rekod Penyelenggaraan (PDF download)
     Route::get('/assets/{asset}/maintenances/kewpa13/download', [AssetMaintenanceController::class, 'downloadKewpa13'])->name('assets.maintenances.kewpa13.download');
 
+    // KEW.PA-11 — Laporan Pemeriksaan Inventori
+    Route::get('/inspections/kewpa11',          [AssetInspectionController::class, 'kewpa11'])->name('inspections.kewpa11');
+    Route::get('/inspections/kewpa11/download', [AssetInspectionController::class, 'downloadKewpa11'])->name('inspections.kewpa11.download');
+
+    // KEW.PA-14 — Daftar Penyelenggaraan Harta Tetap
+    Route::get('/maintenances/kewpa14',          [AssetMaintenanceController::class, 'kewpa14'])->name('maintenances.kewpa14');
+    Route::get('/maintenances/kewpa14/download', [AssetMaintenanceController::class, 'downloadKewpa14'])->name('maintenances.kewpa14.download');
+
     // KEW.PA-17/18/19 — Laporan Pelupusan (PDF download)
     Route::get('/assets/{asset}/disposals/kewpa17/download', [AssetDisposalController::class, 'downloadKewpa17'])->name('assets.disposals.kewpa17.download');
+
+    // KEW.PA-18 — Sijil Pemusnahan (Destruction Certificate)
+    Route::get('/disposals/kewpa18',          [AssetDisposalController::class, 'kewpa18'])->name('disposals.kewpa18');
+    Route::get('/disposals/{disposal}/kewpa18/download', [AssetDisposalController::class, 'downloadKewpa18'])->name('disposals.kewpa18.download');
+
+    // KEW.PA-19 — Sijil Pelupusan (Disposal Certificate)
+    Route::get('/disposals/kewpa19',          [AssetDisposalController::class, 'kewpa19'])->name('disposals.kewpa19');
+    Route::get('/disposals/{disposal}/kewpa19/download', [AssetDisposalController::class, 'downloadKewpa19'])->name('disposals.kewpa19.download');
 
     // KEW.PA-28→32 — Laporan Kehilangan (PDF download)
     Route::get('/assets/{asset}/loss-reports/kewpa28/download', [AssetLossReportController::class, 'downloadKewpa28'])->name('assets.loss-reports.kewpa28.download');

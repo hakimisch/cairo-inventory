@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>KEW.PA-24 — Keputusan Tawaran/Sebutharga/Lelongan</title>
+    <title>KEW.PA-24 — Kenyataan Tawaran Sebutharga Pelupusan Aset Alih Universiti</title>
     <style>
         body { font-family: 'Times New Roman', Times, serif; font-size: 12px; line-height: 1.5; color: #000; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -24,64 +24,66 @@
 
     <div class="header">
         <h1>KEW.PA-24</h1>
-        <h2>KEPUTUSAN {{ strtoupper($sale->sale_type) }}</h2>
-        <p>({{ $sale->sale_type }} Decision)</p>
+        <h2>KENYATAAN TAWARAN SEBUTHARGA PELUPUSAN ASET ALIH UNIVERSITI</h2>
+        <p>(Quotation Notice for Disposal of Movable Assets — University)</p>
         <p>Universiti Teknologi Malaysia</p>
     </div>
 
-    <!-- Sale Information -->
+    <!-- Quotation Information -->
     <table>
         <tr>
-            <th colspan="4">A. MAKLUMAT JUALAN / SALE INFORMATION</th>
+            <th colspan="4">A. MAKLUMAT SEBUTHARGA / QUOTATION INFORMATION</th>
         </tr>
         <tr>
-            <td class="label-cell">Rujukan</td>
+            <td class="label-cell">Rujukan Sebutharga</td>
             <td>{{ $sale->sale_reference }}</td>
-            <td class="label-cell">Jenis</td>
-            <td>{{ $sale->sale_type }}</td>
+            <td class="label-cell">No. Sebutharga</td>
+            <td>{{ $sale->sealed_envelope_ref ?? '-' }}</td>
         </tr>
         <tr>
-            <td class="label-cell">Tarikh Jualan</td>
-            <td>{{ $sale->sale_date ? $sale->sale_date->format('d/m/Y') : '-' }}</td>
-            <td class="label-cell">Tarikh Keputusan</td>
-            <td>{{ $sale->decision_date ? $sale->decision_date->format('d/m/Y') : '-' }}</td>
+            <td class="label-cell">Tarikh Mula Lawatan</td>
+            <td>{{ $sale->viewing_date_start ? $sale->viewing_date_start->format('d/m/Y') : '-' }}</td>
+            <td class="label-cell">Tarikh Tamat Lawatan</td>
+            <td>{{ $sale->viewing_date_end ? $sale->viewing_date_end->format('d/m/Y') : '-' }}</td>
         </tr>
         <tr>
-            <td class="label-cell">Lokasi</td>
-            <td>{{ $sale->sale_location ?? '-' }}</td>
-            <td class="label-cell">Pegawai</td>
-            <td>{{ $sale->sale_officer ?? '-' }}</td>
+            <td class="label-cell">Tarikh & Masa Tutup</td>
+            <td>{{ $sale->closing_datetime ? $sale->closing_datetime->format('d/m/Y h:i A') : '-' }}</td>
+            <td class="label-cell">Tempoh Sah Laku Bidaan</td>
+            <td>{{ $sale->bid_validity_days ?? 60 }} hari</td>
+        </tr>
+        <tr>
+            <td class="label-cell">Alamat Peti Tender</td>
+            <td colspan="3">{{ $sale->tender_box_address ?? 'Pejabat Pendaftar, UTM' }}</td>
         </tr>
     </table>
 
-    <!-- Winning Bids by Item -->
+    <p style="font-size: 11px; font-style: italic; margin-bottom: 15px;">
+        <strong>Nota Penting:</strong> Sampul bertutup bertanda '{{ $sale->sealed_envelope_ref ?? 'No. Sebutharga' }}' hendaklah dikemukakan 
+        sebelum jam 12.00 tengahari pada tarikh tutup. Serahan lewat tidak akan dipertimbangkan.
+    </p>
+
+    <!-- Item List -->
     <table>
         <tr>
-            <th colspan="6">B. KEPUTUSAN / DECISION</th>
+            <th colspan="4">B. SENARAI ITEM / LIST OF ITEMS</th>
         </tr>
         <tr>
-            <th style="width:6%;">Bil.</th>
-            <th style="width:8%;">Lot</th>
-            <th style="width:26%;">Perkara</th>
-            <th style="width:25%;">Pembida Menang</th>
-            <th style="width:20%;">Jumlah Bidaan (RM)</th>
-            <th style="width:15%;">Keputusan</th>
+            <th style="width:8%;">Bil.</th>
+            <th style="width:10%;">Lot</th>
+            <th style="width:42%;">Perkara / Description</th>
+            <th style="width:40%;">Catatan / Remarks</th>
         </tr>
         @forelse ($sale->disposalSaleItems as $itemIndex => $item)
-            @php
-                $winningBid = $item->saleBids->firstWhere('is_winner', true);
-            @endphp
-            <tr>
-                <td style="text-align:center;">{{ $itemIndex + 1 }}</td>
-                <td style="text-align:center;">{{ $item->lot_number ?? '-' }}</td>
-                <td>{{ $item->item_description }}</td>
-                <td>{{ $winningBid->bidder_name ?? 'Tiada / None' }}</td>
-                <td style="text-align:right;">{{ $winningBid ? number_format($winningBid->bid_amount, 2) : '-' }}</td>
-                <td style="text-align:center;">{{ $winningBid ? 'Diterima' : 'Tiada' }}</td>
-            </tr>
+        <tr>
+            <td style="text-align:center;">{{ $itemIndex + 1 }}</td>
+            <td style="text-align:center;">{{ $item->lot_number ?? '-' }}</td>
+            <td>{{ $item->item_description }}</td>
+            <td>{{ $item->remarks ?? '-' }}</td>
+        </tr>
         @empty
         <tr>
-            <td colspan="6" style="text-align:center;">Tiada item / No items listed</td>
+            <td colspan="4" style="text-align:center;">Tiada item / No items listed</td>
         </tr>
         @endforelse
     </table>
@@ -90,7 +92,7 @@
     @if($sale->decision_notes)
     <table>
         <tr>
-            <th>C. CATATAN KEPUTUSAN / DECISION NOTES</th>
+            <th>C. CATATAN / NOTES</th>
         </tr>
         <tr>
             <td>{{ $sale->decision_notes }}</td>
@@ -99,7 +101,7 @@
     @endif
 
     <div class="footer">
-        <p>KEW.PA-24 — Keputusan {{ $sale->sale_type }} | Universiti Teknologi Malaysia</p>
+        <p>KEW.PA-24 — Kenyataan Tawaran Sebutharga Pelupusan Aset Alih | Universiti Teknologi Malaysia</p>
         <p>Dokumen ini sah dan lengkap. Document is valid and complete.</p>
     </div>
 

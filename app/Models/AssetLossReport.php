@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\Relations\MorphMany;
 
 class AssetLossReport extends Model
@@ -48,5 +49,13 @@ class AssetLossReport extends Model
     public function committeeAppointments(): MorphMany
     {
         return $this->morphMany(CommitteeAppointment::class, 'appointable');
+    }
+
+    /**
+     * Get the final loss investigation report (PA-30).
+     */
+    public function finalLossReport(): HasOne
+    {
+        return $this->hasOne(FinalLossReport::class);
     }
 }

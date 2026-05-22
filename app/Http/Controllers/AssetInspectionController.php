@@ -74,4 +74,41 @@ class AssetInspectionController extends Controller
 
         return redirect()->back()->with('success', 'Rekod pemeriksaan berjaya dipadam.');
     }
+
+    // ─── PA-11: Inventory Inspection Report ─────────────────────────────
+
+    /**
+     * Show KEW.PA-11 Inventory Inspection Report page.
+     */
+    public function kewpa11()
+    {
+        $inspections = AssetInspection::with('asset')
+            ->orderBy('inspection_date', 'desc')
+            ->get();
+
+        return inertia('Inspections/Kewpa11', ['inspections' => $inspections]);
+    }
+
+    /**
+     * Download KEW.PA-11 Inventory Inspection Report as PDF.
+     */
+    public function downloadKewpa11()
+    {
+        $inspections = AssetInspection::with('asset')
+            ->orderBy('inspection_date', 'desc')
+            ->get();
+
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa11', ['inspections' => $inspections])
+            ->format('a4')->name('KEW-PA-11-Inventory-Inspection.pdf')
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
+    }
 }

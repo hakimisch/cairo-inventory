@@ -14,6 +14,12 @@ class DisposalSale extends Model
         'sale_reference',
         'sale_date',
         'sale_location',
+        'viewing_date_start',
+        'viewing_date_end',
+        'closing_datetime',
+        'sealed_envelope_ref',
+        'tender_box_address',
+        'bid_validity_days',
         'sale_officer',
         'description',
         'terms_conditions',
@@ -32,6 +38,9 @@ class DisposalSale extends Model
 
     protected $casts = [
         'sale_date'        => 'date',
+        'viewing_date_start' => 'date',
+        'viewing_date_end'   => 'date',
+        'closing_datetime'   => 'datetime',
         'decision_date'    => 'date',
         'report_date'      => 'date',
         'certificate_date' => 'date',

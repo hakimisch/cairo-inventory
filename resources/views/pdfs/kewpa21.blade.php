@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>KEW.PA-21 — Tawaran Jualan Aset</title>
+    <title>KEW.PA-21 — Kenyataan Tawaran Tender Pelupusan Aset Alih Universiti</title>
     <style>
         body { font-family: 'Times New Roman', Times, serif; font-size: 12px; line-height: 1.5; color: #000; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -18,21 +18,22 @@
         .signature-row td { height: 60px; vertical-align: bottom; }
         .footer { text-align: center; font-size: 10px; margin-top: 20px; padding-top: 10px; border-top: 1px solid #000; }
         .page-break { page-break-after: always; }
+        .note { font-size: 10px; font-style: italic; margin-bottom: 15px; padding: 8px; border: 1px solid #000; background-color: #fafafa; text-align: justify; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h1>KEW.PA-21</h1>
-        <h2>TAWARAN JUALAN ASET</h2>
-        <p>(Sale Offer)</p>
+        <h2>KENYATAAN TAWARAN TENDER PELUPUSAN ASET ALIH UNIVERSITI</h2>
+        <p>(University Movable Asset Disposal Tender Notice)</p>
         <p>Universiti Teknologi Malaysia</p>
     </div>
 
-    <!-- Sale Information -->
+    <!-- Tender Offer Information -->
     <table>
         <tr>
-            <th colspan="4">A. MAKLUMAT TAWARAN / OFFER INFORMATION</th>
+            <th colspan="4">A. MAKLUMAT TAWARAN TENDER / TENDER OFFER INFORMATION</th>
         </tr>
         <tr>
             <td class="label-cell">Rujukan Tawaran</td>
@@ -51,6 +52,26 @@
             <td>{{ $sale->sale_officer ?? '-' }}</td>
             <td class="label-cell">Status</td>
             <td>{{ $sale->status ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="label-cell">Tarikh Mula Lawatan</td>
+            <td>{{ $sale->viewing_date_start ? $sale->viewing_date_start->format('d/m/Y') : '-' }}</td>
+            <td class="label-cell">Tarikh Akhir Lawatan</td>
+            <td>{{ $sale->viewing_date_end ? $sale->viewing_date_end->format('d/m/Y') : '-' }}</td>
+        </tr>
+        <tr>
+            <td class="label-cell">Tarikh/Masa Tutup</td>
+            <td>{{ $sale->closing_datetime ? $sale->closing_datetime->format('d/m/Y') . ' (jam 12.00 tengahari)' : '-' }}</td>
+            <td class="label-cell">Rujukan Sampul Bertutup</td>
+            <td>{{ $sale->sealed_envelope_ref ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="label-cell">Alamat Peti Tender</td>
+            <td colspan="3">{{ $sale->tender_box_address ?? '-' }}</td>
+        </tr>
+        <tr>
+            <td class="label-cell">Tempoh Sah Laku Bidaan</td>
+            <td colspan="3">{{ $sale->bid_validity_days ?? '60' }} hari (60 hari tempatan / 90 hari antarabangsa)</td>
         </tr>
     </table>
 
@@ -106,6 +127,11 @@
         @endforelse
     </table>
 
+    <!-- Tender Submission Note -->
+    <div class="note">
+        <strong>Nota Penting / Important Note:</strong> Sampul bertutup bertanda rujukan tender hendaklah dikemukakan melalui pos atau dimasukkan ke dalam peti tender yang disediakan. Serahan lewat tidak akan dipertimbangkan.
+    </div>
+
     <!-- Terms & Conditions -->
     @if($sale->terms_conditions)
     <table>
@@ -143,7 +169,7 @@
     @endif
 
     <div class="footer">
-        <p>KEW.PA-21 — Tawaran Jualan Aset | Universiti Teknologi Malaysia</p>
+        <p>KEW.PA-21 — Kenyataan Tawaran Tender Pelupusan Aset Alih Universiti | Universiti Teknologi Malaysia</p>
         <p>Dokumen ini sah dan lengkap. Document is valid and complete.</p>
     </div>
 

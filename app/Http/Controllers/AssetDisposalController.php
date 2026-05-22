@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Asset;
 use App\Models\AssetDisposal;
+use App\Models\CommitteeAppointment;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AssetDisposalController extends Controller
 {
@@ -92,7 +94,76 @@ class AssetDisposalController extends Controller
             ->format('a4')->name("KEW-PA-17-{$asset->asset_tag}.pdf")
             ->withBrowsershot(function ($b) {
                 if (PHP_OS_FAMILY === 'Windows') {
-                    $b->setChromePath('C:\Program Files\Google\Chrome\Application\chrome.exe');
+                    $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
+    }
+
+    // ─── PA-18: Destruction Certificate (Sijil Pemusnahan) ────────────
+
+    /**
+     * Show KEW.PA-18 Destruction Certificate page.
+     */
+    public function kewpa18()
+    {
+        $disposals = AssetDisposal::with('asset')
+            ->whereIn('disposal_method', ['Tanam', 'Bakar', 'Tenggelam'])
+            ->orderBy('disposal_date', 'desc')
+            ->get();
+
+        return inertia('Disposals/Kewpa18', ['disposals' => $disposals]);
+    }
+
+    /**
+     * Download KEW.PA-18 Destruction Certificate as PDF.
+     */
+    public function downloadKewpa18(AssetDisposal $disposal)
+    {
+        $disposal->load('asset');
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa18', ['disposal' => $disposal])
+            ->format('a4')->name("KEW-PA-18-{$disposal->asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
+                } else {
+                    $b->noSandbox()
+                      ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')
+                      ->setIncludePath('$PATH:/usr/local/bin:/usr/bin');
+                }
+                $b->setTimeout(120);
+            });
+    }
+
+    // ─── PA-19: Disposal Certificate (Sijil Pelupusan) ────────────────
+
+    /**
+     * Show KEW.PA-19 Disposal Certificate page.
+     */
+    public function kewpa19()
+    {
+        $disposals = AssetDisposal::with('asset')
+            ->orderBy('disposal_date', 'desc')
+            ->get();
+
+        return inertia('Disposals/Kewpa19', ['disposals' => $disposals]);
+    }
+
+    /**
+     * Download KEW.PA-19 Disposal Certificate as PDF.
+     */
+    public function downloadKewpa19(AssetDisposal $disposal)
+    {
+        $disposal->load('asset', 'committeeAppointments.user');
+        return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa19', ['disposal' => $disposal])
+            ->format('a4')->name("KEW-PA-19-{$disposal->asset->asset_tag}.pdf")
+            ->withBrowsershot(function ($b) {
+                if (PHP_OS_FAMILY === 'Windows') {
+                    $b->setChromePath('C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe');
                 } else {
                     $b->noSandbox()
                       ->setChromePath(collect(glob(storage_path('puppeteer/chrome/linux-*/chrome-linux64/chrome')))->first() ?? '/usr/bin/google-chrome')

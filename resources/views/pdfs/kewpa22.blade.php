@@ -2,7 +2,7 @@
 <html>
 <head>
     <meta charset="utf-8">
-    <title>KEW.PA-22 — Sebutharga Jualan Aset</title>
+    <title>KEW.PA-22 — Borang Tender Pelupusan Aset Alih Universiti</title>
     <style>
         body { font-family: 'Times New Roman', Times, serif; font-size: 12px; line-height: 1.5; color: #000; }
         .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
@@ -18,21 +18,22 @@
         .signature-row td { height: 60px; vertical-align: bottom; }
         .footer { text-align: center; font-size: 10px; margin-top: 20px; padding-top: 10px; border-top: 1px solid #000; }
         .page-break { page-break-after: always; }
+        .declaration { font-size: 11px; margin-bottom: 15px; padding: 10px; border: 1px solid #000; background-color: #fafafa; text-align: justify; }
     </style>
 </head>
 <body>
 
     <div class="header">
         <h1>KEW.PA-22</h1>
-        <h2>SEBUTHARGA JUALAN ASET</h2>
-        <p>(Sale Quotation)</p>
+        <h2>BORANG TENDER PELUPUSAN ASET ALIH UNIVERSITI</h2>
+        <p>(University Movable Asset Disposal Tender Form)</p>
         <p>Universiti Teknologi Malaysia</p>
     </div>
 
-    <!-- Sale Information -->
+    <!-- Tender Form Information -->
     <table>
         <tr>
-            <th colspan="4">A. MAKLUMAT SEBUTHARGA / QUOTATION INFORMATION</th>
+            <th colspan="4">A. MAKLUMAT BORANG TENDER / TENDER FORM INFORMATION</th>
         </tr>
         <tr>
             <td class="label-cell">Rujukan Sebutharga</td>
@@ -54,10 +55,35 @@
         </tr>
     </table>
 
+    <!-- Bidder Information -->
+    <table>
+        <tr>
+            <th colspan="4">B. MAKLUMAT BIDDER / BIDDER INFORMATION</th>
+        </tr>
+        <tr>
+            <td class="label-cell">Nama Penuh / Full Name</td>
+            <td colspan="3" style="height: 25px;">&nbsp;</td>
+        </tr>
+        <tr>
+            <td class="label-cell">No. IC / No. Syarikat</td>
+            <td colspan="3" style="height: 25px;">&nbsp;</td>
+        </tr>
+        <tr>
+            <td class="label-cell">Alamat / Address</td>
+            <td colspan="3" style="height: 50px;">&nbsp;</td>
+        </tr>
+        <tr>
+            <td class="label-cell">No. Telefon / Phone</td>
+            <td style="height: 25px;">&nbsp;</td>
+            <td class="label-cell">Emel / Email</td>
+            <td style="height: 25px;">&nbsp;</td>
+        </tr>
+    </table>
+
     <!-- Asset Disposal Information -->
     <table>
         <tr>
-            <th colspan="4">B. MAKLUMAT PELUPUSAN / DISPOSAL INFORMATION</th>
+            <th colspan="4">C. MAKLUMAT PELUPUSAN / DISPOSAL INFORMATION</th>
         </tr>
         <tr>
             <td class="label-cell">Tag Aset</td>
@@ -79,17 +105,18 @@
         </tr>
     </table>
 
-    <!-- Sale Items -->
+    <!-- Item Pricing Table -->
     <table>
         <tr>
-            <th colspan="5">C. SENARAI ITEM / LIST OF ITEMS</th>
+            <th colspan="6">D. HARGA ITEM / ITEM PRICING</th>
         </tr>
         <tr>
-            <th style="width:8%;">Bil.</th>
-            <th style="width:10%;">Lot</th>
-            <th style="width:42%;">Perkara / Description</th>
-            <th style="width:10%;">Kuantiti</th>
-            <th style="width:30%;">Anggaran Nilai (RM)</th>
+            <th style="width:6%;">Bil.</th>
+            <th style="width:8%;">Lot</th>
+            <th style="width:32%;">Perkara / Description</th>
+            <th style="width:8%;">Kuantiti</th>
+            <th style="width:23%;">Harga Rizab (RM)</th>
+            <th style="width:23%;">Tawaran Bidaan (RM)</th>
         </tr>
         @forelse ($sale->disposalSaleItems as $index => $item)
         <tr>
@@ -98,19 +125,65 @@
             <td>{{ $item->item_description }}@if($item->asset) ({{ $item->asset->name }}) @endif</td>
             <td style="text-align:center;">{{ $item->quantity }}</td>
             <td style="text-align:right;">{{ $item->estimated_value ? number_format($item->estimated_value, 2) : '-' }}</td>
+            <td style="text-align:right;">&nbsp;</td>
         </tr>
         @empty
         <tr>
-            <td colspan="5" style="text-align:center;">Tiada item / No items listed</td>
+            <td colspan="6" style="text-align:center;">Tiada item / No items listed</td>
         </tr>
         @endforelse
+    </table>
+
+    <!-- Bid Validity -->
+    <table>
+        <tr>
+            <th>E. TEMPOH SAH LAKU BIDAAN / BID VALIDITY PERIOD</th>
+        </tr>
+        <tr>
+            <td>Tempoh sah laku bidaan ini ialah {{ $sale->bid_validity_days ?? '60' }} hari dari tarikh tutup tender.</td>
+        </tr>
+    </table>
+
+    <!-- Declaration -->
+    <table>
+        <tr>
+            <th>F. PENGAKUAN / DECLARATION</th>
+        </tr>
+        <tr>
+            <td>
+                <div class="declaration">
+                    Saya dengan ini mengaku memahami dan bersetuju dengan semua syarat-syarat yang ditetapkan.
+                    <br><br>
+                    <em>I hereby acknowledge that I understand and agree to all the terms and conditions set forth.</em>
+                </div>
+            </td>
+        </tr>
+    </table>
+
+    <!-- Signature -->
+    <table>
+        <tr>
+            <th colspan="2">TANDATANGAN / SIGNATURE</th>
+        </tr>
+        <tr class="signature-row">
+            <td style="width:50%;">
+                <strong>Nama / Name:</strong><br>
+                <strong>Tandatangan / Signature:</strong><br>
+                <strong>Tarikh / Date:</strong>
+            </td>
+            <td style="width:50%;">
+                <strong>Nama / Name:</strong><br>
+                <strong>Tandatangan / Signature:</strong><br>
+                <strong>Tarikh / Date:</strong>
+            </td>
+        </tr>
     </table>
 
     <!-- Terms & Conditions -->
     @if($sale->terms_conditions)
     <table>
         <tr>
-            <th>D. SYARAT & KETENTUAN / TERMS & CONDITIONS</th>
+            <th>G. SYARAT & KETENTUAN / TERMS & CONDITIONS</th>
         </tr>
         <tr>
             <td>{{ $sale->terms_conditions }}</td>
@@ -122,7 +195,7 @@
     @if($sale->deposit_required)
     <table>
         <tr>
-            <th>E. DEPOSIT</th>
+            <th>H. DEPOSIT</th>
         </tr>
         <tr>
             <td>Deposit diperlukan: RM {{ number_format($sale->deposit_required, 2) }}</td>
@@ -131,7 +204,7 @@
     @endif
 
     <div class="footer">
-        <p>KEW.PA-22 — Sebutharga Jualan Aset | Universiti Teknologi Malaysia</p>
+        <p>KEW.PA-22 — Borang Tender Pelupusan Aset Alih Universiti | Universiti Teknologi Malaysia</p>
         <p>Dokumen ini sah dan lengkap. Document is valid and complete.</p>
     </div>
 
