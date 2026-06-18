@@ -1,0 +1,1271 @@
+#!/usr/bin/env python3
+"""
+cairo-ocr — OCR pipeline for CAIRO Inventory procurement documents.
+
+Extracts structured item data from PDF procurement documents (PO, DO, Quotation).
+Supports both digital (text-layer) PDFs and scanned (image-based) PDFs with CCITT
+fax compression.
+
+Usage:
+    python bin/cairo-ocr path/to/document.pdf [--type auto|po|do|quotation] [--format text|json|compact]
+
+Output (JSON by default):
+    {
+        "document_type": "po|do|quotation|unknown",
+        "title": "Document title",
+        "reference": "Doc ref number",
+        "supplier": "Supplier name",
+        "date": "Date string",
+        "total_amount": 2582970.00,
+        "items": [
+            {
+                "item_code": "1.1.1.1",
+                "description": "Office Desktop",
+                "brand": null,
+                "model": null,
+                "serial_number": null,
+                "quantity_ordered": 14,
+                "unit": "units",
+                "unit_price": 5926.00,
+                "total_price": 82964.00,
+                "category": "OFFICE EQUIPMENTS",
+                "section": "DESKTOP AND LAPTOP FOR OFFICE"
+            },
+            ...
+        ],
+        "page_count": 11,
+        "total_items": 63
+    }
+
+Dependencies: PyMuPDF, pytesseract, Pillow, Tesseract-OCR (installed separately)
+"""
+
+import argparse
+import json
+import os
+import re
+import sys
+import io
+import tempfile
+from dataclasses import dataclass, field, asdict
+from typing import Optional
+
+
+# ─── Attempt imports with helpful errors ─────────────────────────────────────
+
+def _find_tesseract():
+    """Locate tesseract executable — check common Windows + WSL paths."""
+    candidates = [
+        r"C:\Program Files\Tesseract-OCR\tesseract.exe",
+        r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
+        "/usr/bin/tesseract",
+        "/usr/local/bin/tesseract",
+    ]
+    # Also check WSL mount
+    for p in [
+        "/mnt/c/Program Files/Tesseract-OCR/tesseract.exe",
+        "/mnt/c/Program Files (x86)/Tesseract-OCR/tesseract.exe",
+    ]:
+        if os.path.exists(p):
+            return p
+    for p in candidates:
+        if os.path.exists(p):
+            return p
+    return None
+
+
+def _check_deps():
+    import importlib
+    missing = []
+    for mod_name, pip_name in [("fitz", "PyMuPDF"), ("PIL", "Pillow"),
+                                 ("pytesseract", "pytesseract")]:
+        try:
+            importlib.import_module(mod_name)
+        except ImportError:
+            missing.append(f"{pip_name} (pip install {pip_name})")
+
+    # Try to configure tesseract path
+    try:
+        import pytesseract
+        # pytesseract always has tesseract_cmd, so we need to check if it actually works
+        tess_path = pytesseract.pytesseract.tesseract_cmd
+        if not os.path.exists(tess_path):
+            found = _find_tesseract()
+            if found:
+                pytesseract.pytesseract.tesseract_cmd = found
+            else:
+                missing.append("Tesseract-OCR not found. Install from https://github.com/UB-Mannheim/tesseract/wiki")
+    except ImportError:
+        pass  # already reported above
+
+    if missing:
+        print(f"Missing dependencies: {', '.join(missing)}", file=sys.stderr)
+        sys.exit(1)
+
+
+_check_deps()
+
+import fitz
+from PIL import Image, ImageOps
+import pytesseract
+
+
+# ─── Data Model ──────────────────────────────────────────────────────────────
+
+@dataclass
+class ExtractedItem:
+    item_code: Optional[str] = None
+    description: Optional[str] = None
+    brand: Optional[str] = None
+    model: Optional[str] = None
+    serial_number: Optional[str] = None
+    quantity_ordered: int = 1
+    unit: Optional[str] = None
+    unit_price: Optional[float] = None
+    total_price: Optional[float] = None
+    category: Optional[str] = None
+    section: Optional[str] = None
+    notes: Optional[str] = None
+
+
+@dataclass
+class ExtractionResult:
+    document_type: str = "unknown"  # po | do | quotation | unknown
+    title: Optional[str] = None
+    reference: Optional[str] = None
+    supplier: Optional[str] = None
+    date: Optional[str] = None
+    total_amount: Optional[float] = None
+    items: list = field(default_factory=list)
+    page_count: int = 0
+    total_items: int = 0
+    raw_text: Optional[str] = None
+    warnings: list = field(default_factory=list)
+    method: str = "unknown"  # digital | ocr
+
+
+# ─── Core OCR Engine ─────────────────────────────────────────────────────────
+
+class OcrEngine:
+    """Handles PDF text extraction — digital or scanned."""
+
+    def __init__(self, pdf_path: str):
+        self.pdf_path = pdf_path
+        self.doc = fitz.open(pdf_path)
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args):
+        self.doc.close()
+
+    def extract_all(self) -> ExtractionResult:
+        """Extract text using best available method."""
+        result = ExtractionResult(page_count=self.doc.page_count)
+
+        # Try digital extraction first (require meaningful content — skip scanner watermarks)
+        digital_text = self._extract_digital()
+
+        # Heavy CamScanner watermark check: if >60% of lines are just "CamScanner",
+        # treat it as a scanned document regardless of meaningful char count
+        camscanner_lines = sum(1 for line in digital_text.split("\n")
+                               if "CamScanner" in line or "camscanner" in line.lower())
+        total_nonempty = sum(1 for line in digital_text.split("\n") if line.strip())
+        is_camscanner_only = (total_nonempty > 0
+                              and camscanner_lines / total_nonempty > 0.5)
+
+        meaningful_chars = sum(1 for c in digital_text if c.isalnum() or c in '.,;:!?-()[]{}')
+        if meaningful_chars > 50 and not is_camscanner_only:
+            result.raw_text = digital_text
+            result.method = "digital"
+            return result
+
+        # Fall back to OCR
+        result.method = "ocr"
+        result.warnings.append("No embedded text found. Using OCR (scanned PDF).")
+
+        ocr_text = self._extract_ocr()
+        result.raw_text = ocr_text
+
+        return result
+
+    def _extract_digital(self) -> str:
+        """Extract embedded text from PDF."""
+        texts = []
+        for page in self.doc:
+            text = page.get_text().strip()
+            if text:
+                texts.append(text)
+        return "\n\n".join(texts)
+
+    def _extract_ocr(self) -> str:
+        """OCR scanned PDF pages — handles CCITT bitonal inversion + PSM 12."""
+        texts = []
+        for pg_idx in range(self.doc.page_count):
+            page = self.doc[pg_idx]
+            text = self._ocr_page(page)
+            if text.strip():
+                texts.append(f"=== PAGE {pg_idx + 1} ===\n{text}")
+        return "\n\n".join(texts)
+
+    def _ocr_page(self, page) -> str:
+        """OCR a single scanned page, finding the best image layer."""
+        images = page.get_images(full=True)
+
+        if not images:
+            return ""
+
+        # Find the best bitonal content image
+        candidates = []
+        for img in images:
+            xref = img[0]
+            w, h = img[2], img[3]
+            bpc = img[4]
+            if bpc == 1 and w > 1000:
+                candidates.append((xref, w, h, w * h))
+
+        if not candidates:
+            # Fallback: try any large image
+            for img in images:
+                xref, w, h = img[0], img[2], img[3]
+                if w > 500:
+                    candidates.append((xref, w, h, w * h))
+
+        if not candidates:
+            return ""
+
+        # Pick largest content image
+        candidates.sort(key=lambda x: x[3], reverse=True)
+        xref = candidates[0][0]
+
+        try:
+            img_data = self.doc.extract_image(xref)
+            pil_img = Image.open(io.BytesIO(img_data["image"]))
+
+            # Convert to grayscale if needed
+            if pil_img.mode != "L":
+                pil_img = pil_img.convert("L")
+
+            # Check if inverted (mostly black background)
+            from PIL import ImageStat
+            stat = ImageStat.Stat(pil_img)
+            mean = stat.mean[0]
+            if mean < 50:  # Mostly black → invert
+                pil_img = ImageOps.invert(pil_img)
+
+            # Try PSM 12 first, fall back to PSM 1
+            text = pytesseract.image_to_string(
+                pil_img, lang="eng+msa", config="--psm 12"
+            )
+            if len(text.strip()) < 50:
+                text2 = pytesseract.image_to_string(
+                    pil_img, lang="eng+msa", config="--psm 1"
+                )
+                if len(text2.strip()) > len(text.strip()):
+                    text = text2
+
+            return text.strip()
+        except Exception as e:
+            return f"[OCR error: {e}]"
+
+
+# ─── Parser — extracts structured items from raw OCR text ──────────────────
+
+class DocumentParser:
+    """Parses raw OCR text into structured item records."""
+
+    # Document type signatures
+    PO_SIGNATURES = [
+        "PESANAN TEMPATAN",
+        "PURCHASE ORDER",
+        "PPTK",
+        "LOCAL ORDER",
+    ]
+    DO_SIGNATURES = [
+        "DELIVERY ORDER",
+        "ACKNOWLEDGEMENT GOODS",
+        "DO NO",
+        "DELIVERY ORDER NO",
+    ]
+    QUOTATION_SIGNATURES = [
+        "JADUAL HARGA",
+        "LAMPIRAN III",
+        "QUOTATION",
+        "PRICE SCHEDULE",
+        "TENDER NO",
+        "NO. TENDER",
+    ]
+
+    # Tender categories (sections in the JADUAL HARGA document)
+    SECTIONS = {
+        "1.1": "OFFICE EQUIPMENTS",
+        "1.2": "AGRICULTURE LABORATORY",
+        "1.3": "HEALTHCARE LABORATORY",
+        "1.4": "FIELD ROBOTICS LABORATORY",
+        "1.5": "SMART MANUFACTURING LABORATORY",
+    }
+
+    # Known brands for classification
+    KNOWN_BRANDS = [
+        "DELL", "LENOVO", "HIKVISION", "SAMSUNG", "EPSON", "TOSHIBA",
+        "PANASONIC", "SHURE", "DJI", "ASUS", "CISCO", "FS", "RUJIE",
+        "TP-LINK", "TP LINK", "LOGITECH", "BAMBU LAB", "XTOOL", "TIMI",
+        "IKEA", "VERTIV", "SYNOLOGY", "QCT", "INTERROLL", "LEYARD",
+        "ROKEA", "R-TECH", "MECH-EYE", "INTEL", "AMD", "NVIDIA",
+    ]
+
+    def __init__(self, raw_text: str, hint: str = "auto"):
+        self.raw_text = raw_text
+        self.hint = hint
+        self.lines = raw_text.split("\n")
+        self._clean_lines()
+
+    def _clean_lines(self):
+        """Remove empty noise lines but keep meaningful ones."""
+        cleaned = []
+        for line in self.lines:
+            s = line.strip()
+            # Skip lines that are just separators
+            if re.match(r'^[=\-*_~]+$', s):
+                continue
+            cleaned.append(s)
+        self.lines = cleaned
+        self.text = "\n".join(cleaned)
+
+    def detect_type(self) -> str:
+        """Auto-detect document type from content."""
+        if self.hint != "auto":
+            return self.hint
+
+        text_upper = self.text.upper()
+
+        # Count matches for each type
+        po_score = sum(1 for sig in self.PO_SIGNATURES if sig in text_upper)
+        do_score = sum(1 for sig in self.DO_SIGNATURES if sig in text_upper)
+        quotation_score = sum(1 for sig in self.QUOTATION_SIGNATURES if sig in text_upper)
+
+        scores = {"po": po_score, "do": do_score, "quotation": quotation_score}
+        best = max(scores, key=scores.get)
+        return best if scores[best] > 0 else "unknown"
+
+    def parse(self) -> ExtractionResult:
+        """Parse raw text into structured result."""
+        doc_type = self.detect_type()
+        result = ExtractionResult(document_type=doc_type)
+
+        # Extract metadata
+        result.title = self._extract_title()
+        result.reference = self._extract_reference()
+        result.supplier = self._extract_supplier()
+        result.date = self._extract_date()
+        result.total_amount = self._extract_total()
+        result.raw_text = self.text
+
+        # Extract items based on document type
+        if doc_type == "po":
+            items = self._parse_po_items()
+        elif doc_type == "do":
+            items = self._parse_do_items()
+        elif doc_type == "quotation":
+            items = self._parse_quotation_items()
+        else:
+            items = self._parse_generic_items()
+
+        result.items = items
+        result.total_items = len(items)
+
+        return result
+
+    # ─── Metadata extraction ─────────────────────────────────────────────
+
+    def _extract_title(self) -> Optional[str]:
+        """Extract document title."""
+        for line in self.lines[:20]:
+            if any(sig in line.upper() for sig in ["PESANAN TEMPATAN", "LAMPIRAN III",
+                                                      "JADUAL HARGA", "DELIVERY ORDER",
+                                                      "ACKNOWLEDGEMENT GOODS"]):
+                return line.strip()
+        return None
+
+    def _extract_reference(self) -> Optional[str]:
+        """Extract reference number (PO/DO/Tender number)."""
+        patterns = [
+            r'(PPTK\d+)',
+            r'(UTMCAIRO/\d+/\d+)',
+            r'(UTM\.B30/\d+)',
+            r'(PO[-\s]?\d+)',
+            r'(DO[-\s]?\d+)',
+            r'(TENDER[:\s]+.*)',
+            r'(PURCHASE ORDER[:\s]+.*)',
+        ]
+        text_upper = self.text.upper()
+        for pat in patterns:
+            m = re.search(pat, text_upper)
+            if m:
+                return m.group(1).strip()
+        return None
+
+    def _extract_supplier(self) -> Optional[str]:
+        """Extract supplier name."""
+        patterns = [
+            r'(DOTCOM\s+TELECOMMUNICATIONS[^\\n]*)',
+            r'(NAMA\s+DAN\s+ALAMAT\s+PEMBEKAL[^\\n]*\\n\\s*([^\\n]+))',
+        ]
+        for pat in patterns:
+            m = re.search(pat, self.text, re.IGNORECASE)
+            if m:
+                return m.group(1).strip()
+        return None
+
+    def _extract_date(self) -> Optional[str]:
+        """Extract date from document."""
+        patterns = [
+            r'(\d{1,2}\s+(?:JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\s+\d{4})',
+            r'(\d{1,2}/\d{1,2}/\d{4})',
+            r'(\d{4}-\d{2}-\d{2})',
+            r'(\d{2}\s+OCT\s+\d{4})',
+        ]
+        for pat in patterns:
+            m = re.search(pat, self.text, re.IGNORECASE)
+            if m:
+                return m.group(1).strip()
+        return None
+
+    def _extract_total(self) -> Optional[float]:
+        """Extract total amount."""
+        patterns = [
+            r'JUMLAH\s+BESAR[^\\n]*?(\\d{1,3}(?:,\\d{3})*\\.\\d{2})',
+            r'TOTAL[^\\n]*?(\\d{1,3}(?:,\\d{3})*\\.\\d{2})',
+            r'GRAND\s+TOTAL[^\\n]*?(\\d{1,3}(?:,\\d{3})*\\.\\d{2})',
+            r'RM\s*(\\d{1,3}(?:,\\d{3})*\\.\\d{2})',
+        ]
+        for pat in patterns:
+            m = re.search(pat, self.text, re.IGNORECASE)
+            if m:
+                try:
+                    return float(m.group(1).replace(",", ""))
+                except ValueError:
+                    pass
+        return None
+
+    # ─── PO Item Parser ──────────────────────────────────────────────────
+
+    def _parse_po_items(self) -> list:
+        """Parse PO (Pesanan Tempatan) items using a state machine.
+
+        The OCR output has each item field on its own line:
+          ITEM_NUM       e.g. "1"
+          DESCRIPTION    e.g. "TRANSCEIVER (INCLUDE INSTALLATION..."
+          CODE           e.g. "B27399" (optional)
+          QUANTITY       e.g. "4" (optional)
+          UNIT_PRICE     e.g. "2,175.00"
+          TOTAL_PRICE    e.g. "8,700.00"
+        """
+        items = []
+        current_category = "GENERAL"
+
+        # State machine for parsing
+        MAX_LINES_AHEAD = 20
+        i = 0
+        while i < len(self.lines):
+            line = self.lines[i]
+            line_s = line.strip()
+            i += 1
+
+            if not line_s:
+                continue
+
+            # Skip metadata, headers, footers
+            if line_s in ["PESANAN TEMPATAN", "SALINAN ASAL"]:
+                continue
+            if "Muka Surat" in line_s:
+                # Extract page number from "Muka Surat : 2 dari 13"
+                continue
+            if re.match(r'^BP\d+$', line_s):  # Registration number
+                continue
+            if "Nama dan alamat" in line_s or "N PENDAFT" in line_s:
+                continue
+            if "TARIKH" in line_s or line_s.startswith("31/") or line_s.startswith("29/"):
+                continue
+            if re.match(r'^NO\.\d+', line_s) or "KUALA LUMPUR" in line_s or "KUCHAI LAMA" in line_s:
+                continue
+            if line_s == "Barang / Perkhidmatan":
+                continue
+            if "JUMLAH HARGA" in line_s or "Di Semak" in line_s or "Di Lulus" in line_s:
+                continue
+            if "Pegawai" in line_s or "Bertanggungjawab" in line_s:
+                continue
+            if "Johor" in line_s or "ABU" in line_s or "No. K/P" in line_s:
+                continue
+
+            # Detect category from item descriptions
+            if "OFFICE" in line_s and "EQUIPMENT" in line_s:
+                current_category = "OFFICE EQUIPMENTS"
+                continue
+            if "SMART MANUFACTURING" in line_s:
+                current_category = "SMART MANUFACTURING LAB"
+                continue
+            if "AGRICULTURE" in line_s and len(line_s) < 30:
+                current_category = "AGRICULTURE LAB"
+                continue
+            if "HEALTHCARE" in line_s and len(line_s) < 30:
+                current_category = "HEALTHCARE LAB"
+                continue
+            if "ROBOTIC" in line_s:
+                current_category = "ROBOTICS"
+                continue
+            if "SUPPORT EQUIPMENT" in line_s or (
+                "SUPPORT" in line_s and "EQUIPMENT" in line_s):
+                current_category = "SUPPORT EQUIPMENT"
+                continue
+            if "NETWORK" in line_s and "OFFICE" in line_s:
+                current_category = "NETWORK"
+                continue
+            if "MULTIMEDIA" in line_s and "OFFICE" in line_s:
+                current_category = "MULTIMEDIA"
+                continue
+
+            # Check if this line starts an item (is a number 1-99)
+            item_num_match = re.match(r'^(\d{1,2})$', line_s)
+            if not item_num_match:
+                continue
+
+            item_num = int(item_num_match.group(1))
+
+            # Peek ahead to collect the item's data fields
+            # State machine for lines following the item number
+            desc_lines = []
+            code = None
+            qty = 1
+            unit_price = None
+            total_price = None
+
+            j = 0
+            while j < MAX_LINES_AHEAD:
+                peek_idx = i + j
+                if peek_idx >= len(self.lines):
+                    break
+                peek = self.lines[peek_idx].strip()
+                if not peek:
+                    j += 1
+                    continue
+
+                # Next item number → stop
+                if re.match(r'^\d{1,2}$', peek):
+                    break
+
+                # "BXXXXX" pattern (code)
+                if re.match(r'^B\d{4,6}$', peek):
+                    code = peek
+                    j += 1
+                    continue
+
+                # Quantity (just digits, 1-999)
+                if re.match(r'^\d{1,3}$', peek) and len(peek) <= 3:
+                    qty = int(peek)
+                    j += 1
+                    continue
+
+                # Price values
+                cleaned = peek.replace(' ', '.')
+                if re.match(r'^[\d,]+(?:\.\d{1,2})?$', cleaned):
+                    val_str = cleaned.replace(',', '')
+                    try:
+                        val = float(val_str)
+                        if unit_price is None:
+                            unit_price = val
+                        elif total_price is None:
+                            total_price = val
+                        # Skip additional price fields (SST, full total)
+                        j += 1
+                        continue
+                    except ValueError:
+                        pass
+
+                # Description text — collect but limit
+                if len(peek) > 3 or re.match(r'^[A-Z]', peek):
+                    # Stop collecting description if we hit a known non-desc line
+                    if re.match(r'^(?:RM|JUMLAH|SST|0[.]00)', peek):
+                        j += 1
+                        continue
+                    desc_lines.append(peek)
+
+                j += 1
+
+            # ADVANCE past the peeked lines so we don't re-read them
+            i += j
+
+            # Skip empty/phantom items
+            description = " ".join(desc_lines).strip() if desc_lines else None
+            is_phantom = (
+                description is None
+                or re.match(r'^\d+$', description)
+                or len(description) < 3
+            )
+            if is_phantom:
+                continue
+
+            item = ExtractedItem(
+                item_code=str(item_num),
+                description=description,
+                quantity_ordered=qty or 1,
+                unit="unit",
+                unit_price=unit_price,
+                total_price=total_price,
+                category=current_category,
+            )
+            item.brand = self._extract_brand(description)
+            items.append(item)
+
+        return items
+
+    def _parse_do_items(self) -> list:
+        """Parse DO items — handles two formats:
+
+        Format A (DOTCOM DO — ACKNOWLEDGEMENT GOODS):
+          Item codes like 1.1.3, 1.1.3.2, 1.5.1.9
+          Category headers: Office Equipments, Security Access, Multimedia, etc.
+          S/N lines: 1. S/N : XXXX or S/N: XXXX
+          "no SN" → has_serial = False
+
+        Format B (SNS DO — Delivery Order):
+          Numbered items 1-18
+          Quantity explicitly listed (e.g. "36" for 36 sensors)
+          "no SN" → has_serial = False
+          "refer attachment" → generic item
+        """
+        items = []
+        current_category = "GENERAL"
+
+        # ── Detect DO format ─────────────────────────────────────────────
+        text_upper = self.text.upper()
+        # Format B (SNS): numbered items like "1", "2"... in a table with NO. and QTY columns
+        has_numbered_table = bool(re.search(r'(?:^|\n)\s*NO\.?\s', text_upper))
+        has_sns_header = "SNS NETWORK" in text_upper[:300] or "SNS" in text_upper[:100]
+        has_item_codes_dotcom = bool(re.search(r'(?:^|\n)\s*\d+\.\d+\.\d', text_upper))
+        # SNS DO has items numbered 1-18 on their own lines (use MULTILINE for $)
+        has_simple_numbered_items = bool(re.search(
+            r'^([1-9]|1[0-8])\s*$', text_upper, re.MULTILINE))
+        is_sns_format = (has_numbered_table and has_sns_header) or \
+                        (has_simple_numbered_items and not has_item_codes_dotcom)
+
+        # Known DO category headers (uppercase keywords)
+        CATEGORY_MAP = {
+            "SECURITY ACCESS": "Security Access",
+            "MULTIMEDIA EQUIPMENTS": "Multimedia Equipments",
+            "SUPPORT EQUIPMENTS": "Support Equipments",
+            "SUPPORT EQUIPMENT": "Support Equipments",
+            "ICT EQUIPMENT": "ICT Equipment",
+            "SMART MANUFACTURING": "Smart Manufacturing Lab",
+            "ROBOTIC EQUIPMENTS": "Robotic Equipments",
+            "ROBOTIC": "Robotic Equipments",
+            "NETWORK EQUIPMENT": "Network Equipment",
+            "NETWORK FOR OFFICE": "Network Equipment",
+            "DESKTOP AND LAPTOP": "Desktop and Laptop",
+            "OFFICE EQUIPMENTS": "Office Equipments",
+            "AGRICULTURE": "Agriculture Lab",
+            "HEALTHCARE": "Healthcare Lab",
+            "FIELD ROBOTICS": "Field Robotics Lab",
+        }
+
+        # ── Utility: detect category from a line ─────────────────────────
+        def _detect_category(line: str) -> Optional[str]:
+            up = line.upper()
+            for kw, name in CATEGORY_MAP.items():
+                if kw in up:
+                    return name
+            return None
+
+        # ── Utility: extract serial numbers from a block of text ─────────
+        def _extract_serials(text_block: str) -> list:
+            """Find serial numbers in text like '1. S/N : XXXX' or 'S/N: XXXX'."""
+            serials = []
+            patterns = [
+                r'(?:S\/N|SIN|SN)[:\s]*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
+                r'(?:^|\s)(\d{2,}\.\s*(?:S\/N|SIN|SN)\s*[:\-]\s*([A-Za-z0-9][A-Za-z0-9\-]{4,}))',
+            ]
+            # Pattern 1: "S/N : XXXX", "S/N: XXXX", "SIN: XXXX"
+            for m in re.finditer(r'(?:S\/N|SIN|SN)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
+                                 text_block, re.IGNORECASE):
+                serials.append(m.group(1))
+            # Pattern 2: numbered "1. S/N : XXXX" 
+            for m in re.finditer(r'\d+\.\s*S\/N\s*:?\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
+                                 text_block, re.IGNORECASE):
+                serials.append(m.group(1))
+            return serials
+
+        # ── Utility: extract brand/model from description ────────────────
+        def _extract_brand_model(desc: str) -> tuple:
+            """Extract brand and model from description.
+            Patterns: 'COUNTRY / BRAND / MODEL', 'BRAND / MODEL'
+            """
+            brand_pats = [
+                r'(?:China|USA|Japan|Netherlands|Sweden|Korea|Taiwan|Germany)\s*/\s*([A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9\s\.\-/]+)',
+                r'([A-Z][A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9][A-Za-z0-9\s\.\-/]+)',
+            ]
+            for pat in brand_pats:
+                m = re.search(pat, desc)
+                if m:
+                    brand = m.group(1).strip()
+                    model = m.group(2).strip()
+                    # Clean up common OCR noise
+                    brand = re.sub(r'\s+', ' ', brand).strip()
+                    model = re.sub(r'\s+', ' ', model).strip()
+                    return brand, model
+            return None, None
+
+        # ── FORMAT B: SNS-style numbered items ──────────────────────────
+        if is_sns_format:
+            # Pre-scan: find REAL item number positions (1-18, followed by a description line,
+            # not by "no SN", empty space, or delivery footer)
+            item_positions = []
+            for idx, ln in enumerate(self.lines):
+                m = re.match(r'^(\d{1,2})\s*$', ln.strip())
+                if not m:
+                    continue
+                n = int(m.group(1))
+                if n < 1 or n > 18:
+                    continue
+
+                # Check next non-empty line — if it's a real description (brand, model, product name),
+                # it's an item number. If it's noise/footer/no-SN it's not.
+                next_line = ""
+                for ni in range(idx + 1, min(idx + 5, len(self.lines))):
+                    nl = self.lines[ni].strip()
+                    if nl:
+                        next_line = nl.upper()
+                        break
+
+                # Heuristic: real item numbers precede descriptions with brand/MAC/spec
+                # patterns. Fake ones precede "no SN", empty, or footer text.
+                is_real = True
+                if not next_line:
+                    is_real = False
+                elif any(s in next_line for s in ["NO SN", "DELIVERY TO:", "ACCEPT ABOVE",
+                                                   "AUTHORISED BY", "CUSTOMER STAMP"]):
+                    is_real = False
+                elif re.match(r'^[A-Z\s]{3,15}$', next_line) and len(next_line) < 20:
+                    # All-caps short line is probably a table header, not description
+                    is_real = False
+
+                if is_real:
+                    item_positions.append((idx, n))
+
+            # If no real item positions found, try broader approach
+            if not item_positions:
+                for idx, ln in enumerate(self.lines):
+                    m = re.match(r'^(\d{1,2})\s*$', ln.strip())
+                    if m:
+                        n = int(m.group(1))
+                        if 1 <= n <= 18:
+                            item_positions.append((idx, n))
+
+            # Use positions to extract content between item numbers
+            for pi in range(len(item_positions)):
+                start_idx, item_num = item_positions[pi]
+                end_idx = item_positions[pi + 1][0] if pi + 1 < len(item_positions) else len(self.lines)
+
+                content_lines = []
+                for li in range(start_idx + 1, end_idx):
+                    ln = self.lines[li].strip()
+                    if not ln:
+                        continue
+                    if any(s in ln.upper() for s in ["DELIVERY TO:", "ACCEPT ABOVE",
+                                                      "AUTHORISED BY", "CUSTOMER STAMP",
+                                                      "RECEIVED", "STAMP & SIGNATURE"]):
+                        break
+                    content_lines.append(ln)
+
+                desc_parts = []
+                qty = 1
+                has_serial = True
+                serial_line = ""
+
+                for cl in content_lines:
+                    if re.match(r'^[A-Za-z0-9]{6,}$', cl) and len(cl) >= 6:
+                        serial_line += " " + cl
+                        continue
+                    if "no SN" in cl.lower():
+                        has_serial = False
+                        continue
+                    if "refer" in cl.lower() and ("attachment" in cl.lower() or "attacment" in cl.lower()):
+                        continue
+                    qm = re.match(r'^(\d{1,3})\s*$', cl)
+                    if qm:
+                        q = int(qm.group(1))
+                        if 1 <= q <= 999:
+                            qty = q
+                            continue
+                    if len(cl) > 2:
+                        desc_parts.append(cl)
+
+                description = " ".join(desc_parts).strip() if desc_parts else ""
+                if len(description) < 5:
+                    continue
+
+                serials = _extract_serials(description + " " + serial_line)
+                serial_number = serials[0] if serials else (None if has_serial else None)
+                brand, model = _extract_brand_model(description)
+
+                items.append(ExtractedItem(
+                    item_code=str(item_num),
+                    description=description,
+                    brand=brand or self._extract_brand(description),
+                    model=model,
+                    serial_number=serial_number,
+                    quantity_ordered=qty,
+                    unit="unit",
+                    category=_detect_category(description) or current_category,
+                    notes="no SN" if not has_serial else None,
+                ))
+
+            # ── Post-process: split merged items by brand/product prefixes ──
+            SPLIT_PREFIXES = [
+                "MSI MS7E", "MSI PRO", "MSI CYBORG",
+                "SENSOR HUMID", "STMICROELECTRONICS", "NUCLEO-",
+                "ALFA AOA", "UBIQUITI", "TP-LINK", "PRO'SKIT SN-396",
+                "PELICAN", "SPACE ERGONOMIC",
+                "VIEWSONIC", "CHARDER", "DAHUA",
+                "HP VICTUS", "RASPBERRY PI",
+            ]
+            SPLIT_PREFIXES_SORTED = sorted(SPLIT_PREFIXES, key=len, reverse=True)
+            split_items = []
+            for item in items:
+                desc_upper = (item.description or "").upper()
+                if len(desc_upper) > 100:
+                    # Try to split at each known prefix
+                    parts = []
+                    last_end = 0
+                    positions = []
+                    for prefix in SPLIT_PREFIXES_SORTED:
+                        pu = prefix.upper()
+                        idx = desc_upper.find(pu, 10)
+                        if idx > 0:
+                            positions.append((idx, prefix))
+                    positions.sort()
+                    for pos, prefix in positions:
+                        if pos >= last_end + 10:
+                            part = item.description[last_end:pos].strip()
+                            if part and len(part) > 10:
+                                parts.append(part)
+                            last_end = pos
+                    if parts:
+                        # Add last segment
+                        last_part = item.description[last_end:].strip()
+                        if last_part and len(last_part) > 10:
+                            parts.append(last_part)
+                        # Create split items
+                        for pi, part in enumerate(parts):
+                            split_items.append(ExtractedItem(
+                                item_code=f"{item.item_code}.{pi+1}" if item.item_code else str(pi+1),
+                                description=part,
+                                brand=self._extract_brand(part),
+                                model=None,
+                                serial_number=item.serial_number if pi == 0 else None,
+                                quantity_ordered=item.quantity_ordered,
+                                unit=item.unit,
+                                category=item.category,
+                                notes=item.notes,
+                            ))
+                        continue  # skip original merged item
+                split_items.append(item)
+            items = split_items
+
+            return items
+
+        # ── FORMAT A: DOTCOM-style item codes ───────────────────────────
+        # Item code may be on same line as description ("1.1.3.2 POE Switch")
+        # OR on its own line ("1.1.3" next line "Security Access For Office")
+        item_code_on_line = re.compile(r'^(\d+\.\d+(?:\.\d+)*(?:\.\d+)?)\s+(.+)')
+        item_code_alone = re.compile(r'^(\d+\.\d+(?:\.\d+)*(?:\.\d+)?)$')
+        in_items_section = False
+        i = 0
+
+        while i < len(self.lines):
+            line = self.lines[i].strip()
+            i += 1
+            if not line or len(line) < 3:
+                continue
+
+            # Skip header/noise lines
+            up_line = line.upper()
+            if any(sig in up_line for sig in [
+                "DOTCOM", "TELECOMMUNICATIONS", "ACKNOWLEDGEMENT GOODS",
+                "SOLD TO", "SHIP TO", "CENTER FOR", "ARTIFICIAL INTELLIGENCE",
+                "AND ROBOTICS", "CAIRO", "PEJABAT", "PEJABET", "PEJABAT",
+                "BANGUNAN", "UNIVERSITI", "UNIVERSITY", "TEKNOLOGI",
+                "MALAYSIA", "JALAN SULTAN", "54100", "54700", "547100",
+                "ATTN", "TEL :", "TEL:", "ACK NO", "ACK DATE", "YOUR P/O",
+                "SALES REP", "TERMS", "NO OF PAGE", "NO of PAGE",
+                "RECEIVED THE", "FOLLOWING", "IN GOOD ORDER",
+                "SIGNATURE", "COMPUTER GENERATED",
+                "ENDACH", "ENDAH", "TAMAN SRI", "BANDAR BARU",
+                "PETALING", "57000", "KUALA LUMPUR",
+                "NENNY", "RUTHFALYDIA", "PEGAWAI", "PENYELIDIK",
+                "PUSAT", "KECERDIKAN", "BUATAN",
+                "UTMCAIRO", "PPTK", "REOSIVED", "REOEIVED",
+                "{TEM", "DESCRIPTION", "QUANTITY", "REMARKS",
+                "pay inet", "Brn seen",
+            ]):
+                continue
+
+            # CamScanner garbage lines
+            if re.match(r'^[^\w]*\d+[^\w]*$', line) and len(line) <= 10:
+                continue
+            if re.match(r'^[a-z\s]{2,6}$', line) and len(line) <= 8:
+                continue
+
+            # Check for category
+            cat = _detect_category(line)
+            if cat:
+                current_category = cat
+                in_items_section = True
+                continue
+
+            # Check for item code on current line
+            m = item_code_on_line.match(line)
+            item_code = None
+            rest = None
+
+            if m:
+                item_code = m.group(1)
+                rest = m.group(2).strip()
+            else:
+                # Try item code alone on line
+                m2 = item_code_alone.match(line)
+                if m2:
+                    item_code = m2.group(1)
+                    rest = ""
+
+            if not item_code:
+                continue
+
+            in_items_section = True
+
+            # Collect description from subsequent lines
+            desc_lines = [rest] if rest else []
+            serial_lines = []
+            qty = 1
+
+            j = 0
+            while i + j < len(self.lines):
+                peek = self.lines[i + j].strip()
+                if not peek:
+                    j += 1
+                    continue
+                # Stop: next item code (same line or alone)
+                if re.match(r'^\d+\.\d+(?:\.\d+)*(?:\.\d+)?\s', peek) or \
+                   re.match(r'^\d+\.\d+(?:\.\d+)*(?:\.\d+)?$', peek):
+                    break
+                # Stop: category header
+                if _detect_category(peek):
+                    break
+                # Stop: section markers
+                if any(s in peek.upper() for s in ["RECEIVED THE", "** THIS", "NAME:", "DATE:", "COMPANY CHOP",
+                                                    "COMPANY CHO", "SIGNATURE"]):
+                    break
+
+                # CamScanner garbage
+                if re.match(r'^[^\w]*\d+[^\w]*$', peek) and len(peek) <= 10:
+                    j += 1
+                    continue
+
+                # Serial number lines
+                if re.search(r'(?:S\/N|SIN|SN)\s*[:=]', peek, re.IGNORECASE) or \
+                   re.match(r'^\d+\.\s*S\/N', peek, re.IGNORECASE):
+                    serial_lines.append(peek)
+                    j += 1
+                    continue
+
+                # Quantity on its own line (just digits, 1-999)
+                qty_m = re.match(r'^(\d{1,3})\s*$', peek)
+                if qty_m and 1 <= int(qty_m.group(1)) <= 500:
+                    qty = int(qty_m.group(1))
+                    j += 1
+                    continue
+
+                # Include line as description
+                desc_lines.append(peek)
+                j += 1
+
+            i += j
+
+            description = " ".join(d for d in desc_lines if d and len(d) > 2).strip()
+            # Clean up
+            description = re.sub(r'\s+', ' ', description).strip()
+
+            # Skip purely noise items
+            if len(description) < 5 or re.match(r'^[A-Z\s]{4,}$', description):
+                continue
+
+            # Extract serials
+            all_serials_text = " ".join(serial_lines)
+            serials = _extract_serials(all_serials_text)
+            serial_number = serials[0] if serials else None
+
+            # Check "no SN" in description
+            has_no_sn = "no SN" in description.lower()
+            if has_no_sn:
+                serial_number = None
+
+            brand, model = _extract_brand_model(description)
+            if "INCLUDING" in description.upper() or "COME WITH" in description.upper():
+                # Single item with accessories
+                pass
+
+            brand, model = _extract_brand_model(description)
+
+            item = ExtractedItem(
+                item_code=item_code,
+                description=description,
+                brand=brand or self._extract_brand(description),
+                model=model,
+                serial_number=serial_number,
+                quantity_ordered=qty,
+                unit="unit",
+                category=current_category,
+                notes="no SN" if has_no_sn else None,
+            )
+            items.append(item)
+
+        return items
+
+    def _parse_quotation_items(self) -> list:
+        """Parse quotation (JADUAL HARGA / tender) items.
+
+        The quotation has structure:
+          BIL | NAMA ITEM | NEGARA | HARGA SEUNIT | KUANTITI | JUMLAH BESAR | SST
+          1.1.1.1 | Office Desktop | 14 units | ...
+        """
+        items = []
+        current_category = "GENERAL"
+        current_section = None
+
+        # Section headers in quotation
+        section_patterns = {
+            "OFFICE EQUIPMENTS": "OFFICE EQUIPMENTS",
+            "DESKTOP AND LAPTOP": "DESKTOP AND LAPTOP FOR OFFICE",
+            "NETWORK FOR OFFICE": "NETWORK FOR OFFICE",
+            "MULTIMEDIA EQUIPMENTS": "MULTIMEDIA EQUIPMENTS FOR OFFICE",
+            "AGRICULTURE": "AGRICULTURE LABORATORY",
+            "HEALTHCARE": "HEALTHCARE LABORATORY",
+            "FIELD ROBOTICS": "FIELD ROBOTICS LABORATORY",
+            "SMART MANUFACTURING": "SMART MANUFACTURING LABORATORY",
+            "ICT EQUIPMENT FOR SMART": "ICT EQUIPMENT FOR SMART MANUFACTURING LAB",
+            "LAB EQUIPMENTS FOR SMART": "LAB EQUIPMENTS FOR SMART MANUFACTURING LAB",
+        }
+
+        # Item code pattern: 1.1.X.X or 1.5.X.X
+        item_code_pattern = re.compile(r'^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)\\s*$')
+
+        i = 0
+        while i < len(self.lines):
+            line = self.lines[i].strip()
+            if not line or len(line) < 3:
+                i += 1
+                continue
+
+            # Check section headers
+            for key, val in section_patterns.items():
+                if key in line.upper():
+                    if "EQUIPMENT" in key or "LAB" in key:
+                        current_category = val
+                    current_section = val
+                    break
+
+            # Check for item code on current line
+            m_code = item_code_pattern.match(line)
+            if m_code:
+                item_code = m_code.group(1)
+                # Next few lines should contain description + quantity
+                desc_parts = []
+                qty = 1
+                unit = "unit"
+                j = i + 1
+                while j < len(self.lines) and j < i + 6:
+                    next_line = self.lines[j].strip()
+                    if not next_line:
+                        j += 1
+                        continue
+                    # Check for quantity
+                    qty_m = re.match(r'^\\s*(\\d+)\\s*(unit|units|set|sets|box|boxes|lot)?\\s*$', next_line, re.IGNORECASE)
+                    if qty_m:
+                        qty = int(qty_m.group(1))
+                        if qty_m.group(2):
+                            unit = qty_m.group(2)
+                        break
+                    # Skip page markers and notes
+                    if any(x in next_line for x in ["CATATAN", "Tandatangan", "LAMPIRAN",
+                                                      "JADUAL HARGA", "NO. TENDER",
+                                                      "of 46 pages", "SILA RUJUK",
+                                                      "HARGA", "JUMLAH"]):
+                        j += 1
+                        continue
+                    desc_parts.append(next_line)
+                    j += 1
+
+                description = " ".join(desc_parts) if desc_parts else line
+
+                item = ExtractedItem(
+                    item_code=item_code,
+                    description=description,
+                    quantity_ordered=qty,
+                    unit=unit,
+                    category=current_category,
+                    section=current_section,
+                )
+                item.brand = self._extract_brand(description)
+                items.append(item)
+
+            i += 1
+
+        return items
+
+    def _parse_generic_items(self) -> list:
+        """Fallback: try any line-based parsing."""
+        items = []
+        for line in self.lines:
+            line_s = line.strip()
+            if not line_s or len(line_s) < 5:
+                continue
+            # Skip headers and footers
+            if any(x in line_s for x in ["BIL", "NAMA", "HARGA", "JUMLAH", "CATATAN",
+                                          "LAMPIRAN", "Tandatangan", "SST", "MODEL",
+                                          "KUANTITI", "NEGARA"]):
+                continue
+
+            # Try to detect item pattern: number + text + quantity
+            m = re.match(r'^\\s*(\\d+(?:\\.\\d+)*)\\s+([A-Za-z].+?)\\s+(\\d+)\\s+(unit|units)?$',
+                         line_s, re.IGNORECASE)
+            if m:
+                item = ExtractedItem(
+                    item_code=m.group(1),
+                    description=m.group(2).strip(),
+                    quantity_ordered=int(m.group(3)),
+                    unit=m.group(4) or "unit",
+                )
+                items.append(item)
+
+        return items
+
+    def _extract_brand(self, text: str) -> Optional[str]:
+        """Try to extract known brand from text."""
+        text_upper = text.upper()
+        for brand in sorted(self.KNOWN_BRANDS, key=len, reverse=True):
+            if brand in text_upper:
+                return brand.title()
+        return None
+
+
+# ─── Main CLI ────────────────────────────────────────────────────────────────
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="cairo-ocr — OCR pipeline for CAIRO Inventory procurement documents",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python bin/cairo-ocr item_documents/PT\\ DOT\\ COM.pdf
+  python bin/cairo-ocr item_documents/DOTCOM\\ DO.pdf --type do --format json
+  python bin/cairo-ocr item_documents/some.pdf --type auto --format compact
+        """,
+    )
+    parser.add_argument("pdf", help="Path to the PDF file")
+    parser.add_argument(
+        "--type", choices=["auto", "po", "do", "quotation"], default="auto",
+        help="Document type hint (auto-detect if not specified)",
+    )
+    parser.add_argument(
+        "--format", choices=["json", "text", "compact"], default="json",
+        help="Output format (default: json)",
+    )
+    parser.add_argument(
+        "--only-items", action="store_true",
+        help="Output only the items array (useful for piping into other tools)",
+    )
+
+    args = parser.parse_args()
+
+    pdf_path = args.pdf
+    if not os.path.exists(pdf_path):
+        print(f"Error: File not found: {pdf_path}", file=sys.stderr)
+        sys.exit(1)
+
+    # Run OCR pipeline
+    try:
+        # Ensure tesseract path is set
+        import pytesseract
+        found = _find_tesseract()
+        if found:
+            pytesseract.pytesseract.tesseract_cmd = found
+        with OcrEngine(pdf_path) as engine:
+            extraction = engine.extract_all()
+    except Exception as e:
+        print(f"Error during OCR: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    # Parse into structured data
+    parser_obj = DocumentParser(extraction.raw_text or "", hint=args.type)
+    result = parser_obj.parse()
+
+    # Override method from extraction
+    result.method = extraction.method
+    result.warnings = extraction.warnings
+
+    # Output
+    if args.only_items:
+        print(json.dumps([asdict(i) for i in result.items], indent=2))
+    elif args.format == "json":
+        # Compute confidence score
+        items_list = [asdict(i) for i in result.items]
+        total = len(items_list)
+        if total > 0:
+            goods = sum(1 for i in items_list
+                        if len(i.get("description") or "") > 15)
+            with_brand = sum(1 for i in items_list if i.get("brand"))
+            with_code = sum(1 for i in items_list if i.get("item_code"))
+            score = 0.0
+            score += 0.4 * (goods / total)
+            score += 0.3 * (with_brand / total)
+            score += 0.3 * (with_code / total)
+            confidence = round(score * 100)
+        else:
+            confidence = 0
+
+        output = {
+            "document_type": result.document_type,
+            "title": result.title,
+            "reference": result.reference,
+            "supplier": result.supplier,
+            "date": result.date,
+            "total_amount": result.total_amount,
+            "method": result.method,
+            "page_count": result.page_count,
+            "total_items": result.total_items,
+            "confidence": confidence,
+            "warnings": result.warnings,
+            "items": items_list,
+            "raw_text": result.raw_text[:10000] if result.raw_text else None,
+        }
+        print(json.dumps(output, indent=2))
+    elif args.format == "compact":
+        print(f"[{result.document_type.upper()}] {result.reference or 'N/A'}")
+        print(f"  Supplier: {result.supplier or 'N/A'}")
+        print(f"  Date: {result.date or 'N/A'}")
+        print(f"  Items: {result.total_items}")
+        if result.total_amount:
+            print(f"  Total: RM {result.total_amount:,.2f}")
+        print(f"  Method: {result.method}")
+        print(f"  Warnings: {len(result.warnings)}")
+        for item in result.items[:5]:
+            print(f"    - {item.description or '(no desc)'}" +
+                  (f" x{item.quantity_ordered}" if item.quantity_ordered else "") +
+                  (f" @ RM{item.unit_price:,.2f}" if item.unit_price else ""))
+        if result.total_items > 5:
+            print(f"    ... and {result.total_items - 5} more items")
+    else:
+        print(result.raw_text or "No text extracted")
+
+
+if __name__ == "__main__":
+    main()

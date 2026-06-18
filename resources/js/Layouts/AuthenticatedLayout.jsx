@@ -262,14 +262,12 @@ export default function AuthenticatedLayout({ header, children }) {
                        LOGISTIK & PENERIMAAN
                        ═══════════════════════════════════════════════════════ */}
                     <NavSection label="Logistik & Penerimaan">
-                        {user.role === 'admin' && (
-                            <NavLink
-                                href={route('receivings.index')}
-                                icon="＋"
-                                label="PA-1 Senarai Penerimaan"
-                                active={isActive('receivings.index', 'receivings.kewpa1')}
-                            />
-                        )}
+                        <NavLink
+                            href={route('items.index')}
+                            icon="▤"
+                            label="Items Overview"
+                            active={isActive('items.index')}
+                        />
                         <NavLink
                             href={route('receivings.index')}
                             icon="◫"
@@ -281,6 +279,36 @@ export default function AuthenticatedLayout({ header, children }) {
                             icon="◈"
                             label="PA-2/3 Pendaftaran Aset"
                             active={isActive('assets.*')}
+                        />
+                        <NavLink
+                            href={route('delivery-orders.index')}
+                            icon="◰"
+                            label="DO Penghantaran Barang"
+                            active={isActive('delivery-orders.*')}
+                        />
+                        <NavLink
+                            href={route('scanner.index')}
+                            icon="◉"
+                            label="Scanner S/N Barcode"
+                            active={isActive('scanner.*')}
+                        />
+                        <NavLink
+                            href={route('delivery-orders.verification')}
+                            icon="◈"
+                            label="Verification Dashboard"
+                            active={isActive('delivery-orders.verification')}
+                        />
+                    </NavSection>
+
+                    {/* ═══════════════════════════════════════════════════════
+                       PDF IMPORT (OCR)
+                       ═══════════════════════════════════════════════════════ */}
+                    <NavSection label="Procurement Import">
+                        <NavLink
+                            href={route('import.index')}
+                            icon="⬆"
+                            label="Import PDF / CSV / Excel"
+                            active={isActive('import.*')}
                         />
                     </NavSection>
 
@@ -499,6 +527,12 @@ export default function AuthenticatedLayout({ header, children }) {
                                 icon="👤"
                                 label="Pengurusan Pengguna"
                                 active={isActive('admin.users.*')}
+                            />
+                            <NavLink
+                                href={route('suppliers.index')}
+                                icon="◈"
+                                label="Pembekal (Suppliers)"
+                                active={isActive('suppliers.*')}
                             />
                         </NavSection>
                     )}

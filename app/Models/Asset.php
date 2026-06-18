@@ -4,7 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-use Spatie\Activitylog\LogOptions;
+use Spatie\Activitylog\Support\LogOptions;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\MediaLibrary\HasMedia;
 use Spatie\MediaLibrary\InteractsWithMedia;
@@ -45,6 +45,11 @@ class Asset extends Model implements HasMedia
         'saga_id',
         'voucher_no',
         'budget_vot',
+        'do_line_item_id',
+        'verified_by_scan',
+        'scan_verified_at',
+        'unit_price',            // NEW — per-unit cost from PO
+        'po_item_code',          // NEW — PO line item number for traceability
     ];
 
     protected $casts = [
@@ -53,6 +58,8 @@ class Asset extends Model implements HasMedia
         'received_date'   => 'date',
         'requires_maintenance' => 'boolean',
         'quantity'        => 'integer',
+        'verified_by_scan' => 'boolean',
+        'scan_verified_at' => 'datetime',
     ];
 
     // ─── Media Library Collections ──────────────────────────────────────────
@@ -126,6 +133,11 @@ class Asset extends Model implements HasMedia
         return $this->hasOne(VehicleDisposalAssessment::class);
     }
 
+    public function doLineItem()
+    {
+        return $this->belongsTo(DoLineItem::class);
+    }
+
     // ─── Accessor: Get primary photo URL ──────────────────────────────────────
     public function getPrimaryPhotoUrlAttribute(): ?string
     {
@@ -139,7 +151,7 @@ class Asset extends Model implements HasMedia
         return LogOptions::defaults()
             ->logAll()
             ->logOnlyDirty()
-            ->dontSubmitEmptyLogs()
+            ->dontLogEmptyChanges()
             ->setDescriptionForEvent(fn(string $eventName) => sprintf('%s has been %s', $this->name ?? $this->asset_tag ?? '#' . $this->id, $eventName));
     }
 }

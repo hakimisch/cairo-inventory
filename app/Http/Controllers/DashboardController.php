@@ -18,9 +18,19 @@ class DashboardController extends Controller
         }
 
         // Fetch assets assigned to this specific user
-        $myAssets = Asset::where('custodian_name', $user->name)
-                         ->orderByDesc('created_at')
-                         ->get();
+        // Uses fuzzy name matching: strip common titles, compare individual name parts
+        $userName = $user->name;
+        $nameParts = preg_split('/\s+/', trim(preg_replace('/^(Ts\.|Dr\.|Prof\.|Ir\.|Hj\.|Hajah)\s*/i', '', $userName)));
+        $myAssets = Asset::where(function ($q) use ($userName, $nameParts) {
+            // Exact match first
+            $q->where('custodian_name', $userName);
+            // Fallback: partial word match (strip titles)
+            foreach ($nameParts as $part) {
+                if (strlen($part) > 2) {
+                    $q->orWhere('custodian_name', 'like', '%' . $part . '%');
+                }
+            }
+        })->orderByDesc('created_at')->get();
 
         $myStats = [
             'total'     => $myAssets->count(),

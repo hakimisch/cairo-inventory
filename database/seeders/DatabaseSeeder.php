@@ -281,5 +281,8 @@ class DatabaseSeeder extends Seeder
 
         // ─── 6. Seed 10+ records for every KEWPA module ──────────────────────
         $this->call(KewpaDataSeeder::class);
+
+        // ─── 7. Seed Phase 2 suppliers ──────────────────────────────────────
+        $this->call(SupplierSeeder::class);
     }
 }

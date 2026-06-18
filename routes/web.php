@@ -11,6 +11,7 @@ use App\Http\Controllers\Admin\UserController as AdminUserController;
 use App\Http\Controllers\Admin\AdminDashboardController as AdminDashboardController;
 use App\Http\Controllers\ReportController;
 use App\Http\Controllers\DamageReportController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\AssetInspectionController;
 use App\Http\Controllers\AssetMaintenanceController;
 use App\Http\Controllers\AssetDisposalController;
@@ -24,6 +25,11 @@ use App\Http\Controllers\DisposalSaleItemController;
 use App\Http\Controllers\SaleBidController;
 
 use App\Http\Controllers\KewpaDirectoryController;
+use App\Http\Controllers\DeliveryOrderController;
+use App\Http\Controllers\DoLineItemController;
+use App\Http\Controllers\ScanController;
+use App\Http\Controllers\SupplierController;
+use App\Http\Controllers\ItemsController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -272,23 +278,90 @@ Route::middleware('auth')->group(function () {
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
 
-Route::get('/dashboard', [DashboardController::class, 'index'])
+
+Route::middleware(['auth', 'verified'])->group(function () {
+
+    // Receivings (was unprotected — moved into auth group)
+    Route::get('/receivings', [AssetController::class, 'receivingIndex'])->name('receivings.index');
+    Route::get('/receivings/{receiving}/kewpa1', [AssetController::class, 'kewpa1'])->name('receivings.kewpa1');
+    Route::post('/receivings/{receiving}/accept', [AssetController::class, 'acceptReceiving'])->name('receivings.accept');
+    Route::post('/receivings/{receiving}/reject', [AssetController::class, 'rejectReceiving'])->name('receivings.reject');
+
+    Route::post('/receivings', [AssetController::class, 'storeReceiving'])->name('receivings.store');
+
+    Route::get('/receivings/{receiving}/kewpa1/download', [AssetController::class, 'downloadKewpa1'])->name('receivings.kewpa1.download');
+    Route::put('/receivings/{receiving}', [AssetController::class, 'updateReceiving'])->name('receivings.update');
+    Route::delete('/receivings/{receiving}', [AssetController::class, 'destroyReceiving'])->name('receivings.destroy');
+
+    // Asset downloads (was unprotected — moved into auth group)
+    Route::get('/assets/{asset}/kewpa2/download', [AssetController::class, 'downloadKewpa2'])->name('assets.kewpa2.download');
+    Route::get('/assets/{asset}/kewpa3/download', [AssetController::class, 'downloadKewpa3'])->name('assets.kewpa3.download');
+    Route::get('/assets/{asset}/label', [AssetController::class, 'downloadLabel'])->name('assets.label');
+
+});
+
+// ── Items Overview Dashboard (unified view) ──────────────────────────────
+Route::get('/items', [ItemsController::class, 'index'])
     ->middleware(['auth', 'verified'])
-    ->name('dashboard');
+    ->name('items.index');
 
+// ── Phase 2: Delivery Order Management ──────────────────────────────────────
+Route::middleware(['auth', 'verified'])->prefix('delivery-orders')->name('delivery-orders.')->group(function () {
 
-Route::get('/receivings', [AssetController::class, 'receivingIndex'])->name('receivings.index');
-Route::get('/receivings/{receiving}/kewpa1', [AssetController::class, 'kewpa1'])->name('receivings.kewpa1');
-Route::post('/receivings/{receiving}/accept', [AssetController::class, 'acceptReceiving'])->name('receivings.accept');
-Route::post('/receivings/{receiving}/reject', [AssetController::class, 'rejectReceiving'])->name('receivings.reject');
+    // DO CRUD
+    Route::get('/',             [DeliveryOrderController::class, 'index'])->name('index');
+    Route::get('/create',       [DeliveryOrderController::class, 'create'])->name('create');
+    Route::post('/',            [DeliveryOrderController::class, 'store'])->name('store');
+    Route::get('/{deliveryOrder}',       [DeliveryOrderController::class, 'show'])->name('show');
+    Route::get('/{deliveryOrder}/edit',  [DeliveryOrderController::class, 'edit'])->name('edit');
+    Route::put('/{deliveryOrder}',       [DeliveryOrderController::class, 'update'])->name('update');
+    Route::delete('/{deliveryOrder}',    [DeliveryOrderController::class, 'destroy'])->name('destroy');
 
-Route::post('/receivings', [AssetController::class, 'storeReceiving'])->name('receivings.store');
+    // Verification
+    Route::post('/{deliveryOrder}/verify/{lineItem}', [DeliveryOrderController::class, 'verifyLineItem'])->name('verify');
+    Route::get('/{deliveryOrder}/stats',              [DeliveryOrderController::class, 'verificationStats'])->name('stats');
 
-Route::get('/receivings/{receiving}/kewpa1/download', [AssetController::class, 'downloadKewpa1'])->name('receivings.kewpa1.download');
-Route::put('/receivings/{receiving}', [AssetController::class, 'updateReceiving'])->name('receivings.update');
-Route::delete('/receivings/{receiving}', [AssetController::class, 'destroyReceiving'])->name('receivings.destroy');
-Route::get('/assets/{asset}/kewpa2/download', [AssetController::class, 'downloadKewpa2'])->name('assets.kewpa2.download');
-Route::get('/assets/{asset}/kewpa3/download', [AssetController::class, 'downloadKewpa3'])->name('assets.kewpa3.download');
-Route::get('/assets/{asset}/label', [AssetController::class, 'downloadLabel'])->name('assets.label');
+    // Batch Import
+    Route::get('/{deliveryOrder}/batch-import', [DeliveryOrderController::class, 'batchImportForm'])->name('batch-import.form');
+    Route::post('/{deliveryOrder}/batch-import', [DeliveryOrderController::class, 'batchImport'])->name('batch-import');
+
+    // Line Items (inline CRUD)
+    Route::post('/{deliveryOrder}/line-items',           [DoLineItemController::class, 'store'])->name('line-items.store');
+    Route::put('/{deliveryOrder}/line-items/{lineItem}', [DoLineItemController::class, 'update'])->name('line-items.update');
+    Route::delete('/{deliveryOrder}/line-items/{lineItem}', [DoLineItemController::class, 'destroy'])->name('line-items.destroy');
+});
+
+// ── Phase 2: Verification Dashboard ─────────────────────────────────────────
+Route::middleware(['auth', 'verified'])->get('/verification', [DeliveryOrderController::class, 'dashboard'])->name('delivery-orders.verification');
+
+// ── Phase 2: Supplier Management ────────────────────────────────────────────
+Route::middleware(['auth', 'verified'])->prefix('suppliers')->name('suppliers.')->group(function () {
+    Route::get('/',          [SupplierController::class, 'index'])->name('index');
+    Route::post('/',         [SupplierController::class, 'store'])->name('store');
+    Route::put('/{supplier}', [SupplierController::class, 'update'])->name('update');
+    Route::delete('/{supplier}', [SupplierController::class, 'destroy'])->name('destroy');
+});
+
+// ── Phase 2: Scanner Module ─────────────────────────────────────────────────
+Route::middleware(['auth', 'verified'])->prefix('scanner')->name('scanner.')->group(function () {
+    Route::get('/',              [ScanController::class, 'index'])->name('index');
+    Route::get('/history',       [ScanController::class, 'history'])->name('history');
+    Route::post('/lookup',       [ScanController::class, 'lookup'])->name('lookup');
+    Route::post('/scan',         [ScanController::class, 'scan'])->name('scan');
+});
+
+// ── PDF Import (OCR Pipeline) ──────────────────────────────────────────────
+Route::middleware(['auth', 'verified'])->prefix('pdf-import')->name('pdf-import.')->group(function () {
+    Route::get('/',              [\App\Http\Controllers\PdfImportController::class, 'index'])->name('index');
+    Route::post('/preview',      [\App\Http\Controllers\PdfImportController::class, 'preview'])->name('preview');
+    Route::post('/confirm',      [\App\Http\Controllers\PdfImportController::class, 'confirm'])->name('confirm');
+});
+
+// ── Unified Import (PDF + CSV + Excel + Paste) ─────────────────────────────
+Route::middleware(['auth', 'verified'])->prefix('import')->name('import.')->group(function () {
+    Route::get('/',              [\App\Http\Controllers\ImportController::class, 'index'])->name('index');
+    Route::post('/preview',      [\App\Http\Controllers\ImportController::class, 'preview'])->name('preview');
+    Route::post('/confirm',      [\App\Http\Controllers\ImportController::class, 'confirm'])->name('confirm');
+});
 
 require __DIR__.'/auth.php';
