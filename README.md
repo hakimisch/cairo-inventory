@@ -142,12 +142,12 @@ Supplier PO PDF ──→ OCR Engine ──→ Preview Grid (confidence %) ─�
 
 ### Real Data Imported
 
-| Source | Supplier | Type | Extractable | Status |
-|--------|----------|------|-------------|--------|
-| `PT DOT COM.pdf` | Dotcom Telecom | Purchase Order | **51/51 items** (100%) | ✅ Imported |
-| `DOTCOM DO.pdf` | Dotcom Telecom | Delivery Order | **59 items** (33 with serial numbers) | ✅ Imported |
-| `DO SNS - First.pdf` | SNS Network | Delivery Order | ~11/18 items (partial — OCR limited) | 🟡 Partial |
-| `JADUAL HARGA DOTCOM.pdf` | Dotcom Telecom | Tender pricing | Metadata only | ❌ Reference only |
+| Source | Supplier | Type | 
+|--------|----------|------|
+| `PT DOT COM.pdf` | Dotcom Telecom | Purchase Order |
+| `DOTCOM DO.pdf` | Dotcom Telecom | Delivery Order | 
+| `DO SNS - First.pdf` | SNS Network | Delivery Order | 
+| `JADUAL HARGA DOTCOM.pdf` | Dotcom Telecom | Tender pricing |
 
 ### Key Numbers
 
@@ -424,7 +424,7 @@ cairo-inventory/
 │   ├── migrations/                     # 34 migration files
 │   └── seeders/
 │       ├── DatabaseSeeder.php
-│       └── KewpaDataSeeder.php         # Demo data (10+ records/module)
+│       └── KewpaDataSeeder.php         
 ├── resources/
 │   ├── js/Pages/                       # 58 React page components
 │   │   ├── Admin/
@@ -472,9 +472,6 @@ cairo-inventory/
 | **Phase 2 — Supplier Management** | **✅ 2 real suppliers** |
 | **Phase 2 — Scanner Module** | **✅ Manual S/N entry, camera 🔄** |
 | **Phase 2 — Verification Dashboard** | **✅ DO progress tracking** |
-| **Phase 2 — Scan→Asset auto-creation** | 🟡 Built but not wired (manual step required) |
-| Mobile Responsiveness | ⚠️ Basic (desktop-first priority) |
-| Automated Tests | 📋 Not yet started |
 | Activity Logging | ✅ `spatie/activitylog` — 131 entries |
 
 ### Ground Truth Alignment — Completed ✅
@@ -525,7 +522,7 @@ cairo-inventory/
 | `committee_appointments` | 12 | Pre-seeded placeholder |
 | `disposal_sale_items` | 21 | Demo lots with reserve prices |
 | `sale_bids` | 30 | Demo bids |
-| `final_loss_reports` | 0 | 8-section investigation schema (PA-30) |
+| `final_loss_reports` | 10 | 8-section investigation schema (PA-30) |
 
 > **Note:** The `assets` table contains demo seed data only. The Phase 2 pipeline has imported real PO/DO data (51 items, 59 DO items), but the Scan→Asset creation step is awaiting production workflow.
 
@@ -567,7 +564,7 @@ cairo-inventory/
 | OCR Engine (Python) | 1,201 lines |
 | Activity Log Entries | 131 |
 | Real PO Items Imported | 51 |
-| Real DO Items Imported | 59 + 11 partial |
+| Real DO Items Imported | 59 |
 | Seed Records | 10+ per module |
 
 ---
