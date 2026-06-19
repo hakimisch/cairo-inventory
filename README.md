@@ -10,10 +10,11 @@
 |-----------|--------|
 | **Project** | CAIRO Inventory — Digital Asset Lifecycle Management |
 | **Target** | UTM Asset Management Centre (Pusat Pengurusan Aset) |
-| **Scope** | 34 KEW.PA forms × 16 functional modules |
+| **Scope** | 34 KEW.PA forms × 16 functional modules + Phase 2 procurement pipeline |
 | **Campus Coverage** | UTM Johor Bahru & UTM Kuala Lumpur |
-| **Status** | **100% Complete** — All modules built, seeded, verified, and ground-truth aligned against official KEW.PA PDF |
+| **Status** | **Phase 1** (16 KEW.PA lifecycle modules) — all built, seeded with demo data, ground-truth verified. **Phase 2** (Procurement OCR pipeline) — 1 real PO (51 items) + 3 real DOs (59 items) live-imported via CLI/web UI. **Assets table** awaiting production data entry. |
 | **Purpose** | Thesis demonstration & pilot deployment |
+| **Deployment** | AWS Elastic Beanstalk + RDS + S3 (Singapore region) |
 
 ---
 
@@ -25,6 +26,7 @@
 | **Backend** | Laravel 12 (PHP 8.4) |
 | **Database** | PostgreSQL 18 |
 | **PDF Engine** | Spatie Laravel-PDF + Browsershot (Chromium) — 29 Blade templates covering all 34 KEW.PA forms |
+| **OCR Pipeline** | Python (PyMuPDF + Tesseract) — 1,201-line CLI engine `bin/cairo-ocr` |
 | **UI Components** | Headless UI + Tailwind CSS |
 | **Brand Identity** | UTM maroon (`#5C001F`) & gold (`#F8A617`) |
 | **Auth** | Laravel Breeze (session-based, 2 roles) |
@@ -49,9 +51,9 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 │                     Laravel Backend                            │
 │  ┌──────────┐  ┌──────────────┐  ┌────────────────────────┐  │
 │  │ Routes   │  │ Controllers  │  │ Eloquent Models        │  │
-│  │ web.php  │──│ (20 business +│──│ (17 models)           │  │
-│  │ ~200 rts │  │  9 auth + 1  │  │                        │  │
-│  │          │  │  base = 30)  │  │                        │  │
+│  │ web.php  │──│ (27 business +│──│ (17 models)           │  │
+│  │ ~130 rts │  │  10 auth + 1 │  │                        │  │
+│  │          │  │  base = 38)  │  │                        │  │
 │  └──────────┘  └──────────────┘  └───────────┬────────────┘  │
 │                                               │                │
 │  ┌────────────────────────────────────────────┘                │
@@ -62,6 +64,19 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 │  │  Spatie Laravel-PDF + Browsershot (Chromium)
 │  │  → 29 KEW.PA form templates (Blade) — all 34 forms
 │  └───────────────────────────────────────────────────────────┘
+│                              │
+│  ┌───────────────────────────┘
+│  │  OCR & Import Pipeline (Python + Tesseract)
+│  │  → 1,201-line engine parsing PO/DO/Quotation PDFs
+│  │  → CamScanner watermark + confidence scoring
+│  │  → CLI (`cairo:import-pdf`) + Web UI (`/import`)
+│  └───────────────────────────────────────────────────────────┘
+└───────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────┐
+│              Deployment: AWS Elastic Beanstalk                 │
+│    Elastic Beanstalk (Laravel) ── RDS (PostgreSQL) ── S3      │
+│    Tailscale VPN → Developer SSH access (WSL dev env)         │
 └───────────────────────────────────────────────────────────────┘
 ```
 
@@ -72,10 +87,11 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 3. **Render** → React renders full page (sidebar, header, content) from received props
 4. **CRUD** → Inline forms submit PUT/POST/DELETE through Inertia — no page reload
 5. **PDF** → Controller renders Blade template → Spatie/Browsershot generates PDF → download response
+6. **OCR Import** → Upload PDF → Python engine extracts items → preview grid (confidence %, raw text fallback) → confirm import → DB write
 
 ---
 
-## 16 Modules — Full CRUD Coverage
+## 16 Modules — Full CRUD Coverage (Phase 1)
 
 | # | Module | KEW.PA Forms | Description | Status |
 |---|--------|--------------|-------------|--------|
@@ -96,7 +112,61 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 | 15 | **Annual Reports** | PA-4/5/7/8/12/20 | 6 annual reports (admin only) | ✅ Complete |
 | 16 | **KEW.PA Directory** | /kewpa | Searchable grid of all 34 KEW.PA forms | ✅ Complete |
 
-> **All 16 modules — full CRUD with zero gaps.**
+> **Phase 1 complete:** 16 modules with full CRUD, seeded demo data (10+ records each), verified against official KEW.PA PDF.
+
+---
+
+## Phase 2 — Procurement & OCR Pipeline 🆕
+
+The Phase 2 pipeline bridges the gap between supplier PDF documents and the asset database — replacing manual data entry with automated OCR extraction, barcode reconciliation, and import workflows.
+
+### Data Pipeline
+
+```
+Supplier PO PDF ──→ OCR Engine ──→ Preview Grid (confidence %) ──→ Confirm Import
+                      (1,201 lines)       │                              │
+                                          │                              ▼
+                                    ┌──────┴──────┐            Purchase Order (51 items)
+                                    │ Raw text     │                    │
+                                    │ fallback     │                    ▼
+                                    └──────────────┘          Delivery Order (59 items)
+                                                                    │
+                                         ┌──────────────────────────┤
+                                         ▼                          ▼
+                                   Barcode Scan              Verify Item
+                                   (/scanner)                (Receive button)
+                                         │                          │
+                                         ▼                          ▼
+                                    Auto-create Asset ─────→ KEW.PA-2/PA-3
+```
+
+### Real Data Imported
+
+| Source | Supplier | Type | Extractable | Status |
+|--------|----------|------|-------------|--------|
+| `PT DOT COM.pdf` | Dotcom Telecom | Purchase Order | **51/51 items** (100%) | ✅ Imported |
+| `DOTCOM DO.pdf` | Dotcom Telecom | Delivery Order | **59 items** (33 with serial numbers) | ✅ Imported |
+| `DO SNS - First.pdf` | SNS Network | Delivery Order | ~11/18 items (partial — OCR limited) | 🟡 Partial |
+| `JADUAL HARGA DOTCOM.pdf` | Dotcom Telecom | Tender pricing | Metadata only | ❌ Reference only |
+
+### Key Numbers
+
+| Metric | Value |
+|--------|-------|
+| OCR engine size | **1,201 lines** (Python, PyMuPDF + Tesseract) |
+| Document type detectors | 4 (PO, DO, Quotation, Unknown) |
+| CamScanner detection | >60% threshold → forces full OCR pass |
+| Import interfaces | CLI (`cairo:import-pdf`) + Web UI (`/import`, `/pdf-import`) |
+| Preview confidence | Per-item %, raw text fallback for low-confidence |
+| Suppliers managed | **2 real** (Dotcom Telecom, SNS Network) |
+
+### Import Web UI
+
+- **Unified Import Page** (`/import`) — PDF, CSV, Excel, or pasted text
+- **Editable Preview Grid** — review extracted items before commit (add row, delete, edit fields)
+- **Confidence Indicators** — colour-coded badges (green/yellow/red) per extracted field
+- **Raw Text Fallback** — full OCR output visible alongside structured preview
+- **Error Handling** — inline error banner on import failure
 
 ---
 
@@ -198,6 +268,17 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 - **6 Annual Reports** with PDF download
 - **User Management** — add, edit, delete, change roles
 
+### Procurement & OCR Features
+
+- **Supplier Management** — manage 2 real suppliers with contact info
+- **Purchase Order Import** — OCR-extract 51 items from supplier PDF
+- **Delivery Order Import** — parse 59 DO items with serial numbers
+- **Batch Import** (`/delivery-orders/batch-import`) — upload multiple PDFs at once
+- **Scanner Module** (`/scanner`) — manual S/N entry with dynamic import
+- **Verification Dashboard** (`/delivery-orders/verification`) — PO/DO progress summary
+- **Confidence Scoring** — per-field extraction quality indicators
+- **Raw Text Fallback** — full OCR output for low-confidence documents
+
 ### User Interface
 
 - **UTM Branding** — maroon (#5C001F) and gold (#F8A617) colour palette
@@ -233,6 +314,8 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 | Composer | ≥ 2.0 |
 | Node.js | ≥ 18 |
 | PostgreSQL | ≥ 15 |
+| Python | ≥ 3.10 (for OCR pipeline) |
+| Tesseract OCR | ≥ 5.0 (for OCR pipeline) |
 | Chromium | (for PDF generation) |
 
 ### Steps
@@ -258,10 +341,13 @@ php artisan key:generate
 # 6. Run migrations and seeders
 php artisan migrate --seed
 
-# 7. Build frontend assets
+# 7. Install Python OCR dependencies
+pip install -r requirements.txt
+
+# 8. Build frontend assets
 npm run build
 
-# 8. Start development server
+# 9. Start development server
 php artisan serve
 # Or use Herd / Valet for production-like setup
 ```
@@ -275,6 +361,17 @@ LARAVEL_PDF_CHROME_PATH=/path/to/chrome
 LARAVEL_PDF_NO_SANDBOX=true
 ```
 
+### OCR Import
+
+Import supplier PDFs via Artisan command:
+
+```bash
+php artisan cairo:import-pdf --file=path/to/po.pdf --type=po --supplier=1
+php artisan cairo:import-pdf --file=path/to/do.pdf --type=do --supplier=1
+```
+
+Or via the web UI at `/import` or `/delivery-orders/batch-import`.
+
 ---
 
 ## Project Structure
@@ -283,10 +380,10 @@ LARAVEL_PDF_NO_SANDBOX=true
 cairo-inventory/
 ├── app/
 │   ├── Http/
-│   │   ├── Controllers/               # 30 controllers (20 business + 9 auth + 1 base)
+│   │   ├── Controllers/               # 38 controllers (27 business + 10 auth + 1 base)
 │   │   │   ├── Admin/
 │   │   │   │   ├── AdminDashboardController.php
-│   │   │   │   └── UserController.php
+│   │   │   │   └── AdminUserController.php
 │   │   │   ├── AssetController.php              # Assets + Receiving + Placement
 │   │   │   ├── AssetDisposalController.php      # Disposal workflows (PA-17/18/19)
 │   │   │   ├── AssetInspectionController.php    # Inspections (PA-10/11)
@@ -296,38 +393,54 @@ cairo-inventory/
 │   │   │   ├── AssetUpgradeController.php       # Upgrades
 │   │   │   ├── CommitteeAppointmentController.php
 │   │   │   ├── DamageReportController.php
+│   │   │   ├── DeliveryOrderController.php      # Phase 2 — DO management
 │   │   │   ├── DisposalSaleController.php       # Asset sales (PA-21→27A)
 │   │   │   ├── DisposalSaleItemController.php   # Sale items
+│   │   │   ├── DoLineItemController.php         # Phase 2 — DO line items
+│   │   │   ├── ImportController.php             # Phase 2 — Web import
+│   │   │   ├── ItemsController.php              # Phase 2 — Unified view
 │   │   │   ├── KewpaDirectoryController.php     # KEW.PA directory
+│   │   │   ├── PdfImportController.php          # Phase 2 — OCR import
 │   │   │   ├── ReportController.php             # Annual reports
 │   │   │   ├── SaleBidController.php            # Sale bids
-│   │   │   └── VehicleDisposalAssessmentController.php
+│   │   │   ├── ScanController.php               # Phase 2 — Barcode scanner
+│   │   │   ├── SupplierController.php           # Phase 2 — Supplier CRUD
+│   │   │   ├── VehicleDisposalAssessmentController.php
+│   │   │   └── Auth/                            # 10 auth controllers (Breeze)
 │   │   └── Requests/
 │   ├── Models/                         # 17 Eloquent models
 │   │   ├── Asset.php, AssetDisposal.php, AssetInspection.php, ...
 │   │   ├── AssetLossReport.php, AssetMaintenance.php, AssetPlacement.php
 │   │   ├── AssetTransfer.php, AssetUpgrade.php, CommitteeAppointment.php
-│   │   ├── DamageReport.php, DisposalSale.php, DisposalSaleItem.php
-│   │   ├── FinalLossReport.php         # Tier 1 — 8-section loss investigation
-│   │   ├── Receiving.php, SaleBid.php, User.php
+│   │   ├── DamageReport.php, DeliveryOrder.php, DisposalSale.php
+│   │   ├── DisposalSaleItem.php, DoLineItem.php, FinalLossReport.php
+│   │   ├── PurchaseOrder.php, Receiving.php, SaleBid.php
+│   │   ├── Scan.php, Supplier.php, User.php
 │   │   └── VehicleDisposalAssessment.php
 │   └── ...
+├── bin/
+│   └── cairo-ocr                      # 1,201-line OCR/import CLI (Python)
 ├── database/
 │   ├── migrations/                     # 34 migration files
 │   └── seeders/
 │       ├── DatabaseSeeder.php
-│       └── KewpaDataSeeder.php         # Sample data (10+ records/module)
+│       └── KewpaDataSeeder.php         # Demo data (10+ records/module)
 ├── resources/
 │   ├── js/Pages/                       # 58 React page components
 │   │   ├── Admin/
 │   │   ├── Assets/                     # KEW.PA-1/2/3/6/9/9A/10/13/16/17/28/30/31/32
 │   │   ├── CommitteeAppointments/
+│   │   ├── DeliveryOrders/            # Phase 2 — DO pages
 │   │   ├── DisposalSales/             # KEW.PA-21→27A
 │   │   ├── Disposals/                 # KEW.PA-18/19
+│   │   ├── Import/                    # Phase 2 — OCR import UI
 │   │   ├── Inspections/               # KEW.PA-11
+│   │   ├── Items/                     # Phase 2 — Unified items view
 │   │   ├── Maintenances/              # KEW.PA-14
 │   │   ├── Profile/
 │   │   ├── Reports/                   # KEW.PA-4/5/7/8/12/20
+│   │   ├── Scanner/                   # Phase 2 — Barcode/scanner UI
+│   │   ├── Suppliers/                 # Phase 2 — Supplier pages
 │   │   └── Auth/
 │   ├── js/Layouts/
 │   │   ├── AuthenticatedLayout.jsx     # Sidebar + header
@@ -335,7 +448,8 @@ cairo-inventory/
 │   ├── js/Components/                  # 15 reusable components
 │   └── views/pdfs/                     # 29 KEW.PA PDF Blade templates
 ├── routes/
-│   └── web.php                         # ~200 routes
+│   └── web.php                         # ~130 routes (auth + asset + procurement)
+├── requirements.txt                    # Python OCR dependencies
 └── public/build/                       # Compiled frontend assets
 ```
 
@@ -353,13 +467,17 @@ cairo-inventory/
 | KEW.PA Directory | ✅ Fully Built |
 | Seed Data (10+ records/module) | ✅ Complete |
 | **Ground Truth Alignment (4 tiers)** | **✅ Complete** |
+| **Phase 2 — OCR Engine (1,201 lines)** | **✅ Built & Verified** |
+| **Phase 2 — PO/DO Import Pipeline** | **✅ Real data imported (51 PO + 59 DO items)** |
+| **Phase 2 — Supplier Management** | **✅ 2 real suppliers** |
+| **Phase 2 — Scanner Module** | **✅ Manual S/N entry, camera 🔄** |
+| **Phase 2 — Verification Dashboard** | **✅ DO progress tracking** |
+| **Phase 2 — Scan→Asset auto-creation** | 🟡 Built but not wired (manual step required) |
 | Mobile Responsiveness | ⚠️ Basic (desktop-first priority) |
 | Automated Tests | 📋 Not yet started |
-| Activity Logging | 📋 Not yet started |
+| Activity Logging | ✅ `spatie/activitylog` — 131 entries |
 
 ### Ground Truth Alignment — Completed ✅
-
-All 4 tiers of the KEW.PA Ground Truth Alignment Plan have been executed and verified:
 
 | Tier | What was built | Status |
 |------|----------------|--------|
@@ -368,33 +486,48 @@ All 4 tiers of the KEW.PA Ground Truth Alignment Plan have been executed and ver
 | **Tier 3** | PA-18 (Destruction Certificate), PA-19 (Disposal Certificate) | ✅ Complete |
 | **Tier 4** | 14 title corrections across PA-9A→PA-27A to match official PDF names | ✅ Complete |
 
-**Summary:** All 16 development milestones completed. System is ready for thesis demonstration and pilot deployment.
-
 ---
 
 ## Database Overview
 
 **26 tables** (17 business + 9 Laravel system):
 
+### Real Data (Phase 2 Procurement)
+
 | Table | Records | Notes |
 |-------|---------|-------|
-| `assets` | 10 | 34 columns, full lifecycle tracking |
-| `receivings` | 12 | KEW.PA-1 receiving records |
-| `asset_placements` | 11 | Loans & placements (KEW.PA-9A) |
-| `asset_disposals` | 10 | Disposal requests |
-| `asset_transfers` | 10 | Transfer records |
-| `asset_inspections` | 10 | Inspection records |
-| `asset_maintenances` | 10 | Maintenance records |
-| `asset_loss_reports` | 10 | Loss/theft reports (KEW.PA-28→32) |
-| `damage_reports` | 11 | Damage reporting |
-| `vehicle_disposal_assessments` | 10 | Vehicle disposal assessments (KEW.PA-16) |
-| `disposal_sales` | 10 | Public disposal sales +6 procedural columns |
-| `asset_upgrades` | 10 | RAM, SSD, battery replacements |
-| `committee_appointments` | 12 | Chairman + members per disposal |
-| `disposal_sale_items` | 21 | Items with lot numbers and reserve prices |
-| `sale_bids` | 30 | Bids with deposit and winner tracking |
-| `final_loss_reports` | 0 | 8-section investigation (PA-30) |
-| `users` | 3 | Admin + staff accounts |
+| `suppliers` | **2** | Dotcom Telecom Sdn Bhd + SNS Network (M) Sdn Bhd |
+| `purchase_orders` | **1** | PO #PPTK170300122025000272 (Dotcom, 51 items) |
+| `purchase_order_items` | **51** | With unit_price, category, brand, model |
+| `delivery_orders` | **3** | 1 real DO (59 items) + 2 test imports |
+| `do_line_items` | **70** | 59 real (33 with serial numbers) + 11 test |
+| `media` | **2** | PT-DOT-COM.pdf (291KB) + DOTCOM-DO.pdf (9.5MB) |
+| `scans` | **0** | Scanner module built, awaiting production data |
+| `users` | **3** | 2 admin + 1 staff (Ts. Dr. Mohd Ibrahim) |
+| `activity_log` | **131** | All import + seeding operations tracked |
+
+### Demo Data (Phase 1 Seed)
+
+| Table | Records | Notes |
+|-------|---------|-------|
+| `assets` | **10** | 38 columns, demo records only (no real data yet) |
+| `receivings` | **12** | Legacy seed from fictional companies — no FK to Phase 2 |
+| `asset_placements` | 11 | Demo data |
+| `asset_disposals` | 10 | Demo data |
+| `asset_transfers` | 10 | Demo data |
+| `asset_inspections` | 10 | Demo data |
+| `asset_maintenances` | 10 | Demo data |
+| `asset_loss_reports` | 10 | Demo data |
+| `damage_reports` | 11 | Demo data |
+| `vehicle_disposal_assessments` | 10 | Demo data |
+| `disposal_sales` | 10 | Demo data |
+| `asset_upgrades` | 10 | Demo data |
+| `committee_appointments` | 12 | Pre-seeded placeholder |
+| `disposal_sale_items` | 21 | Demo lots with reserve prices |
+| `sale_bids` | 30 | Demo bids |
+| `final_loss_reports` | 0 | 8-section investigation schema (PA-30) |
+
+> **Note:** The `assets` table contains demo seed data only. The Phase 2 pipeline has imported real PO/DO data (51 items, 59 DO items), but the Scan→Asset creation step is awaiting production workflow.
 
 ---
 
@@ -402,16 +535,18 @@ All 4 tiers of the KEW.PA Ground Truth Alignment Plan have been executed and ver
 
 | Item | Notes |
 |------|-------|
-| **Docker Deployment** | Currently WSL-only; containerise for reproducible environments |
+| **Scan→Asset Auto-Creation** | Wire scanner to auto-create assets after barcode verification |
+| **Production Asset Data Entry** | Convert 59 DO items → real PA-2/PA-3 asset records |
+| **Docker Deployment** | Containerise Laravel + OCR + PostgreSQL for reproducible environments |
 | **Granular Permissions** | Add read-only, editor, admin roles |
 | **PDF Fallback** | If Browsershot proves unstable, switch to DomPDF |
 | **PA-4/5/8 Blade templates** | Add Blade PDF templates for these React-only forms |
 | **PA-15/29 letter-format PDF** | Add PDF output for committee appointment letters |
 | **i18n / Bilingual Support** | Current UI is mixed BM/EN; add full language toggle |
 | **Barcode/QR Labels** | Print scannable labels from KEW.PA-2 registration |
-| **Audit Log** | Record every asset change for traceability |
 | **SAGA Integration** | Sync asset data with Malaysia's national SAGA system |
 | **E2E Testing** | Automated end-to-end tests for all CRUD workflows |
+| **SNS DO OCR** | Improve OCR for SNS Network PDF format (currently ~61% extraction) |
 
 ---
 
@@ -422,12 +557,17 @@ All 4 tiers of the KEW.PA Ground Truth Alignment Plan have been executed and ver
 | React Pages | 58 |
 | Reusable Components | 15 |
 | Eloquent Models | 17 |
-| Business Controllers | 20 |
-| Auth Controllers | 9 |
-| Total Controllers | 30 |
+| Business Controllers | 27 |
+| Auth Controllers | 10 |
+| Total Controllers | **38** |
 | Database Migrations | 34 |
 | PDF Blade Templates | 29 |
 | Database Tables | 26 |
+| Web Routes | **~130** |
+| OCR Engine (Python) | 1,201 lines |
+| Activity Log Entries | 131 |
+| Real PO Items Imported | 51 |
+| Real DO Items Imported | 59 + 11 partial |
 | Seed Records | 10+ per module |
 
 ---
