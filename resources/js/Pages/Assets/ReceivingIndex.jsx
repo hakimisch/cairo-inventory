@@ -63,6 +63,18 @@ const labelStyle = {
     marginBottom : 5,
 };
 
+function StatCard({ label, count, color }) {
+    return (
+        <div style={{
+            background: UTM.white, borderRadius: 10, border: `1.5px solid ${UTM.gray100}`,
+            padding: '14px 20px', textAlign: 'center', minWidth: 110, flex: 1,
+        }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: color ?? UTM.maroon }}>{count}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: UTM.gray500, marginTop: 2 }}>{label}</div>
+        </div>
+    );
+}
+
 // ── Inline Create Form ────────────────────────────────────────────────────────
 
 function CreateReceivingForm({ onDone }) {
@@ -279,11 +291,30 @@ function EditReceivingForm({ record, onDone }) {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-export default function ReceivingIndex({ receivings }) {
+export default function ReceivingIndex({ receivings, stats }) {
     const [selectedItem, setSelectedItem] = useState(null);
     const [expandedId, setExpandedId]     = useState(null);
     const [editingId, setEditingId]       = useState(null);
     const [showCreate, setShowCreate]     = useState(false);
+    const [dateFrom, setDateFrom]         = useState('');
+    const [dateTo, setDateTo]             = useState('');
+
+    const fmtDT = (iso) => {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleString('ms-MY', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
+
+    const filteredReceivings = React.useMemo(() => {
+        if (!dateFrom && !dateTo) return receivings;
+        return receivings.filter(r => {
+            const d = r.created_at ? new Date(r.created_at) : null;
+            if (!d) return !dateFrom && !dateTo;
+            const fromOk = !dateFrom || d >= new Date(dateFrom);
+            const toOk = !dateTo || d <= new Date(dateTo + 'T23:59:59');
+            return fromOk && toOk;
+        });
+    }, [receivings, dateFrom, dateTo]);
 
     const { data, setData, post, processing, errors, reset } = useForm({
         unit_price : '',
@@ -320,10 +351,10 @@ export default function ReceivingIndex({ receivings }) {
     };
 
     const thStyle = {
-        padding      : '12px 20px',
+        padding      : '10px 12px',
         fontSize     : '11px',
         fontWeight   : 700,
-        letterSpacing: '0.07em',
+        letterSpacing: '0.05em',
         textTransform: 'uppercase',
         color        : UTM.gray500,
         textAlign    : 'left',
@@ -373,6 +404,45 @@ export default function ReceivingIndex({ receivings }) {
                         <CreateReceivingForm onDone={() => setShowCreate(false)} />
                     )}
 
+                    {/* ── Stats row ── */}
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                        <StatCard label="Total" count={stats?.total ?? receivings.length} color={UTM.maroon} />
+                        <StatCard label="Menunggu" count={stats?.pending ?? 0} color={UTM.goldDark} />
+                        <StatCard label="Diterima" count={stats?.accepted ?? 0} color="#1A7A3C" />
+                        <StatCard label="Ditolak" count={stats?.rejected ?? 0} color={UTM.maroon} />
+                    </div>
+
+                    {/* ── Date range filter ── */}
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16 }}>
+                        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                            style={{
+                                padding: '6px 10px', borderRadius: 6, fontSize: 12,
+                                border: `1.5px solid ${UTM.gray100}`, background: UTM.white,
+                                color: UTM.gray700, fontWeight: 600, cursor: 'pointer',
+                            }}
+                        />
+                        <span style={{ color: UTM.gray300, fontSize: 11 }}>to</span>
+                        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                            style={{
+                                padding: '6px 10px', borderRadius: 6, fontSize: 12,
+                                border: `1.5px solid ${UTM.gray100}`, background: UTM.white,
+                                color: UTM.gray700, fontWeight: 600, cursor: 'pointer',
+                            }}
+                        />
+                        {(dateFrom || dateTo) && (
+                            <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+                                style={{
+                                    padding: '4px 10px', borderRadius: 6, fontSize: 11,
+                                    border: `1px solid ${UTM.gray100}`, background: UTM.white,
+                                    color: UTM.gray500, fontWeight: 600, cursor: 'pointer',
+                                }}>
+                                Clear
+                            </button>
+                        )}
+                    </div>
+
+                    {/* ── Filtered receivings ── */}
+
                     {/* ── Table Container (Scrollable) ── */}
                     <div style={{ background: UTM.white, borderRadius: 12,
                                   boxShadow: '0 1px 4px rgba(92,0,31,0.07)', overflow: 'hidden' }}>
@@ -384,20 +454,21 @@ export default function ReceivingIndex({ receivings }) {
                                         <th style={thStyle}>Pembekal</th>
                                         <th style={thStyle}>Item</th>
                                         <th style={{ ...thStyle, textAlign: 'center' }}>Qty Dipesan</th>
-                                        <th style={{ ...thStyle, textAlign: 'center' }}>Qty Diterima</th>
+                                        <th style={thStyle}>Qty Diterima</th>
+                                        <th style={thStyle}>Added</th>
                                         <th style={thStyle}>Status</th>
                                         <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {receivings.length === 0 && (
+                                    {filteredReceivings.length === 0 && (
                                         <tr>
-                                            <td colSpan={7} style={{ padding: '48px', textAlign: 'center', color: UTM.gray500, fontSize: '14px' }}>
+                                            <td colSpan={8} style={{ padding: '48px', textAlign: 'center', color: UTM.gray500, fontSize: '14px' }}>
                                                 Tiada rekod penerimaan.
                                             </td>
                                         </tr>
                                     )}
-                                    {receivings.map((item, idx) => (
+                                    {filteredReceivings.map((item, idx) => (
                                         <React.Fragment key={item.id}>
                                             <tr style={{
                                                     background  : expandedId === item.id ? '#FFF5E8' : (idx % 2 === 0 ? UTM.white : UTM.gray50),
@@ -406,25 +477,28 @@ export default function ReceivingIndex({ receivings }) {
                                                 onMouseEnter={e => { if(expandedId !== item.id) e.currentTarget.style.background = '#FFF5E8' }}
                                                 onMouseLeave={e => { if(expandedId !== item.id) e.currentTarget.style.background = idx % 2 === 0 ? UTM.white : UTM.gray50 }}
                                             >
-                                                <td style={{ padding: '14px 20px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 700, color: UTM.maroon, whiteSpace: 'nowrap' }}>
+                                                <td style={{ padding: '10px 12px', fontFamily: 'monospace', fontSize: '12px', fontWeight: 700, color: UTM.maroon, whiteSpace: 'nowrap' }}>
                                                     {item.receive_no}
                                                 </td>
-                                                <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>
+                                                <td style={{ padding: '10px 12px', fontSize: '13px', color: UTM.gray700 }}>
                                                     {item.supplier_name}
                                                 </td>
-                                                <td style={{ padding: '14px 20px', fontSize: '13px', fontWeight: 600, color: UTM.gray900 }}>
+                                                <td style={{ padding: '10px 12px', fontSize: '13px', fontWeight: 600, color: UTM.gray900 }}>
                                                     {item.item_description}
                                                 </td>
-                                                <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700, textAlign: 'center' }}>
+                                                <td style={{ padding: '10px 12px', fontSize: '13px', color: UTM.gray700, textAlign: 'center' }}>
                                                     {item.quantity_ordered}
                                                 </td>
-                                                <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700, textAlign: 'center' }}>
+                                                <td style={{ padding: '10px 12px', fontSize: '13px', color: UTM.gray700, textAlign: 'center' }}>
                                                     {item.quantity_received}
                                                 </td>
-                                                <td style={{ padding: '14px 20px' }}>
+                                                <td style={{ padding: '10px 12px', fontSize: '11px', whiteSpace: 'nowrap', color: UTM.gray500 }}>
+                                                    {fmtDT(item.created_at)}
+                                                </td>
+                                                <td style={{ padding: '10px 12px' }}>
                                                     <StatusBadge status={item.status} />
                                                 </td>
-                                                <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                                     {/* Expand Details Button */}
                                                     <button
                                                         onClick={() => { setExpandedId(expandedId === item.id ? null : item.id); if (editingId === item.id) setEditingId(null); }}

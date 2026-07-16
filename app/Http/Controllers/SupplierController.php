@@ -33,7 +33,7 @@ class SupplierController extends Controller
                 'email'           => $s->email,
                 'contact_person'  => $s->contact_person,
                 'is_active'       => $s->is_active,
-                'delivery_orders_count' => $s->deliveryOrders()->count(),
+                'master_items_count' => $s->masterItems()->count(),
                 'created_at'      => $s->created_at?->toDateString(),
             ]);
 

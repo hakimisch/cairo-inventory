@@ -27,14 +27,9 @@ class Supplier extends Model
 
     // ─── Relations ─────────────────────────────────────────────────────────────
 
-    public function deliveryOrders()
+    public function masterItems()
     {
-        return $this->hasMany(DeliveryOrder::class);
-    }
-
-    public function purchaseOrders()
-    {
-        return $this->hasMany(PurchaseOrder::class);
+        return $this->hasMany(MasterItem::class);
     }
 
     // ─── Activity Log ──────────────────────────────────────────────────────────

@@ -5,7 +5,7 @@ import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 export default function Index({ suppliers, preview }) {
     const { flash, errors } = usePage().props;
 
-    const [importAs, setImportAs] = useState('do');
+    const [importAs, setImportAs] = useState('master');
     const [supplierId, setSupplierId] = useState('');
     const [reference, setReference] = useState('');
     const [uploadMethod, setUploadMethod] = useState('file'); // file | paste
@@ -63,7 +63,6 @@ export default function Index({ suppliers, preview }) {
 
         router.post(route('import.confirm'), {
             items: items,
-            import_as: importAs,
             reference: reference || preview?.metadata?.reference || '',
             supplier_id: supplierId || '',
             supplier_name: preview?.metadata?.supplier || '',
@@ -137,45 +136,6 @@ export default function Index({ suppliers, preview }) {
                         border: '2px dashed #D1D5DB', borderRadius: 12, padding: 32,
                         background: '#FAFAFA', marginBottom: 24,
                     }}>
-                        {/* Import type selector */}
-                        <div style={{ display: 'flex', gap: 16, marginBottom: 20, flexWrap: 'wrap' }}>
-                            <div>
-                                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6, fontSize: 13 }}>
-                                    Import As
-                                </label>
-                                <div style={{ display: 'flex', gap: 8 }}>
-                                    <button onClick={() => setImportAs('do')} style={{
-                                        ...btnStyle,
-                                        background: importAs === 'do' ? '#5C001F' : '#F3F4F6',
-                                        color: importAs === 'do' ? '#FFF' : '#374151',
-                                    }}>Delivery Order (DO)</button>
-                                    <button onClick={() => setImportAs('po')} style={{
-                                        ...btnStyle,
-                                        background: importAs === 'po' ? '#5C001F' : '#F3F4F6',
-                                        color: importAs === 'po' ? '#FFF' : '#374151',
-                                    }}>Purchase Order (PO)</button>
-                                </div>
-                            </div>
-                            <div>
-                                <label style={{ fontWeight: 600, display: 'block', marginBottom: 6, fontSize: 13 }}>
-                                    Supplier
-                                </label>
-                                <select
-                                    value={supplierId}
-                                    onChange={e => setSupplierId(e.target.value)}
-                                    style={{
-                                        padding: '8px 12px', border: '1px solid #D1D5DB',
-                                        borderRadius: 6, width: 260, fontSize: 14,
-                                    }}
-                                >
-                                    <option value="">Auto-detect from file</option>
-                                    {suppliers?.map(s => (
-                                        <option key={s.id} value={s.id}>{s.name}</option>
-                                    ))}
-                                </select>
-                            </div>
-                        </div>
-
                         {/* Method selector */}
                         <div style={{ display: 'flex', gap: 12, marginBottom: 20 }}>
                             <button onClick={() => setUploadMethod('file')} style={{
@@ -188,6 +148,26 @@ export default function Index({ suppliers, preview }) {
                                 background: uploadMethod === 'paste' ? '#5C001F' : '#F3F4F6',
                                 color: uploadMethod === 'paste' ? '#FFF' : '#374151',
                             }}>Paste Text</button>
+                        </div>
+
+                        {/* Supplier selection */}
+                        <div style={{ marginBottom: 20 }}>
+                            <label style={{ fontWeight: 600, display: 'block', marginBottom: 6, fontSize: 13 }}>
+                                Supplier (optional)
+                            </label>
+                            <select
+                                value={supplierId}
+                                onChange={e => setSupplierId(e.target.value)}
+                                style={{
+                                    padding: '8px 12px', border: '1px solid #D1D5DB',
+                                    borderRadius: 6, width: 300, fontSize: 14,
+                                }}
+                            >
+                                <option value="">Auto-detect from file</option>
+                                {suppliers?.map(s => (
+                                    <option key={s.id} value={s.id}>{s.name}</option>
+                                ))}
+                            </select>
                         </div>
 
                         {/* File upload */}
@@ -262,8 +242,8 @@ export default function Index({ suppliers, preview }) {
                                     <div style={{ fontWeight: 600 }}>{items?.length || 0}</div>
                                 </div>
                                 <div>
-                                    <span style={{ color: '#64748B', fontSize: 12 }}>IMPORT AS</span>
-                                    <div style={{ fontWeight: 600, textTransform: 'uppercase' }}>{importAs}</div>
+                                    <span style={{ color: '#64748B', fontSize: 12 }}>TO</span>
+                                    <div style={{ fontWeight: 600 }}>Master Equipment List</div>
                                 </div>
                                 {preview?.metadata?.reference && (
                                     <div>
@@ -465,7 +445,7 @@ export default function Index({ suppliers, preview }) {
                                 fontSize: 14, fontWeight: 600,
                                 cursor: importing ? 'default' : 'pointer',
                             }}>
-                                {importing ? 'Importing...' : `Import ${items?.length || 0} Items as ${importAs.toUpperCase()}`}
+                                {importing ? 'Importing...' : `Import ${items?.length || 0} Items into Master List`}
                             </button>
                         </div>
                     </div>

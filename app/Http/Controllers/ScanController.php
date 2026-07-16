@@ -3,10 +3,12 @@
 namespace App\Http\Controllers;
 
 use App\Models\Scan;
-use App\Models\DoLineItem;
-use App\Models\DeliveryOrder;
+use App\Models\MasterItem;
 use App\Models\Asset;
+use App\Models\Receiving;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class ScanController extends Controller
@@ -35,8 +37,7 @@ class ScanController extends Controller
     }
 
     /**
-     * Look up a serial number against all pending DO line items.
-     * Returns match info or suggests possible DOs.
+     * Look up a serial number against all master items.
      */
     public function lookup(Request $request)
     {
@@ -46,32 +47,43 @@ class ScanController extends Controller
 
         $serialNumber = trim($request->serial_number);
 
-        // Search for matching line items in pending/partial DOs
-        $matches = DoLineItem::where(function ($q) use ($serialNumber) {
-                // Direct match
-                $q->where('serial_number', $serialNumber)
-                  // Or comma-separated list contains this S/N
-                  ->orWhere('serial_number', 'LIKE', "%{$serialNumber}%");
+        // 1. Search master_items by serial_numbers field
+        $matches = MasterItem::where(function ($q) use ($serialNumber) {
+                $q->where('serial_numbers', $serialNumber)
+                  ->orWhere('serial_numbers', 'LIKE', "%{$serialNumber}%");
             })
-            ->whereIn('status', ['pending', 'received'])
-            ->with(['deliveryOrder.supplier'])
+            ->with('supplier')
+            ->orderByRaw("CASE status
+                WHEN 'verified' THEN 3
+                WHEN 'diterima' THEN 2
+                WHEN 'belum_diterima' THEN 1
+                ELSE 0 END DESC")
+            ->orderBy('id', 'DESC')
             ->get()
             ->map(fn ($item) => [
-                'id'                => $item->id,
-                'do_id'             => $item->delivery_order_id,
-                'do_no'             => $item->deliveryOrder->do_no,
-                'supplier_name'     => $item->deliveryOrder->supplier?->name ?? 'N/A',
-                'description'       => $item->description,
-                'brand'             => $item->brand,
-                'model'             => $item->model,
-                'quantity_ordered'  => $item->quantity_ordered,
-                'quantity_received' => $item->quantity_received,
-                'status'            => $item->status,
-                'category'          => $item->category,
+                'id'              => $item->id,
+                'item_no'         => $item->item_no,
+                'name'            => $item->name,
+                'brand'           => $item->brand,
+                'serial_numbers'  => $item->serial_numbers,
+                'quantity'        => $item->quantity,
+                'unit_price'      => (float) $item->unit_price,
+                'supplier_name'   => $item->supplier?->name ?? 'N/A',
+                'status'          => $item->status,
+                'category'        => $item->category,
+                'has_asset'       => $item->asset()->exists(),
             ]);
 
-        // Also check if this S/N already exists in the assets table
-        $existingAsset = Asset::where('serial_number', $serialNumber)->first();
+        // 2. Check if this S/N exists in assets (by serial_number OR asset_tag)
+        $existingAsset = Asset::where('serial_number', $serialNumber)
+            ->orWhere('asset_tag', $serialNumber)
+            ->first();
+
+        // 3. If scanned value looks like an asset tag (AST-...) also try matching
+        //    directly in case step 1 didn't catch it
+        if (str_starts_with($serialNumber, 'AST-') && !$existingAsset) {
+            $existingAsset = Asset::where('asset_tag', $serialNumber)->first();
+        }
 
         return response()->json([
             'serial_number'  => $serialNumber,
@@ -94,74 +106,23 @@ class ScanController extends Controller
         $request->validate([
             'serial_number'  => 'required|string|max:255',
             'result'         => 'required|in:match,mismatch,new,duplicate',
-            'do_line_item_id' => 'nullable|exists:do_line_items,id',
+            'master_item_id' => 'nullable|exists:master_items,id',
             'asset_id'       => 'nullable|exists:assets,id',
             'location'       => 'nullable|string|max:255',
             'notes'          => 'nullable|string',
-            'create_asset'   => 'nullable|boolean',
         ]);
 
         $scan = Scan::create([
-            'serial_number'  => $request->serial_number,
-            'scan_type'      => 'receive',
+            'serial_number'   => $request->serial_number,
+            'scan_type'       => 'receive',
             'scanner_user_id' => auth()->id(),
-            'scanned_at'     => now(),
-            'do_line_item_id' => $request->do_line_item_id,
-            'asset_id'       => $request->asset_id,
-            'location'       => $request->location,
-            'result'         => $request->result,
-            'notes'          => $request->notes,
+            'scanned_at'      => now(),
+            'master_item_id'  => $request->master_item_id,
+            'asset_id'        => $request->asset_id,
+            'location'        => $request->location,
+            'result'          => $request->result,
+            'notes'           => $request->notes,
         ]);
-
-        // If matched and we have a line item, update its status
-        if ($request->result === 'match' && $request->do_line_item_id) {
-            $lineItem = DoLineItem::find($request->do_line_item_id);
-            if ($lineItem && $lineItem->status === 'pending') {
-                $lineItem->update([
-                    'status'           => 'received',
-                    'quantity_received' => $lineItem->quantity_ordered,
-                    'scan_user_id'     => auth()->id(),
-                    'scanned_at'       => now(),
-                ]);
-
-                // Check if DO is complete
-                $do = $lineItem->deliveryOrder;
-                $totalOrdered = $do->lineItems()->sum('quantity_ordered');
-                $totalReceived = $do->lineItems()->sum('quantity_received');
-                if ($totalReceived >= $totalOrdered) {
-                    $do->update(['status' => 'complete']);
-                }
-
-                // Auto-create asset if requested
-                if ($request->boolean('create_asset')) {
-                    $asset = Asset::create([
-                        'asset_tag'        => 'AST-' . strtoupper(substr(md5(uniqid()), 0, 8)),
-                        'name'             => $lineItem->description,
-                        'category'         => $lineItem->category ?? 'General',
-                        'brand'            => $lineItem->brand,
-                        'model'            => $lineItem->model,
-                        'serial_number'    => $lineItem->serial_number,
-                        'supplier_name'    => $do->supplier?->name,
-                        'do_reference'     => $do->do_no,
-                        'po_reference'     => $do->po_reference,
-                        'do_line_item_id'  => $lineItem->id,
-                        'verified_by_scan' => true,
-                        'scan_verified_at' => now(),
-                        'asset_type'       => 'inventory',
-                        'status'           => 'active',
-                        'location'         => 'Pending Assignment',
-                        'purchase_price'   => 0,
-                        'unit_price'       => 0,
-                    ]);
-
-                    $responseExtra = [
-                        'asset_created' => true,
-                        'asset_tag'     => $asset->asset_tag,
-                        'asset_id'      => $asset->id,
-                    ];
-                }
-            }
-        }
 
         $response = [
             'scan' => [
@@ -173,10 +134,6 @@ class ScanController extends Controller
             'message' => $this->resultMessage($request->result),
         ];
 
-        if (isset($responseExtra)) {
-            $response = array_merge($response, $responseExtra);
-        }
-
         return response()->json($response);
     }
 
@@ -185,7 +142,7 @@ class ScanController extends Controller
      */
     public function history(Request $request)
     {
-        $query = Scan::with('scanner', 'doLineItem.deliveryOrder', 'asset')
+        $query = Scan::with('scanner', 'masterItem', 'asset')
             ->latest();
 
         if ($request->search) {
@@ -206,8 +163,8 @@ class ScanController extends Controller
                 'result'         => $s->result,
                 'scanner_name'   => $s->scanner?->name ?? 'System',
                 'scanned_at'     => $s->scanned_at?->toISOString(),
-                'do_no'          => $s->doLineItem?->deliveryOrder?->do_no,
-                'item_description' => $s->doLineItem?->description,
+                'item_no'        => $s->masterItem?->item_no,
+                'item_name'      => $s->masterItem?->name,
                 'asset_tag'      => $s->asset?->asset_tag,
                 'location'       => $s->location,
             ]);
@@ -218,13 +175,196 @@ class ScanController extends Controller
         ]);
     }
 
+    /**
+     * Verify a master item directly from a scan result.
+     * Creates PA-2/PA-3 (Asset) — PA-1 is already created at receive time.
+     */
+    public function verifyFromScan(Request $request, MasterItem $masterItem)
+    {
+        if ($masterItem->status !== 'diterima') {
+            return response()->json([
+                'success' => false,
+                'message' => $masterItem->status === 'belum_diterima'
+                    ? 'This item has not been received yet. Scan to receive first.'
+                    : 'This item is already verified.',
+            ], 422);
+        }
+
+        $request->validate([
+            'location'       => 'nullable|string|max:255',
+            'custodian_name' => 'nullable|string|max:255',
+            'warranty_expiry'=> 'nullable|date',
+        ]);
+
+        $threshold = 2000;
+        $user = auth()->user();
+
+        DB::transaction(function () use ($masterItem, $request, $threshold, $user) {
+            // 1. Update master item
+            $assetType = $masterItem->unit_price >= $threshold ? 'fixed_asset' : 'inventory';
+            $masterItem->update([
+                'status'        => 'verified',
+                'verified_at'   => now(),
+                'verified_by'   => $user->id,
+                'asset_type'    => $assetType,
+            ]);
+
+            // 2. Parse serial numbers from master item
+            $serials = collect(explode(',', $masterItem->serial_numbers ?? ''))
+                ->map(fn($s) => trim($s))
+                ->filter(fn($s) => $s !== '')
+                ->values()
+                ->toArray();
+
+            $commonLocation = $request->location ?? 'TBD';
+            $custodianName = $request->custodian_name;
+
+            // 3. Create assets with atomic tag generation
+            $tagLock = Cache::lock('asset-tag', 10);
+            $tagLock->block(5);
+            try {
+                $today = date('Ymd');
+                $maxSeq = DB::table('assets')
+                    ->where('asset_tag', 'LIKE', "AST-{$today}-%")
+                    ->max(DB::raw("CAST(SUBSTRING(asset_tag FROM 'AST-[0-9]{8}-([0-9]+)') AS INTEGER)"));
+
+                $seqNo = ($maxSeq ?? 0) + 1;
+
+                if (count($serials) > 1) {
+                    foreach ($serials as $sn) {
+                        $assetTag = "AST-{$today}-" . str_pad($seqNo, 6, '0', STR_PAD_LEFT);
+                        $seqNo++;
+
+                        Asset::create([
+                            'master_item_id'   => $masterItem->id,
+                            'asset_tag'        => $assetTag,
+                            'name'             => $masterItem->name,
+                            'category'         => $masterItem->category,
+                            'brand'            => $masterItem->brand,
+                            'serial_number'    => $sn,
+                            'asset_type'       => $assetType,
+                            'purchase_price'   => $masterItem->unit_price,
+                            'unit_price'       => $masterItem->unit_price,
+                            'quantity'         => 1,
+                            'location'         => $commonLocation,
+                            'custodian_name'   => $custodianName,
+                            'status'           => 'active',
+                            'supplier_name'    => $masterItem->supplier?->name,
+                            'received_date'    => $masterItem->received_date,
+                            'warranty_expiry'  => $request->warranty_expiry,
+                            'verified_by_scan' => true,
+                            'scan_verified_at' => now(),
+                        ]);
+                    }
+                } else {
+                    $assetTag = "AST-{$today}-" . str_pad($seqNo, 6, '0', STR_PAD_LEFT);
+
+                    Asset::create([
+                        'master_item_id'   => $masterItem->id,
+                        'asset_tag'        => $assetTag,
+                        'name'             => $masterItem->name,
+                        'category'         => $masterItem->category,
+                        'brand'            => $masterItem->brand,
+                        'serial_number'    => $serials[0] ?? $masterItem->serial_numbers,
+                        'asset_type'       => $assetType,
+                        'purchase_price'   => $masterItem->unit_price,
+                        'unit_price'       => $masterItem->unit_price,
+                        'quantity'         => $masterItem->quantity,
+                        'location'         => $commonLocation,
+                        'custodian_name'   => $custodianName,
+                        'status'           => 'active',
+                        'supplier_name'    => $masterItem->supplier?->name,
+                        'received_date'    => $masterItem->received_date,
+                        'warranty_expiry'  => $request->warranty_expiry,
+                        'verified_by_scan' => true,
+                        'scan_verified_at' => now(),
+                    ]);
+                }
+            } finally {
+                $tagLock->release();
+            }
+        });
+
+        return response()->json([
+            'success'   => true,
+            'message'   => "{$masterItem->name} — verified and asset created.",
+            'asset_tag' => 'AST-' . date('Ymd') . '-' . str_pad(Asset::whereDate('created_at', today())->count(), 6, '0', STR_PAD_LEFT),
+            'item_no'   => $masterItem->item_no,
+            'name'      => $masterItem->name,
+        ]);
+    }
+
+    /**
+     * Quick receive from scanner — creates PA-1 immediately.
+     */
+    public function receiveFromScan(Request $request, MasterItem $masterItem)
+    {
+        if ($masterItem->status !== 'belum_diterima') {
+            return response()->json([
+                'success' => false,
+                'message' => 'This item has already been received.',
+            ], 422);
+        }
+
+        $request->validate([
+            'receiver_name'  => 'nullable|string|max:255',
+            'received_date'  => 'nullable|date',
+            'do_no'          => 'nullable|string|max:255',
+        ]);
+
+        DB::transaction(function () use ($request, $masterItem) {
+            $masterItem->update([
+                'status'        => 'diterima',
+                'received_date' => $request->received_date ?? now(),
+                'do_no'         => $request->do_no ?? $masterItem->do_no,
+            ]);
+
+            $recvLock = Cache::lock('receiving-number', 10);
+            $recvLock->block(5);
+            try {
+                $receiveNo = 'REC-' . date('Ymd') . '-' . str_pad(
+                    Receiving::whereDate('created_at', today())->count() + 1, 4, '0', STR_PAD_LEFT
+                );
+            } finally {
+                $recvLock->release();
+            }
+
+            Receiving::create([
+                'master_item_id'    => $masterItem->id,
+                'receive_no'        => $receiveNo,
+                'supplier_name'     => $masterItem->supplier?->name ?? 'N/A',
+                'supplier_address'  => $masterItem->supplier?->address,
+                'delivery_order_no' => $request->do_no ?? $masterItem->do_no ?? 'N/A',
+                'purchase_order_no' => 'N/A',
+                'item_description'  => $masterItem->name,
+                'quantity_ordered'  => $masterItem->quantity,
+                'quantity_received' => $masterItem->quantity,
+                'unit_price'        => $masterItem->unit_price,
+                'total_price'       => $masterItem->total_price,
+                'status'            => 'accepted',
+                'receiver_name'     => $request->receiver_name,
+            ]);
+        });
+
+        return response()->json([
+            'success'    => true,
+            'message'    => "{$masterItem->name} — received and PA-1 created.",
+            'item_no'    => $masterItem->item_no,
+            'name'       => $masterItem->name,
+            'status'     => 'diterima',
+            'receive_no' => 'REC-' . date('Ymd') . '-' . str_pad(
+                Receiving::whereDate('created_at', today())->count(), 4, '0', STR_PAD_LEFT
+            ),
+        ]);
+    }
+
     private function resultMessage(string $result): string
     {
         return match ($result) {
-            'match'     => 'Match found! Line item marked as received.',
-            'mismatch'  => 'No matching DO item found for this serial number.',
+            'match'     => 'Match found in master equipment list!',
+            'mismatch'  => 'No matching item found for this serial number.',
             'duplicate' => 'This serial number has already been scanned.',
-            'new'       => 'New serial number recorded (not yet in any DO).',
+            'new'       => 'New serial number recorded.',
             default     => 'Scan recorded.',
         };
     }

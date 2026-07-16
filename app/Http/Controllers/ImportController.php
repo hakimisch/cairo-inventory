@@ -5,10 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Supplier;
-use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderItem;
-use App\Models\DeliveryOrder;
-use App\Models\DoLineItem;
+use App\Models\MasterItem;
+use App\Services\OcrService;
 
 class ImportController extends Controller
 {
@@ -19,6 +17,7 @@ class ImportController extends Controller
     {
         return inertia('Import/Index', [
             'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'preview'   => session('import_preview'),
         ]);
     }
 
@@ -43,7 +42,7 @@ class ImportController extends Controller
             $ext = strtolower($file->getClientOriginalExtension());
 
             if ($ext === 'pdf') {
-                $result = $this->parsePdf($file);
+                $result = $this->parsePdf($file, $request->input('type_hint', 'auto'));
                 $items = $result['items'];
                 $metadata = $result['metadata'];
                 $sourceType = 'pdf';
@@ -65,31 +64,30 @@ class ImportController extends Controller
             return back()->withErrors(['file' => 'No items could be extracted from the provided data.']);
         }
 
-        session()->flash('import_preview', [
+        $previewData = [
             'items'      => $items,
             'metadata'   => $metadata ?? [],
             'raw_text'   => ($sourceType === 'pdf' && isset($result)) ? ($result['raw_text'] ?? null) : null,
-            'confidence' => ($sourceType === 'pdf' && isset($result)) ? ($result['confidence'] ?? null) : null,
             'source'     => $sourceType,
             'file_name'  => $request->hasFile('file') ? $file->getClientOriginalName() : null,
-        ]);
+            'item_count' => count($items),
+        ];
+
+        // Confidence score is only meaningful for OCR-processed PDFs
+        if ($sourceType === 'pdf' && isset($result)) {
+            $previewData['confidence'] = $result['confidence'] ?? null;
+        }
+
+        session()->flash('import_preview', $previewData);
 
         return inertia('Import/Index', [
             'suppliers' => Supplier::where('is_active', true)->orderBy('name')->get(['id', 'name']),
-            'preview'   => [
-                'items'      => $items,
-                'metadata'   => $metadata ?? [],
-                'raw_text'   => ($sourceType === 'pdf' && isset($result)) ? ($result['raw_text'] ?? null) : null,
-                'confidence' => ($sourceType === 'pdf' && isset($result)) ? ($result['confidence'] ?? null) : null,
-                'source'     => $sourceType,
-                'file_name'  => $request->hasFile('file') ? $file->getClientOriginalName() : null,
-                'item_count' => count($items),
-            ],
+            'preview'   => $previewData,
         ]);
     }
 
     /**
-     * Confirm import: save items as PO or DO.
+     * Confirm import: save items into master_items register.
      */
     public function confirm(Request $request)
     {
@@ -104,18 +102,13 @@ class ImportController extends Controller
             'items.*.quantity_ordered' => 'nullable|integer|min:1',
             'items.*.unit'             => 'nullable|string',
             'items.*.unit_price'       => 'nullable|numeric|min:0',
-            'import_as'     => 'required|in:po,do',
-            'reference'     => 'nullable|string|max:255',
             'supplier_id'   => 'nullable|exists:suppliers,id',
             'supplier_name' => 'nullable|string|max:255',
         ]);
 
         $items = $request->items;
-        $importAs = $request->import_as;
-        $reference = $request->reference;
         $supplierId = $request->supplier_id;
         $supplierName = $request->supplier_name;
-        $userId = auth()->id();
 
         $supplier = null;
         if ($supplierId) {
@@ -127,84 +120,50 @@ class ImportController extends Controller
             );
         }
 
-        if ($importAs === 'po') {
-            $record = $this->importAsPo($items, $supplier, $reference, $userId);
-            $type = 'Purchase Order';
-        } else {
-            $record = $this->importAsDo($items, $supplier, $reference, $userId);
-            $type = 'Delivery Order';
-        }
+        $count = $this->importAsMasterItems($items, $supplier);
 
         return redirect()->route('import.index')
-            ->with('success', "{$type} #{$record->reference} created with {$record->count} items.");
+            ->with('success', "{$count} items imported into master equipment list.");
     }
 
-    // ─── Importers ─────────────────────────────────────────────────────────
+    // ─── Import into master_items ─────────────────────────────────────────
 
-    private function importAsPo(array $items, ?Supplier $supplier, ?string $reference, int $userId): object
+    private function importAsMasterItems(array $items, ?Supplier $supplier): int
     {
-        $po = PurchaseOrder::create([
-            'po_no'       => $reference ?? 'IMPORT-' . now()->format('YmdHis'),
-            'supplier_id' => $supplier?->id,
-            'status'      => 'pending',
-            'created_by'  => $userId,
-        ]);
+        $count = 0;
+        $existingCount = MasterItem::count();
 
-        foreach ($items as $item) {
-            $unitPrice = !empty($item['unit_price']) ? (float) $item['unit_price'] : null;
-            $po->items()->create([
-                'item_code'        => $item['item_code'] ?? null,
-                'description'      => $item['description'],
-                'brand'            => $item['brand'] ?? null,
-                'model'            => $item['model'] ?? null,
-                'category'         => $item['category'] ?? null,
-                'quantity_ordered' => (int) ($item['quantity_ordered'] ?? 1),
-                'unit'             => $item['unit'] ?? 'unit',
-                'unit_price'       => $unitPrice,
-                'total_price'      => $unitPrice ? $unitPrice * (int) ($item['quantity_ordered'] ?? 1) : null,
-                'status'           => 'pending',
+        foreach ($items as $i => $item) {
+            $unitPrice = !empty($item['unit_price']) ? (float) $item['unit_price'] : 0;
+
+            MasterItem::create([
+                'item_no'       => $item['item_code'] ?? ($existingCount + $i + 1),
+                'category'      => mb_substr($item['category'] ?? 'Uncategorized', 0, 255),
+                'name'          => mb_substr($item['description'] ?? '(no name)', 0, 1000),
+                'brand'         => isset($item['brand']) ? mb_substr($item['brand'], 0, 255) : null,
+                'serial_numbers'=> $item['serial_number'] ?? null,
+                'unit_price'    => $unitPrice,
+                'total_price'   => $unitPrice * max(1, (int) ($item['quantity_ordered'] ?? 1)),
+                'sodo_bayaran'  => null,
+                'supplier_id'   => $supplier?->id,
+                'quantity'      => (int) ($item['quantity_ordered'] ?? 1),
+                'status'        => 'belum_diterima',
             ]);
+            $count++;
         }
 
-        return (object) ['reference' => $po->po_no, 'count' => count($items)];
-    }
-
-    private function importAsDo(array $items, ?Supplier $supplier, ?string $reference, int $userId): object
-    {
-        $do = DeliveryOrder::create([
-            'do_no'       => $reference ?? 'IMPORT-' . now()->format('YmdHis'),
-            'supplier_id' => $supplier?->id,
-            'status'      => 'pending',
-            'created_by'  => $userId,
-        ]);
-
-        foreach ($items as $item) {
-            $do->lineItems()->create([
-                'item_code'        => $item['item_code'] ?? null,
-                'description'      => $item['description'],
-                'brand'            => $item['brand'] ?? null,
-                'model'            => $item['model'] ?? null,
-                'serial_number'    => $item['serial_number'] ?? null,
-                'category'         => $item['category'] ?? null,
-                'quantity_ordered' => (int) ($item['quantity_ordered'] ?? 1),
-                'unit'             => $item['unit'] ?? 'unit',
-                'has_serial'       => $item['has_serial'] ?? !empty($item['serial_number']),
-                'status'           => 'pending',
-            ]);
-        }
-
-        return (object) ['reference' => $do->do_no, 'count' => count($items)];
+        return $count;
     }
 
     // ─── Parsers ───────────────────────────────────────────────────────────
 
-    private function parsePdf($file): array
+    private function parsePdf($file, string $typeHint = 'auto'): array
     {
         $path = $file->store('import-temp', 'local');
         $fullPath = Storage::disk('local')->path($path);
 
         try {
-            $json = $this->runOcr($fullPath);
+            $json = $this->runOcr($fullPath, $typeHint);
             $data = json_decode($json, true);
 
             return [
@@ -226,23 +185,34 @@ class ImportController extends Controller
 
     private function parseCsv($file): array
     {
-        $rows = array_map('str_getcsv', file($file->getRealPath()));
-        if (empty($rows)) return [];
+        // Use fgetcsv for proper quoting support (handles multi-line quoted fields)
+        $handle = fopen($file->getRealPath(), 'r');
+        if (!$handle) return [];
 
-        $header = array_map('strtolower', $rows[0]);
-        $data = array_slice($rows, 1);
+        $header = array_map('strtolower', fgetcsv($handle));
+        if (empty($header)) {
+            fclose($handle);
+            return [];
+        }
 
-        // Map common column names
+        $rows = [];
+        while (($row = fgetcsv($handle)) !== false) {
+            $rows[] = $row;
+        }
+        fclose($handle);
+
+        $data = $rows;
+
         $fieldMap = [
-            'description' => ['description', 'item', 'name', 'item description', 'product', 'perkara', 'butiran'],
-            'item_code'   => ['item_code', 'code', 'item code', 'no', 'bil', 'number', 'part_no', 'part number'],
+            'description' => ['description', 'nama item', 'item description', 'nama', 'name', 'perkara', 'butiran', 'product'],
+            'item_code'   => ['item_code', 'no item', 'item code', 'code', 'part_no', 'part number', 'bil', 'number'],
             'brand'       => ['brand', 'jenama', 'manufacturer', 'make', 'merk'],
             'model'       => ['model', 'type', 'tipe', 'part'],
-            'serial'      => ['serial', 'serial_number', 'serial number', 'sn', 's/n', 'no siri', 'no.siri'],
-            'category'    => ['category', 'kategori', 'jenis', 'section', 'category'],
-            'qty'         => ['quantity', 'qty', 'kuantiti', 'quantity_ordered', 'ordered', 'jumlah'],
-            'unit'        => ['unit', 'unit_of_measure', 'uom', 'measure'],
-            'price'       => ['price', 'unit_price', 'harga', 'harga seunit', 'cost', 'amount'],
+            'serial'      => ['serial', 'serial_number', 'serial number', 'no siri', 'sn', 's/n', 'no.siri'],
+            'category'    => ['category', 'kategori', 'jenis', 'section'],
+            'qty'         => ['quantity', 'qty', 'kuantiti', 'kuantiti', 'quantity_ordered', 'ordered'],
+            'unit'        => ['unit_of_measure', 'uom', 'unit'],
+            'price'       => ['price', 'harga seunit', 'unit_price', 'harga', 'cost', 'amount'],
         ];
 
         $items = [];
@@ -255,11 +225,21 @@ class ImportController extends Controller
                 }
             }
             if (!empty($item['description']) || !empty($item['item_code'])) {
+                // Brand-model split: If the brand value looks like "BRAND ModelXYZ"
+                // and no separate model column was found, split on first space.
+                $brand = $item['brand'] ?? null;
+                $modelRaw = $item['model'] ?? null;
+                if ($brand !== null && $modelRaw === null && str_contains($brand, ' ')) {
+                    $parts = explode(' ', $brand, 2);
+                    $brand = $parts[0];
+                    $modelRaw = $parts[1];
+                }
+
                 $items[] = [
                     'description'      => $item['description'] ?? $item['item_code'] ?? '',
                     'item_code'        => $item['item_code'] ?? null,
-                    'brand'            => $item['brand'] ?? null,
-                    'model'            => $item['model'] ?? null,
+                    'brand'            => $brand,
+                    'model'            => $modelRaw,
                     'serial_number'    => $item['serial'] ?? null,
                     'category'         => $item['category'] ?? null,
                     'quantity_ordered' => (int) ($item['qty'] ?? 1),
@@ -274,14 +254,11 @@ class ImportController extends Controller
 
     private function parseExcel($file): array
     {
-        // Fallback: try reading as CSV first (many .xlsx files have embedded CSV)
-        // For proper Excel parsing, PhpSpreadsheet should be installed
         try {
-            if (class_exists('\PhpOffice\PhpSpreadsheet\IOFactory')) {
+            if (class_exists(\PhpOffice\PhpSpreadsheet\IOFactory::class)) {
                 $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($file->getRealPath());
                 $sheet = $spreadsheet->getActiveSheet();
                 $rows = $sheet->toArray();
-                // Reuse CSV parser logic
                 $csvPath = tempnam(sys_get_temp_dir(), 'csv') . '.csv';
                 $fp = fopen($csvPath, 'w');
                 foreach ($rows as $row) {
@@ -293,16 +270,13 @@ class ImportController extends Controller
                 return $result;
             }
         } catch (\Exception $e) {
-            // Fall through to CSV attempt
         }
 
-        // Try reading as CSV since some .xlsx files are actually CSV
         return $this->parseCsv($file);
     }
 
     private function parsePastedText(string $text): array
     {
-        // Try parsing as CSV first (tab or comma separated)
         $lines = explode("\n", trim($text));
         if (count($lines) >= 2) {
             $csvPath = tempnam(sys_get_temp_dir(), 'csv') . '.csv';
@@ -312,7 +286,6 @@ class ImportController extends Controller
             if (!empty($items)) return $items;
         }
 
-        // Fallback: line-by-line parsing (one item per line)
         $items = [];
         foreach ($lines as $line) {
             $line = trim($line);
@@ -329,17 +302,67 @@ class ImportController extends Controller
 
     // ─── Helpers ───────────────────────────────────────────────────────────
 
+    /**
+     * Find the best-matching column index for a set of aliases.
+     *
+     * Scans ALL header columns and returns the one with the LONGEST matching
+     * alias (longer = more specific). Prevents short aliases like 'no' or 'item'
+     * or 'unit' from accidentally matching unrelated columns ('no item' vs 'no',
+     * 'nama item' vs 'item', 'harga seunit' vs 'unit').
+     *
+     * Exact matches always win immediately. Prefix/suffix and substring matches
+     * use word-boundary detection for short aliases (< 5 chars) to avoid false
+     * positives like 'unit' matching inside 'seunit'.
+     */
     private function findColumnIndex(array $header, array $aliases): ?int
     {
+        // Sort aliases longest-first so specific matches are scored first
+        usort($aliases, fn($a, $b) => strlen($b) - strlen($a));
+
+        $bestIdx = null;
+        $bestAliasLen = 0;
+
         foreach ($header as $idx => $col) {
-            $col = trim(strtolower($col));
+            $normalized = trim(strtolower($col));
+
             foreach ($aliases as $alias) {
-                if ($col === $alias || str_contains($col, $alias)) {
+                $aliasLow = strtolower(trim($alias));
+
+                // Exact match = highest priority, return immediately
+                if ($normalized === $aliasLow) {
                     return $idx;
+                }
+
+                // Prefix/suffix match — with word-boundary guard for short aliases
+                $prefixOk = str_starts_with($normalized, $aliasLow)
+                    && (strlen($aliasLow) >= 5
+                        || strlen($normalized) === strlen($aliasLow)
+                        || !ctype_alnum($normalized[strlen($aliasLow)] ?? ' '));
+                $suffixOk = str_ends_with($normalized, $aliasLow)
+                    && (strlen($aliasLow) >= 5
+                        || strlen($normalized) === strlen($aliasLow)
+                        || ($strlen = strlen($normalized)) > strlen($aliasLow)
+                           && !ctype_alnum($normalized[$strlen - strlen($aliasLow) - 1]));
+
+                if ($prefixOk || $suffixOk) {
+                    if (strlen($aliasLow) > $bestAliasLen) {
+                        $bestAliasLen = strlen($aliasLow);
+                        $bestIdx = $idx;
+                    }
+                    continue; // prefix/suffix > plain substring
+                }
+
+                // Plain substring match — only for longer aliases (>= 5 chars)
+                if (strlen($aliasLow) >= 5 && str_contains($normalized, $aliasLow)) {
+                    if (strlen($aliasLow) > $bestAliasLen) {
+                        $bestAliasLen = strlen($aliasLow);
+                        $bestIdx = $idx;
+                    }
                 }
             }
         }
-        return null;
+
+        return $bestIdx;
     }
 
     private function parsePrice(?string $value): ?float
@@ -349,20 +372,8 @@ class ImportController extends Controller
         return $cleaned !== '' ? (float) $cleaned : null;
     }
 
-    private function runOcr(string $pdfPath): ?string
+    private function runOcr(string $pdfPath, string $type = 'auto'): ?string
     {
-        $type = 'auto';
-
-        // Windows Python needs Windows-style paths; run via powershell from WSL
-        $pythonExe = 'C:/Users/cairo/AppData/Local/Programs/Python/Python314/python.exe';
-        $ocrScript = str_replace('/mnt/c/', 'C:/', base_path('bin/cairo-ocr'));
-
-        // Convert WSL /mnt/c/ storage path to C:/ for Windows Python
-        $pdfArg = preg_replace('/^\/mnt\/c\//i', 'C:/', $pdfPath);
-
-        $cmd = 'powershell.exe -Command "'
-             . $pythonExe . ' \"' . $ocrScript . '\" \"' . $pdfArg . '\"'
-             . ' --type ' . $type . ' --format json 2>&1"';
-        return shell_exec($cmd);
+        return app(OcrService::class)->runOcr($pdfPath, $type);
     }
 }

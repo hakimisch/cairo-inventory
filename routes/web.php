@@ -25,8 +25,7 @@ use App\Http\Controllers\DisposalSaleItemController;
 use App\Http\Controllers\SaleBidController;
 
 use App\Http\Controllers\KewpaDirectoryController;
-use App\Http\Controllers\DeliveryOrderController;
-use App\Http\Controllers\DoLineItemController;
+use App\Http\Controllers\VerificationController;
 use App\Http\Controllers\ScanController;
 use App\Http\Controllers\SupplierController;
 use App\Http\Controllers\ItemsController;
@@ -300,39 +299,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
 });
 
-// ── Items Overview Dashboard (unified view) ──────────────────────────────
-Route::get('/items', [ItemsController::class, 'index'])
-    ->middleware(['auth', 'verified'])
-    ->name('items.index');
+// ── Items Overview — redirects to Verification Registry tab ────────────────
+Route::permanentRedirect('/items', '/verification?tab=registry');
 
-// ── Phase 2: Delivery Order Management ──────────────────────────────────────
-Route::middleware(['auth', 'verified'])->prefix('delivery-orders')->name('delivery-orders.')->group(function () {
-
-    // DO CRUD
-    Route::get('/',             [DeliveryOrderController::class, 'index'])->name('index');
-    Route::get('/create',       [DeliveryOrderController::class, 'create'])->name('create');
-    Route::post('/',            [DeliveryOrderController::class, 'store'])->name('store');
-    Route::get('/{deliveryOrder}',       [DeliveryOrderController::class, 'show'])->name('show');
-    Route::get('/{deliveryOrder}/edit',  [DeliveryOrderController::class, 'edit'])->name('edit');
-    Route::put('/{deliveryOrder}',       [DeliveryOrderController::class, 'update'])->name('update');
-    Route::delete('/{deliveryOrder}',    [DeliveryOrderController::class, 'destroy'])->name('destroy');
-
-    // Verification
-    Route::post('/{deliveryOrder}/verify/{lineItem}', [DeliveryOrderController::class, 'verifyLineItem'])->name('verify');
-    Route::get('/{deliveryOrder}/stats',              [DeliveryOrderController::class, 'verificationStats'])->name('stats');
-
-    // Batch Import
-    Route::get('/{deliveryOrder}/batch-import', [DeliveryOrderController::class, 'batchImportForm'])->name('batch-import.form');
-    Route::post('/{deliveryOrder}/batch-import', [DeliveryOrderController::class, 'batchImport'])->name('batch-import');
-
-    // Line Items (inline CRUD)
-    Route::post('/{deliveryOrder}/line-items',           [DoLineItemController::class, 'store'])->name('line-items.store');
-    Route::put('/{deliveryOrder}/line-items/{lineItem}', [DoLineItemController::class, 'update'])->name('line-items.update');
-    Route::delete('/{deliveryOrder}/line-items/{lineItem}', [DoLineItemController::class, 'destroy'])->name('line-items.destroy');
+// ── Verification Pipeline ────────────────────────────────────────────
+Route::middleware(['auth', 'verified'])->prefix('verification')->name('verification.')->group(function () {
+    Route::get('/',                    [VerificationController::class, 'index'])->name('index');
+    Route::post('/{masterItem}/receive', [VerificationController::class, 'receive'])->name('receive');
+    Route::post('/{masterItem}/verify', [VerificationController::class, 'verify'])->name('verify');
+    Route::get('/stats',               [VerificationController::class, 'stats'])->name('stats');
 });
-
-// ── Phase 2: Verification Dashboard ─────────────────────────────────────────
-Route::middleware(['auth', 'verified'])->get('/verification', [DeliveryOrderController::class, 'dashboard'])->name('delivery-orders.verification');
 
 // ── Phase 2: Supplier Management ────────────────────────────────────────────
 Route::middleware(['auth', 'verified'])->prefix('suppliers')->name('suppliers.')->group(function () {
@@ -342,12 +318,14 @@ Route::middleware(['auth', 'verified'])->prefix('suppliers')->name('suppliers.')
     Route::delete('/{supplier}', [SupplierController::class, 'destroy'])->name('destroy');
 });
 
-// ── Phase 2: Scanner Module ─────────────────────────────────────────────────
+// ── Scanner Module — GET routes redirect, API routes stay ──────────────────
+Route::permanentRedirect('/scanner', '/verification?scan=1');
+Route::permanentRedirect('/scanner/history', '/verification?scan=1');
+
+// API endpoints (used by Verification ScanPanel + scanner recordings)
 Route::middleware(['auth', 'verified'])->prefix('scanner')->name('scanner.')->group(function () {
-    Route::get('/',              [ScanController::class, 'index'])->name('index');
-    Route::get('/history',       [ScanController::class, 'history'])->name('history');
-    Route::post('/lookup',       [ScanController::class, 'lookup'])->name('lookup');
-    Route::post('/scan',         [ScanController::class, 'scan'])->name('scan');
+    Route::post('/lookup', [ScanController::class, 'lookup'])->name('lookup');
+    Route::post('/scan',   [ScanController::class, 'scan'])->name('scan');
 });
 
 // ── PDF Import (OCR Pipeline) ──────────────────────────────────────────────
@@ -363,5 +341,38 @@ Route::middleware(['auth', 'verified'])->prefix('import')->name('import.')->grou
     Route::post('/preview',      [\App\Http\Controllers\ImportController::class, 'preview'])->name('preview');
     Route::post('/confirm',      [\App\Http\Controllers\ImportController::class, 'confirm'])->name('confirm');
 });
+
+// ── Utility: Deduplicate master_items ──────────────────────────────────────
+Route::get('/_dev/dedup-master-items', function () {
+    $dupes = \DB::table('master_items')
+        ->select('item_no', \DB::raw('COUNT(*) as cnt'))
+        ->groupBy('item_no')
+        ->havingRaw('COUNT(*) > 1')
+        ->get();
+
+    $deleted = 0;
+    foreach ($dupes as $dup) {
+        $rows = \DB::table('master_items')
+            ->where('item_no', $dup->item_no)
+            ->orderBy('status', 'desc')
+            ->orderBy('id', 'desc')
+            ->get();
+
+        $keep = $rows->shift();
+        foreach ($rows as $row) {
+            \DB::table('assets')->where('master_item_id', $row->id)->update(['master_item_id' => $keep->id]);
+            \DB::table('receivings')->where('master_item_id', $row->id)->update(['master_item_id' => $keep->id]);
+            \DB::table('master_items')->where('id', $row->id)->delete();
+            $deleted++;
+        }
+    }
+
+    return response()->json([
+        'deleted' => $deleted,
+        'dupes_left' => \DB::table('master_items')
+            ->select(\DB::raw('COUNT(*) - COUNT(DISTINCT item_no)'))
+            ->value(\DB::raw('COUNT(*) - COUNT(DISTINCT item_no)')),
+    ]);
+})->name('dev.dedup');
 
 require __DIR__.'/auth.php';

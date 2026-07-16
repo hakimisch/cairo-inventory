@@ -5,10 +5,8 @@ namespace App\Http\Controllers;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use App\Models\Supplier;
-use App\Models\PurchaseOrder;
-use App\Models\PurchaseOrderItem;
-use App\Models\DeliveryOrder;
-use App\Models\DoLineItem;
+use App\Models\MasterItem;
+use App\Services\OcrService;
 
 class PdfImportController extends Controller
 {
@@ -28,7 +26,7 @@ class PdfImportController extends Controller
     public function preview(Request $request)
     {
         $request->validate([
-            'file'      => 'required|file|mimes:pdf|max:102400', // 100MB
+            'file'      => 'required|file|mimes:pdf|max:102400',
             'type'      => 'required|in:auto,po,do,quotation',
             'supplier_id' => 'nullable|exists:suppliers,id',
         ]);
@@ -49,7 +47,6 @@ class PdfImportController extends Controller
                 return back()->withErrors(['file' => 'Failed to parse OCR output.']);
             }
 
-            // Store preview in session for confirmation step
             session()->flash('ocr_preview', $data);
             session()->flash('ocr_file', $path);
             session()->flash('ocr_type', $request->input('type'));
@@ -63,7 +60,6 @@ class PdfImportController extends Controller
         } catch (\Exception $e) {
             return back()->withErrors(['file' => 'OCR error: ' . $e->getMessage()]);
         } finally {
-            // Clean up temp file
             if (file_exists($fullPath)) {
                 @unlink($fullPath);
             }
@@ -71,7 +67,7 @@ class PdfImportController extends Controller
     }
 
     /**
-     * Confirm the OCR preview and import data.
+     * Confirm the OCR preview and import data into master_items.
      */
     public function confirm(Request $request)
     {
@@ -86,18 +82,13 @@ class PdfImportController extends Controller
             'items.*.unit'             => 'nullable|string',
             'items.*.unit_price'       => 'nullable|numeric|min:0',
             'items.*.serial_number'    => 'nullable|string',
-            'document_type' => 'required|string|in:po,do,quotation',
-            'reference'     => 'nullable|string|max:255',
             'supplier_id'   => 'nullable|exists:suppliers,id',
             'supplier_name' => 'nullable|string|max:255',
         ]);
 
         $items = $request->items;
-        $docType = $request->document_type;
-        $reference = $request->reference;
         $supplierId = $request->supplier_id;
         $supplierName = $request->supplier_name;
-        $userId = auth()->id();
 
         $supplier = null;
         if ($supplierId) {
@@ -109,88 +100,40 @@ class PdfImportController extends Controller
             );
         }
 
-        if ($docType === 'po' || $docType === 'quotation') {
-            $record = $this->importAsPurchaseOrder($items, $supplier, $reference, $userId);
-            $type = 'Purchase Order';
-        } elseif ($docType === 'do') {
-            $record = $this->importAsDeliveryOrder($items, $supplier, $reference, $userId);
-            $type = 'Delivery Order';
-        } else {
-            return back()->withErrors(['document_type' => 'Invalid document type.']);
-        }
+        $count = $this->importAsMasterItems($items, $supplier);
 
         return redirect()->route('pdf-import.index')
-            ->with('success', "{$type} #{$record->reference} created with {$record->count} items.");
+            ->with('success', "{$count} items imported into master equipment list.");
     }
 
     /**
-     * Import items as a Purchase Order (from PO or quotation).
+     * Import items into master_items register.
      */
-    private function importAsPurchaseOrder(array $items, ?Supplier $supplier, ?string $reference, int $userId): object
+    private function importAsMasterItems(array $items, ?Supplier $supplier): int
     {
-        $po = PurchaseOrder::create([
-            'po_no'       => $reference ?? 'IMPORT-' . now()->format('YmdHis'),
-            'supplier_id' => $supplier?->id,
-            'status'      => 'pending',
-            'created_by'  => $userId,
-        ]);
+        $count = 0;
+        $existingCount = MasterItem::count();
 
-        foreach ($items as $item) {
-            $unitPrice = !empty($item['unit_price']) ? (float) $item['unit_price'] : null;
-            $totalPrice = $unitPrice && !empty($item['quantity_ordered'])
-                ? $unitPrice * (int) $item['quantity_ordered']
-                : null;
+        foreach ($items as $i => $item) {
+            $unitPrice = !empty($item['unit_price']) ? (float) $item['unit_price'] : 0;
 
-            $po->items()->create([
-                'item_code'        => $item['item_code'] ?? null,
-                'description'      => $item['description'],
-                'brand'            => $item['brand'] ?? null,
-                'model'            => $item['model'] ?? null,
-                'category'         => $item['category'] ?? null,
-                'quantity_ordered' => (int) ($item['quantity_ordered'] ?? 1),
-                'unit'             => $item['unit'] ?? 'unit',
-                'unit_price'       => $unitPrice,
-                'total_price'      => $totalPrice,
-                'status'           => 'pending',
+            MasterItem::create([
+                'item_no'       => $item['item_code'] ?? ($existingCount + $i + 1),
+                'category'      => mb_substr($item['category'] ?? 'Uncategorized', 0, 255),
+                'name'          => mb_substr($item['description'] ?? '(no name)', 0, 1000),
+                'brand'         => isset($item['brand']) ? mb_substr($item['brand'], 0, 255) : null,
+                'serial_numbers'=> $item['serial_number'] ?? null,
+                'unit_price'    => $unitPrice,
+                'total_price'   => $unitPrice * max(1, (int) ($item['quantity_ordered'] ?? 1)),
+                'sodo_bayaran'  => null,
+                'supplier_id'   => $supplier?->id,
+                'quantity'      => (int) ($item['quantity_ordered'] ?? 1),
+                'status'        => 'belum_diterima',
             ]);
+            $count++;
         }
 
-        return (object) [
-            'reference' => $po->po_no,
-            'count'     => count($items),
-        ];
-    }
-
-    /**
-     * Import items as a Delivery Order.
-     */
-    private function importAsDeliveryOrder(array $items, ?Supplier $supplier, ?string $reference, int $userId): object
-    {
-        $do = DeliveryOrder::create([
-            'do_no'       => $reference ?? 'IMPORT-' . now()->format('YmdHis'),
-            'supplier_id' => $supplier?->id,
-            'status'      => 'pending',
-            'created_by'  => $userId,
-        ]);
-
-        foreach ($items as $item) {
-            $do->lineItems()->create([
-                'item_code'        => $item['item_code'] ?? null,
-                'description'      => $item['description'],
-                'brand'            => $item['brand'] ?? null,
-                'model'            => $item['model'] ?? null,
-                'serial_number'    => $item['serial_number'] ?? null,
-                'category'         => $item['category'] ?? null,
-                'quantity_ordered' => (int) ($item['quantity_ordered'] ?? 1),
-                'unit'             => $item['unit'] ?? 'unit',
-                'status'           => 'pending',
-            ]);
-        }
-
-        return (object) [
-            'reference' => $do->do_no,
-            'count'     => count($items),
-        ];
+        return $count;
     }
 
     /**
@@ -198,18 +141,6 @@ class PdfImportController extends Controller
      */
     private function runOcr(string $pdfPath, string $type): ?string
     {
-        $pythonCmd = 'python3';
-        $winPython = '/mnt/c/Users/cairo/AppData/Local/Programs/Python/Python314/python.exe';
-
-        if (file_exists($winPython)) {
-            $pythonCmd = '"' . $winPython . '"';
-        }
-
-        $ocrScript = base_path('bin/cairo-ocr');
-        $cmd = "{$pythonCmd} \"{$ocrScript}\" "
-             . escapeshellarg($pdfPath)
-             . " --type {$type} --format json 2>/dev/null";
-
-        return shell_exec($cmd);
+        return app(OcrService::class)->runOcr($pdfPath, $type);
     }
 }

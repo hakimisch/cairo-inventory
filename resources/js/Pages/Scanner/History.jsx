@@ -92,14 +92,13 @@ export default function History({ scans, filters }) {
                                             </span>
                                         </td>
                                         <td style={tdStyle}>
-                                            {s.do_no ? (
+                                            {s.item_no ? (
                                                 <>
-                                                    <Link href={route('delivery-orders.show', s.do_no.split('/')[0] || s.do_no)}
-                                                          style={{ color: '#5C001F', textDecoration: 'none', fontWeight: 600 }}>
-                                                        {s.do_no}
-                                                    </Link>
-                                                    {s.item_description && (
-                                                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{s.item_description}</div>
+                                                    <span style={{ color: '#5C001F', fontWeight: 600 }}>
+                                                        {s.item_no}
+                                                    </span>
+                                                    {s.item_name && (
+                                                        <div style={{ fontSize: 12, color: '#6B7280', marginTop: 2 }}>{s.item_name}</div>
                                                     )}
                                                 </>
                                             ) : (

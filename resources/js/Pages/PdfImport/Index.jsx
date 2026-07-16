@@ -249,6 +249,7 @@ export default function Index({ suppliers, preview, file_name }) {
                                         <th style={thStyle}>Brand</th>
                                         <th style={thStyle}>Model</th>
                                         <th style={thStyle}>Category</th>
+                                        <th style={thStyle}>S/N</th>
                                         <th style={thStyle}>Qty</th>
                                         <th style={thStyle}>Unit</th>
                                         <th style={thStyle}>Unit Price</th>
@@ -295,6 +296,13 @@ export default function Index({ suppliers, preview, file_name }) {
                                                     value={item.category || ''}
                                                     onChange={e => handleItemChange(idx, 'category', e.target.value)}
                                                     style={{ ...inputStyle, width: 100 }}
+                                                />
+                                            </td>
+                                            <td style={tdStyle}>
+                                                <input
+                                                    value={item.serial_number || ''}
+                                                    onChange={e => handleItemChange(idx, 'serial_number', e.target.value)}
+                                                    style={{ ...inputStyle, width: 100, fontFamily: 'monospace', fontSize: 11 }}
                                                 />
                                             </td>
                                             <td style={tdStyle}>

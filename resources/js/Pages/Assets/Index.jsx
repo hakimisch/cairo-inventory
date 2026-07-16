@@ -148,12 +148,32 @@ function FilterTab({ label, count, active, onClick }) {
         </button>
     );
 }
- 
-export default function Index({ assets, totalValue }) {
+
+function StatCard({ label, count, color }) {
+    return (
+        <div style={{
+            background: UTM.white, borderRadius: 10, border: `1.5px solid ${UTM.gray100}`,
+            padding: '14px 20px', textAlign: 'center', minWidth: 110, flex: 1,
+        }}>
+            <div style={{ fontSize: 28, fontWeight: 800, color: color ?? UTM.maroon }}>{count}</div>
+            <div style={{ fontSize: 11, fontWeight: 600, color: UTM.gray500, marginTop: 2 }}>{label}</div>
+        </div>
+    );
+}
+
+export default function Index({ assets, totalValue, stats }) {
     const [search, setSearch]         = useState('');
     const [typeFilter, setTypeFilter] = useState('all'); 
     const [expandedId, setExpandedId] = useState(null); 
- 
+    const [dateFrom, setDateFrom]     = useState('');
+    const [dateTo, setDateTo]         = useState('');
+
+    const fmtDT = (iso) => {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleString('ms-MY', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
+
     const filtered = assets.filter(a => {
         const matchSearch =
             a.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -163,17 +183,21 @@ export default function Index({ assets, totalValue }) {
             ;
         const matchType =
             typeFilter === 'all' || a.asset_type === typeFilter;
-        return matchSearch && matchType;
+        const aDate = a.created_at ? new Date(a.created_at) : null;
+        const matchDate =
+            (!dateFrom || (aDate && aDate >= new Date(dateFrom))) &&
+            (!dateTo || (aDate && aDate <= new Date(dateTo + 'T23:59:59')));
+        return matchSearch && matchType && matchDate;
     });
  
     const fixedCount     = assets.filter(a => a.asset_type === 'fixed_asset').length;
     const inventoryCount = assets.filter(a => a.asset_type === 'inventory').length;
  
     const thStyle = {
-        padding      : '12px 20px',
+        padding      : '10px 12px',
         fontSize     : '11px',
         fontWeight   : 700,
-        letterSpacing: '0.07em',
+        letterSpacing: '0.05em',
         textTransform: 'uppercase',
         color        : UTM.gray500,
         textAlign    : 'left',
@@ -224,7 +248,7 @@ export default function Index({ assets, totalValue }) {
                         <div style={{ position: 'relative', width: 280, maxWidth: '100%' }}>
                             <span style={{ position: 'absolute', left: 12, top: '50%',
                                            transform: 'translateY(-50%)', color: UTM.gray300,
-                                           fontSize: 16, pointerEvents: 'none' }}>🔍</span>
+                                           fontSize: 13, pointerEvents: 'none', fontWeight: 700 }}>...</span>
                             <input
                                 type="text"
                                 placeholder="Cari nama, tag, lokasi..."
@@ -260,15 +284,53 @@ export default function Index({ assets, totalValue }) {
                             active={typeFilter === 'inventory'} onClick={() => setTypeFilter('inventory')}
                         />
                     </div>
- 
+
+                    {/* ── Stats row ── */}
+                    <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
+                        <StatCard label="Total Aset" count={stats?.total ?? filtered.length} color={UTM.maroon} />
+                        <StatCard label="Aktif" count={stats?.active ?? 0} color="#1A7A3C" />
+                        <StatCard label="Selenggara" count={stats?.repair ?? 0} color={UTM.goldDark} />
+                        <StatCard label="Dilupus" count={stats?.disposed ?? 0} color={UTM.maroon} />
+                        <StatCard label="Aset Tetap" count={stats?.fixed_asset ?? 0} color="#7B1FA2" />
+                        <StatCard label="Inventori" count={stats?.inventory ?? 0} color={UTM.goldDark} />
+                    </div>
+
+                    {/* ── Date range filter ── */}
+                    <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 16 }}>
+                        <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+                            style={{
+                                padding: '6px 10px', borderRadius: 6, fontSize: 12,
+                                border: `1.5px solid ${UTM.gray100}`, background: UTM.white,
+                                color: UTM.gray700, fontWeight: 600, cursor: 'pointer',
+                            }}
+                        />
+                        <span style={{ color: UTM.gray300, fontSize: 11 }}>to</span>
+                        <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+                            style={{
+                                padding: '6px 10px', borderRadius: 6, fontSize: 12,
+                                border: `1.5px solid ${UTM.gray100}`, background: UTM.white,
+                                color: UTM.gray700, fontWeight: 600, cursor: 'pointer',
+                            }}
+                        />
+                        {(dateFrom || dateTo) && (
+                            <button onClick={() => { setDateFrom(''); setDateTo(''); }}
+                                style={{
+                                    padding: '4px 10px', borderRadius: 6, fontSize: 11,
+                                    border: `1px solid ${UTM.gray100}`, background: UTM.white,
+                                    color: UTM.gray500, fontWeight: 600, cursor: 'pointer',
+                                }}>
+                                Clear
+                            </button>
+                        )}
+                    </div>
+
                     {/* ── Table Container (Scrollable) ── */}
-                    <div style={{ background: UTM.white, borderRadius: 12,
-                                  boxShadow: '0 1px 4px rgba(92,0,31,0.07)', overflow: 'hidden' }}>
-                        <div style={{ overflowX: 'auto', width: '100%' }}>
-                            <table style={{ width: '100%', minWidth: '1050px', borderCollapse: 'collapse' }}>
-                                <thead>
-                                    <tr>
-                                        <th style={thStyle}>Tag Aset</th>
+                    <div style={{ background: UTM.white, borderRadius: 10,
+                                  border: `1.5px solid ${UTM.gray100}`, overflow: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 1000 }}>
+                            <thead>
+                                <tr style={{ background: UTM.gray50, borderBottom: `1.5px solid ${UTM.gray100}` }}>
+                                    <th style={thStyle}>Tag Aset</th>
                                         <th style={thStyle}>Nama Aset</th>
                                         <th style={thStyle}>Jenis</th>
                                         <th style={thStyle}>Kategori</th>
@@ -277,6 +339,7 @@ export default function Index({ assets, totalValue }) {
                                         <th style={thStyle}>Lokasi</th>
                                         <th style={thStyle}>Waranti</th>
                                         <th style={thStyle}>Status</th>
+                                        <th style={thStyle}>Added</th>
                                         <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
                                     </tr>
                                 </thead>
@@ -298,45 +361,48 @@ export default function Index({ assets, totalValue }) {
                                             onMouseEnter={e => { if(expandedId !== asset.id) e.currentTarget.style.background = '#FFF5E8' }}
                                             onMouseLeave={e => { if(expandedId !== asset.id) e.currentTarget.style.background = idx % 2 === 0 ? UTM.white : UTM.gray50 }}
                                             >
-                                                <td style={{ padding: '14px 20px', fontFamily: 'monospace',
+                                                <td style={{ padding: '10px 12px', fontFamily: 'monospace',
                                                             fontWeight: 700, color: UTM.maroon,
                                                             fontSize: '12px', textTransform: 'uppercase',
                                                             whiteSpace: 'nowrap' }}>
                                                     {asset.asset_tag}
                                                 </td>
-                                                <td style={{ padding: '14px 20px', fontWeight: 600,
+                                                <td style={{ padding: '10px 12px', fontWeight: 600,
                                                             color: UTM.gray900, fontSize: '13px' }}>
                                                     {asset.name}
                                                 </td>
-                                                <td style={{ padding: '14px 20px' }}>
+                                                <td style={{ padding: '10px 12px' }}>
                                                     {asset.asset_type
                                                         ? <TypeBadge type={asset.asset_type} />
                                                         : <span style={{ color: UTM.gray300, fontSize: '12px' }}>—</span>
                                                     }
                                                 </td>
-                                                <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>
+                                                <td style={{ padding: '10px 12px', fontSize: '13px', color: UTM.gray700 }}>
                                                     {asset.category || '—'}
                                                 </td>
-                                                <td style={{ padding: '14px 20px', fontSize: '13px',
+                                                <td style={{ padding: '10px 12px', fontSize: '13px',
                                                             fontWeight: 700, color: UTM.gray900 }}>
                                                     {Number(asset.purchase_price).toLocaleString()}
                                                 </td>
-                                                <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>
+                                                <td style={{ padding: '10px 12px', fontSize: '13px', color: UTM.gray700 }}>
                                                     {asset.custodian_name || <span style={{color: UTM.gray300, fontStyle: 'italic'}}>Belum ditetapkan</span>}
                                                 </td>
-                                                <td style={{ padding: '14px 20px', fontSize: '13px',
+                                                <td style={{ padding: '10px 12px', fontSize: '13px',
                                                             color: UTM.gray700, maxWidth: 180,
                                                             overflow: 'hidden', textOverflow: 'ellipsis',
                                                             whiteSpace: 'nowrap' }}>
                                                     {asset.location || '—'}
                                                 </td>
-                                                <td style={{ padding: '14px 20px' }}>
+                                                <td style={{ padding: '10px 12px' }}>
                                                     <WarrantyBadge expiryDate={asset.warranty_expiry} />
                                                 </td>
-                                                <td style={{ padding: '14px 20px' }}>
+                                                <td style={{ padding: '10px 12px' }}>
                                                     <StatusBadge status={asset.status} />
                                                 </td>
-                                                <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                <td style={{ padding: '10px 12px', fontSize: '11px', whiteSpace: 'nowrap', color: UTM.gray500 }}>
+                                                    {fmtDT(asset.created_at)}
+                                                </td>
+                                                <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
                                                     {/* Expand Details Button */}
                                                     <button
                                                         onClick={() => setExpandedId(expandedId === asset.id ? null : asset.id)}
@@ -528,9 +594,9 @@ export default function Index({ assets, totalValue }) {
                                                                             <tr><td style={{ color: UTM.gray500 }}>Tamat Waranti</td><td style={{ fontWeight: 600, color: UTM.gray900 }}>{asset.warranty_expiry ? new Date(asset.warranty_expiry).toLocaleDateString('ms-MY') : '—'}</td></tr>
                                                                         </tbody>
                                                                     </table>
-                                                                </div>
-                                                            </div>
+                                                                    </div>
                                                         </div>
+                                                    </div>
                                                     </td>
                                                 </tr>
                                             )}
@@ -538,8 +604,7 @@ export default function Index({ assets, totalValue }) {
                                     ))}
                                 </tbody>
                             </table>
-                        </div>
- 
+
                         {/* Table footer */}
                         <div style={{ padding: '12px 20px', borderTop: `1px solid ${UTM.gray100}`,
                                       background: UTM.gray50, fontSize: '12px', color: UTM.gray500 }}>

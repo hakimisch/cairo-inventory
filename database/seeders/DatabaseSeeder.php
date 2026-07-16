@@ -284,5 +284,8 @@ class DatabaseSeeder extends Seeder
 
         // ─── 7. Seed Phase 2 suppliers ──────────────────────────────────────
         $this->call(SupplierSeeder::class);
+
+        // ─── 8. Seed master equipment register (156 items from Excel) ────────
+        $this->call(MasterItemSeeder::class);
     }
 }

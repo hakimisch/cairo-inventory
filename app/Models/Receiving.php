@@ -11,6 +11,7 @@ class Receiving extends Model
     use LogsActivity;
 
     protected $fillable = [
+        'master_item_id',
         'receive_no',
         'supplier_name',
         'supplier_address',
@@ -37,6 +38,13 @@ class Receiving extends Model
         'unit_price'  => 'decimal:2',
         'total_price' => 'decimal:2',
     ];
+
+    // ─── Relations ─────────────────────────────────────────────────────────────
+
+    public function masterItem()
+    {
+        return $this->belongsTo(MasterItem::class);
+    }
 
     public function getActivitylogOptions(): LogOptions
     {

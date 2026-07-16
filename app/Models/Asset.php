@@ -50,6 +50,7 @@ class Asset extends Model implements HasMedia
         'scan_verified_at',
         'unit_price',            // NEW — per-unit cost from PO
         'po_item_code',          // NEW — PO line item number for traceability
+        'master_item_id',        // Links to master_items register
     ];
 
     protected $casts = [
@@ -133,9 +134,9 @@ class Asset extends Model implements HasMedia
         return $this->hasOne(VehicleDisposalAssessment::class);
     }
 
-    public function doLineItem()
+    public function masterItem()
     {
-        return $this->belongsTo(DoLineItem::class);
+        return $this->belongsTo(MasterItem::class);
     }
 
     // ─── Accessor: Get primary photo URL ──────────────────────────────────────

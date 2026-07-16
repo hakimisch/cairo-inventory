@@ -278,7 +278,6 @@ class DocumentParser:
     PO_SIGNATURES = [
         "PESANAN TEMPATAN",
         "PURCHASE ORDER",
-        "PPTK",
         "LOCAL ORDER",
     ]
     DO_SIGNATURES = [
@@ -339,12 +338,43 @@ class DocumentParser:
 
         text_upper = self.text.upper()
 
-        # Count matches for each type
-        po_score = sum(1 for sig in self.PO_SIGNATURES if sig in text_upper)
-        do_score = sum(1 for sig in self.DO_SIGNATURES if sig in text_upper)
-        quotation_score = sum(1 for sig in self.QUOTATION_SIGNATURES if sig in text_upper)
+        # ── Weighted scoring ────────────────────────────────────────────
+        # Simple signature match is too fragile when reference numbers contain
+        # keywords from other types (e.g. "PPTK..." as a PO ref appearing in
+        # an ACKNOWLEDGEMENT GOODS document). Use title-line matches as
+        # stronger signals than substring matches anywhere in the text.
 
-        scores = {"po": po_score, "do": do_score, "quotation": quotation_score}
+        def _title_match(keywords: list) -> bool:
+            """Check if any keyword appears in a title-like line (first 50 lines, scanning past page markers and noise)."""
+            for ln in self.lines[:50]:
+                s = ln.strip()
+                if not s:
+                    continue
+                # Skip page markers and pure-address lines
+                if s.startswith("=== PAGE") or re.match(r'^[^a-zA-Z]{5,}$', s):
+                    continue
+                for kw in keywords:
+                    if kw in s.upper():
+                        return True
+            return False
+
+        # Title-level matches (stronger signal)
+        po_title = _title_match(["PESANAN TEMPATAN", "PURCHASE ORDER", "LOCAL ORDER"])
+        do_title = _title_match(["DELIVERY ORDER", "ACKNOWLEDGEMENT GOODS"])
+        quotation_title = _title_match(["JADUAL HARGA", "LAMPIRAN III", "QUOTATION", "PRICE SCHEDULE"])
+
+        # Body-level matches (weaker — substring anywhere)
+        po_body = sum(1 for sig in self.PO_SIGNATURES if sig in text_upper)
+        do_body = sum(1 for sig in self.DO_SIGNATURES if sig in text_upper)
+        quotation_body = sum(1 for sig in self.QUOTATION_SIGNATURES if sig in text_upper)
+
+        # Composite score: title match counts triple, body match counts once
+        scores = {
+            "po": (3 if po_title else 0) + po_body,
+            "do": (3 if do_title else 0) + do_body,
+            "quotation": (3 if quotation_title else 0) + quotation_body,
+        }
+
         best = max(scores, key=scores.get)
         return best if scores[best] > 0 else "unknown"
 
@@ -922,6 +952,12 @@ class DocumentParser:
                 in_items_section = True
                 continue
 
+            # Skip date-like patterns (e.g. "19.06.26" being confused with item codes)
+            if re.match(r'^\d{1,2}\.\d{1,2}\.\d{2,4}$', line):
+                parts = line.split('.')
+                if len(parts) == 3 and 1 <= int(parts[0]) <= 31 and 1 <= int(parts[1]) <= 12:
+                    continue
+
             # Check for item code on current line
             m = item_code_on_line.match(line)
             item_code = None
@@ -965,6 +1001,13 @@ class DocumentParser:
                                                     "COMPANY CHO", "SIGNATURE"]):
                     break
 
+                # Quantity on its own line (just digits, 1-999)
+                qty_m = re.match(r'^(\d{1,3})\s*$', peek)
+                if qty_m and 1 <= int(qty_m.group(1)) <= 500:
+                    qty = int(qty_m.group(1))
+                    j += 1
+                    continue
+
                 # CamScanner garbage
                 if re.match(r'^[^\w]*\d+[^\w]*$', peek) and len(peek) <= 10:
                     j += 1
@@ -972,15 +1015,9 @@ class DocumentParser:
 
                 # Serial number lines
                 if re.search(r'(?:S\/N|SIN|SN)\s*[:=]', peek, re.IGNORECASE) or \
-                   re.match(r'^\d+\.\s*S\/N', peek, re.IGNORECASE):
+                   re.match(r'^(?:\d+\.\s*)?S\/N', peek, re.IGNORECASE) or \
+                   re.match(r'^(?:\d+\.\s*)?SIN\b', peek, re.IGNORECASE):
                     serial_lines.append(peek)
-                    j += 1
-                    continue
-
-                # Quantity on its own line (just digits, 1-999)
-                qty_m = re.match(r'^(\d{1,3})\s*$', peek)
-                if qty_m and 1 <= int(qty_m.group(1)) <= 500:
-                    qty = int(qty_m.group(1))
                     j += 1
                     continue
 
@@ -993,6 +1030,8 @@ class DocumentParser:
             description = " ".join(d for d in desc_lines if d and len(d) > 2).strip()
             # Clean up
             description = re.sub(r'\s+', ' ', description).strip()
+            # Remove sub-item markers like "(i)", "(ii)", "(iii)" at the start
+            description = re.sub(r'^\([ivx]+\)\s*', '', description).strip()
 
             # Skip purely noise items
             if len(description) < 5 or re.match(r'^[A-Z\s]{4,}$', description):
@@ -1036,6 +1075,11 @@ class DocumentParser:
         The quotation has structure:
           BIL | NAMA ITEM | NEGARA | HARGA SEUNIT | KUANTITI | JUMLAH BESAR | SST
           1.1.1.1 | Office Desktop | 14 units | ...
+
+        Handles OCR-fragmented scanned output where:
+        - Item descriptions span many broken lines (6+ not enough)
+        - Table cells become individual lines (price, N/A, country mixed in)
+        - Garbage/noise lines appear between real content
         """
         items = []
         current_category = "GENERAL"
@@ -1055,8 +1099,98 @@ class DocumentParser:
             "LAB EQUIPMENTS FOR SMART": "LAB EQUIPMENTS FOR SMART MANUFACTURING LAB",
         }
 
-        # Item code pattern: 1.1.X.X or 1.5.X.X
-        item_code_pattern = re.compile(r'^(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)\\s*$')
+        # Item code pattern: 1.1.X.X or 1.5.X.X (also handles OCR noise like 1.1X.X)
+        item_code_pattern = re.compile(r'^(\d+\.\d+(?:\.\d+)+(?:\.\d+)?)\s*$')
+        # Same-line pattern: "1.1.1.1 Office Desktop"
+        item_code_on_line = re.compile(r'^(\d+\.\d+(?:\.\d+)+(?:\.\d+)?)\s+(.+)$')
+
+        # Lines that signal end of an item block (footer/noise)
+        FOOTER_MARKERS = [
+            "CATATAN", "Tandatangan", "Tandatganan",
+            "Harga barang buatan tempatan sahaja",
+            "Harga F.O.B", "Harga F.0.B", "Harga F.0.8",
+            "Nama dan Cop Syarikat", "Nama dan",
+            "SST hanya untuk", "dengan Kastam",
+            "Universiti tidak terikat",
+            "berasingan daripada pakej utama",
+            "0 2 OCT", "0 2 ocT", "02 OCT",
+            "20 OCT 2025",
+        ]
+
+        # Known table-noise lines from poor OCR of multi-column tables
+        TABLE_NOISE = [
+            "N/A", "NIA", "N/A", "N/A.", "NlA", "N/A ",
+            "TIADA TAWARAN",
+            "SILA RUJUK", "SIL 4 RUJUK", "SILA RUJUK LAMPIRAN",
+            "YANG DISERTAK", "YANG DISERTAI", "YANG DISFRTAK",
+            "DISERTAKAN", "JISERTAKAN", "ISEKLAKAN",
+            "BERSAIZ A3", "BER 3AIZ A3", "BERSAL A3",
+            "BERS/, \\lZ A3",
+            "LAMPIRAN", "LAMPIRA", "LAMPIF",
+            "JADUAL HARGA", "JADL AL HARGA", "JADUAL HARC",
+            "JADUAL HAF GA", "JADUA L HAF GA", "JADU AL HARGA",
+            "LAMPIRAN III",
+            "of 46 pages", "1 of 46 pages", "7 of 46 pages",
+            "=== PAGE", "=== PAGE",
+            "NO. TENDER", "TAJUK TENDER",
+            "JUMLAH HARGA", "JUMLAH BESAR",
+            "BIL | NAMA ITEM", "NAMA ITEM",  "NEGARA", "KUANTITI",
+            "HARGA SEUNIT", "JUMLAH",
+            "(Free On", "(Free On Board)", "F.0.B", "F.O.B", "F.0.8",
+            "F.O.B.", "F.O.B",
+            "BUATAN", "TEMPATAN", "LOADING", "PENTAULIAHAN",
+            "PORT OF", "SEUNIT", "(1)", "(2)", "(3)", "(4)", "(5)", "(6)",
+            "(7)", "(8)", "(9)", "(10)", "(11)", "(12)", "(13)",
+            "SST", "(%)", "(8+10/", "(4x7)", "(5X7)", "9+10)",
+            "TERMASUK", "DAN", "Board)", "ASAL", "JENAMA", "MPATAN",
+            "MODEL", "BESAR", "PEMASANGAN",
+            "SDN", "SDN.", "SDW.", "SUN", "SON",
+            "Tarikh", "Tarikh.",
+            "kx", "wer", "ak", "aK", "Be", "vy?", "vy",
+            "1a", "la", "4K", "KO", "WI", "YI", "NI", "u", "a",
+            "agaT4", "ageT4", "gqqgotoriers", "qao-",
+            "4gqaci01181s", "sgqeot0",
+            "TAINS VIOOCNIAr AIN DENor",
+            "CH A PITH | ARADIB AN TAN IAI",
+            "PPPPTISeTITTTeTirire rere r ree",
+            "(488719-K)", "4999010", "811.00", "541.00",
+            "OUN", "Fah", "#",
+        ]
+
+        # Lines that are pure OCR garbage (single words, fragments, etc.)
+        def _is_noise(line: str) -> bool:
+            up = line.upper().strip()
+            if len(up) <= 2 and not up.isdigit():
+                return True
+            if up in TABLE_NOISE:
+                return True
+            if any(marker in up for marker in TABLE_NOISE):
+                return True
+            # Short all-caps that aren't real words
+            if re.match(r'^[A-Z\s]{2,6}$', up) and len(up) <= 7:
+                if up not in ["UNIT", "UNITS", "SET", "SETS", "BOX", "LOT"]:
+                    return True
+            # Page number markers
+            if re.match(r'^\d+\s+of\s+\d+\s+pages$', line, re.IGNORECASE):
+                return True
+            # Pure number lines (price fragments)
+            if re.match(r'^[\d,]+(?:\s*\d{3})*(?:\.\d{1,2})?$', line):
+                return True
+            # N/A-like
+            if re.match(r'^N[1lIA]\s*$', line, re.IGNORECASE) and len(line) <= 4:
+                return True
+            # Price-like lines "513 00", "29,482 00"
+            if re.match(r'^[\d, ]+\s*$', line) and re.search(r'\d', line):
+                return True
+            return False
+
+        # Check if a line signals end of item block
+        def _is_footer(line: str) -> bool:
+            up = line.upper().strip()
+            for marker in FOOTER_MARKERS:
+                if marker.upper() in up:
+                    return True
+            return False
 
         i = 0
         while i < len(self.lines):
@@ -1073,51 +1207,100 @@ class DocumentParser:
                     current_section = val
                     break
 
-            # Check for item code on current line
-            m_code = item_code_pattern.match(line)
-            if m_code:
-                item_code = m_code.group(1)
-                # Next few lines should contain description + quantity
-                desc_parts = []
-                qty = 1
-                unit = "unit"
-                j = i + 1
-                while j < len(self.lines) and j < i + 6:
-                    next_line = self.lines[j].strip()
-                    if not next_line:
-                        j += 1
-                        continue
-                    # Check for quantity
-                    qty_m = re.match(r'^\\s*(\\d+)\\s*(unit|units|set|sets|box|boxes|lot)?\\s*$', next_line, re.IGNORECASE)
-                    if qty_m:
-                        qty = int(qty_m.group(1))
-                        if qty_m.group(2):
-                            unit = qty_m.group(2)
+            # Check for item code
+            item_code = None
+            rest = None
+
+            # Try same-line pattern first: "1.1.1.1 Office Desktop"
+            m_same = item_code_on_line.match(line)
+            if m_same:
+                item_code = m_same.group(1)
+                rest = m_same.group(2)
+            else:
+                # Try item code on its own line
+                m_code = item_code_pattern.match(line)
+                if m_code:
+                    item_code = m_code.group(1)
+
+            if not item_code:
+                i += 1
+                continue
+
+            # Collect description from ALL lines until next item code,
+            # section header, or footer marker
+            desc_parts = [rest] if rest else []
+            qty = 1
+            unit = "unit"
+
+            j = i + 1
+            lookahead_limit = 60  # cap lookahead — OCR fragments items within ~60 lines
+            while j < len(self.lines) and (j - i) < lookahead_limit:
+                peek = self.lines[j].strip()
+                j += 1
+                if not peek:
+                    continue
+
+                # Stop: next item code (same line or alone)
+                if re.match(r'^\d+\.\d+(?:\.\d+)+(?:\.\d+)?\s', peek) or \
+                   re.match(r'^\d+\.\d+(?:\.\d+)+(?:\.\d+)?$', peek):
+                    j -= 1  # don't consume the next item code
+                    break
+
+                # Stop: section header
+                found_section = False
+                for key in section_patterns:
+                    if key in peek.upper():
+                        found_section = True
                         break
-                    # Skip page markers and notes
-                    if any(x in next_line for x in ["CATATAN", "Tandatangan", "LAMPIRAN",
-                                                      "JADUAL HARGA", "NO. TENDER",
-                                                      "of 46 pages", "SILA RUJUK",
-                                                      "HARGA", "JUMLAH"]):
-                        j += 1
-                        continue
-                    desc_parts.append(next_line)
-                    j += 1
+                if found_section:
+                    j -= 1
+                    break
 
-                description = " ".join(desc_parts) if desc_parts else line
+                # Stop: footer markers
+                if _is_footer(peek):
+                    # But don't stop mid-item if we're still collecting description
+                    # Only stop if we already have a description and this is clearly a section end
+                    desc_so_far = " ".join(d for d in desc_parts if d and len(d) > 2)
+                    if len(desc_so_far) > 5:
+                        break
+                    continue
 
-                item = ExtractedItem(
-                    item_code=item_code,
-                    description=description,
-                    quantity_ordered=qty,
-                    unit=unit,
-                    category=current_category,
-                    section=current_section,
-                )
-                item.brand = self._extract_brand(description)
-                items.append(item)
+                # Skip noise lines
+                if _is_noise(peek):
+                    continue
 
-            i += 1
+                # Check for quantity on its own line
+                qty_m = re.match(r'^\s*(\d+)\s*(unit|units|set|sets|box|boxes|lot)?\s*$', peek, re.IGNORECASE)
+                if qty_m:
+                    qty = int(qty_m.group(1))
+                    if qty_m.group(2):
+                        unit = qty_m.group(2)
+                    continue
+
+                # Collect as description
+                desc_parts.append(peek)
+
+            # Build description
+            description = " ".join(desc_parts).strip() if desc_parts else ""
+            # Clean up whitespace
+            description = re.sub(r'\s+', ' ', description).strip()
+
+            if len(description) < 3:
+                continue
+
+            item = ExtractedItem(
+                item_code=item_code,
+                description=description,
+                quantity_ordered=qty,
+                unit=unit,
+                category=current_category,
+                section=current_section,
+            )
+            item.brand = self._extract_brand(description)
+            items.append(item)
+
+            # Move i to where our lookahead stopped
+            i = j
 
         return items
 

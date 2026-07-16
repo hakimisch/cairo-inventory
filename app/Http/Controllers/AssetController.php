@@ -15,6 +15,14 @@ class AssetController extends Controller
         return Inertia::render('Assets/Index', [
             'assets'     => Asset::latest()->get(),
             'totalValue' => Asset::sum('purchase_price'),
+            'stats'      => [
+                'total'       => Asset::count(),
+                'active'      => Asset::where('status', 'active')->count(),
+                'repair'      => Asset::where('status', 'repair')->count(),
+                'disposed'    => Asset::where('status', 'disposed')->count(),
+                'fixed_asset' => Asset::where('asset_type', 'fixed_asset')->count(),
+                'inventory'   => Asset::where('asset_type', 'inventory')->count(),
+            ],
         ]);
     }
 
@@ -126,6 +134,12 @@ class AssetController extends Controller
     {
         return Inertia::render('Assets/ReceivingIndex', [
             'receivings' => Receiving::latest()->get(),
+            'stats'      => [
+                'total'    => Receiving::count(),
+                'pending'  => Receiving::where('status', 'pending')->count(),
+                'accepted' => Receiving::where('status', 'accepted')->count(),
+                'rejected' => Receiving::where('status', 'rejected')->count(),
+            ],
         ]);
     }
 

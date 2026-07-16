@@ -162,7 +162,7 @@ export default function Index({ suppliers, filters }) {
                                         {s.email && <div style={{ fontSize: 12, color: '#6B7280' }}>{s.email}</div>}
                                         {s.contact_person && <div style={{ fontSize: 12, color: '#6B7280' }}>{s.contact_person}</div>}
                                     </td>
-                                    <td style={tdStyle}>{s.delivery_orders_count}</td>
+                                    <td style={tdStyle}>{s.master_items_count}</td>
                                     <td style={tdStyle}>
                                         <span style={{
                                             display: 'inline-block', padding: '2px 10px', borderRadius: 20,

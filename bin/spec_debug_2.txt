@@ -1,0 +1,52 @@
+Item #1.0: Office Desktop
+Spec length: 2000 chars, 49 lines
+============================================================
+i.
+The specification should be at least:
+ii.
+Form Factor & Dimensions: 8.2 L small-form-factor chassis,
+92.5 × 291.7 × 339.5 mm (W × D × H), ≈ 4.63 kg
+iii.
+Processor: 13th Gen Intel Core i5-13420H (8 cores: 4 P-cores +
+4 E-cores, 12 threads; P-core up to 4.6 GHz, E-core up to 3.4
+GHz; 12 MB cache)
+iv.
+Memory: Dual-channel DDR5-5200 via two SO-DIMM slots, up
+to 64 GB
+14 units
+TENDER FOR SUPPLY, DELIVERY, INSTALLATION, INTEGRATION, TESTING AND COMMISSIONING OF ROBOTICS EQUIPMENT AND ICT
+GOODS FOR PROCUREMENT PROJECT UNDER NEW BUILDING H4, CENTRE FOR ARTIFICIAL INTELLIGENCE & ROBOTICS (CAIRO), UTM
+KUALA LUMPUR
+_________________________
+_________________________
+_________________________
+keterangan berhubung dengan pengenalan petender dijadual ini/katalog/risalah teknikal.
+v.
+Storage & Expansion: Up to two M.2 PCIe 4.0 ×4 SSDs
+(2242/2280, up to 1 TB each); one low-profile PCIe 4.0 ×16
+slot; one PCIe 3.0 ×1 slot; third M.2 slot for WLAN
+vi.
+Graphics: Integrated Intel UHD Graphics supporting 4K @ 60
+Hz (HDMI 2.1) or 1920 × 1200 @ 60 Hz (VGA); optional 4 GB
+GDDR6 discrete GPU
+vii. Power Supply: Fixed 180 W (85 % efficiency) PSU with remote-
+boot ("Smart Power On") support
+viii. Connectivity: Gigabit Ethernet; Intel Wi-Fi 6 (802.11ax 2×2) +
+Bluetooth 5.2
+ix.
+Front I/O: 1× USB-C 3.2 Gen 1 (5 Gbps, 15 W PD), 2× USB-A
+3.2 Gen 1 (5 Gbps), headphone/mic combo jack, mic-only jack
+x.
+Rear I/O: 2× USB-A 2.0, 2× USB-A 3.2 Gen 1 (one with Smart
+Power On), HDMI 2.1, VGA, RJ-45 LAN, line-out; optional
+serial/parallel ports
+xi.
+Security & Manageability: Firmware TPM 2.0; BIOS-level
+admin/hard-disk/power-on passwords; Secure Boot; Smart USB
+TENDER FOR SUPPLY, DELIVERY, INSTALLATION, INTEGRATION, TESTING AND COMMISSIONING OF ROBOTICS EQUIPMENT AND ICT
+GOODS FOR PROCUREMENT PROJECT UNDER NEW BUILDING H4, CENTRE FOR ARTIFICIAL INTELLIGENCE & ROBOTICS (CAIRO), UTM
+KUALA LUMPUR
+_________________________
+_________________________
+_________________________
+keterangan berhubung dengan pengenalan

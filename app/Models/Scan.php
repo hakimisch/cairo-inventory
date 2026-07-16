@@ -16,7 +16,7 @@ class Scan extends Model
         'scan_type',
         'scanner_user_id',
         'scanned_at',
-        'do_line_item_id',
+        'master_item_id',
         'asset_id',
         'location',
         'result',
@@ -34,9 +34,9 @@ class Scan extends Model
         return $this->belongsTo(User::class, 'scanner_user_id');
     }
 
-    public function doLineItem(): BelongsTo
+    public function masterItem(): BelongsTo
     {
-        return $this->belongsTo(DoLineItem::class);
+        return $this->belongsTo(MasterItem::class);
     }
 
     public function asset(): BelongsTo

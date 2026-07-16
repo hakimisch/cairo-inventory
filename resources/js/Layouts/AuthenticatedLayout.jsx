@@ -262,12 +262,49 @@ export default function AuthenticatedLayout({ header, children }) {
                        LOGISTIK & PENERIMAAN
                        ═══════════════════════════════════════════════════════ */}
                     <NavSection label="Logistik & Penerimaan">
+
+                        {/* ── Penerimaan & Pengesahan (Pipeline Flow) ── */}
+                        <p style={{
+                            fontSize     : '9px',
+                            fontWeight   : 700,
+                            letterSpacing: '0.1em',
+                            textTransform: 'uppercase',
+                            color        : 'rgba(248,166,23,0.6)',
+                            padding      : '6px 12px 2px',
+                            marginBottom : 2,
+                        }}>
+                            Penerimaan & Pengesahan
+                        </p>
                         <NavLink
-                            href={route('items.index')}
-                            icon="▤"
-                            label="Items Overview"
-                            active={isActive('items.index')}
+                            href={route('import.index')}
+                            icon="⬆"
+                            label="Import PDF / CSV / Excel"
+                            active={isActive('import.*')}
                         />
+                        <NavLink
+                            href={route('verification.index')}
+                            icon="◈"
+                            label="Verification Pipeline + Registry"
+                            active={isActive('verification.*')}
+                        />
+                        <NavLink
+                            href={'/verification?scan=1'}
+                            icon="◉"
+                            label="Scanner S/N / Barcode"
+                        />
+
+                        {/* ── Pendaftaran (Registry & Forms) ── */}
+                        <p style={{
+                            fontSize     : '9px',
+                            fontWeight   : 700,
+                            letterSpacing: '0.1em',
+                            textTransform: 'uppercase',
+                            color        : 'rgba(248,166,23,0.6)',
+                            padding      : '12px 12px 2px',
+                            marginBottom : 2,
+                        }}>
+                            Pendaftaran
+                        </p>
                         <NavLink
                             href={route('receivings.index')}
                             icon="◫"
@@ -279,36 +316,6 @@ export default function AuthenticatedLayout({ header, children }) {
                             icon="◈"
                             label="PA-2/3 Pendaftaran Aset"
                             active={isActive('assets.*')}
-                        />
-                        <NavLink
-                            href={route('delivery-orders.index')}
-                            icon="◰"
-                            label="DO Penghantaran Barang"
-                            active={isActive('delivery-orders.*')}
-                        />
-                        <NavLink
-                            href={route('scanner.index')}
-                            icon="◉"
-                            label="Scanner S/N Barcode"
-                            active={isActive('scanner.*')}
-                        />
-                        <NavLink
-                            href={route('delivery-orders.verification')}
-                            icon="◈"
-                            label="Verification Dashboard"
-                            active={isActive('delivery-orders.verification')}
-                        />
-                    </NavSection>
-
-                    {/* ═══════════════════════════════════════════════════════
-                       PDF IMPORT (OCR)
-                       ═══════════════════════════════════════════════════════ */}
-                    <NavSection label="Procurement Import">
-                        <NavLink
-                            href={route('import.index')}
-                            icon="⬆"
-                            label="Import PDF / CSV / Excel"
-                            active={isActive('import.*')}
                         />
                     </NavSection>
 
