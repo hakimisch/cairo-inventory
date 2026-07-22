@@ -235,7 +235,7 @@ export default function AuthenticatedLayout({ header, children }) {
                             label="Direktori KEW.PA"
                             active={route().current('kewpa.directory')}
                         />
-                        {user.role === 'admin' ? (
+                        {['admin', 'superadmin'].includes(user.role) ? (
                             <NavLink
                                 href={route('admin.dashboard')}
                                 icon="▣"
@@ -493,9 +493,9 @@ export default function AuthenticatedLayout({ header, children }) {
                     </NavSection>
 
                     {/* ═══════════════════════════════════════════════════════
-                       LAPORAN (Admin)
+                       LAPORAN (view_reports)
                        ═══════════════════════════════════════════════════════ */}
-                    {user.role === 'admin' && (
+                    {['admin', 'superadmin', 'manager', 'auditor'].includes(user.role) && (
                         <NavSection label="Laporan Tahunan">
                             <NavLink
                                 href={route('reports.kewpa4')}
@@ -527,14 +527,16 @@ export default function AuthenticatedLayout({ header, children }) {
                     {/* ═══════════════════════════════════════════════════════
                        SISTEM (Admin)
                        ═══════════════════════════════════════════════════════ */}
-                    {user.role === 'admin' && (
+                    {['admin', 'superadmin'].includes(user.role) && (
                         <NavSection label="Sistem">
-                            <NavLink
-                                href={route('admin.users.index')}
-                                icon="👤"
-                                label="Pengurusan Pengguna"
-                                active={isActive('admin.users.*')}
-                            />
+                            {user.role === 'superadmin' && (
+                                <NavLink
+                                    href={route('admin.users.index')}
+                                    icon="👤"
+                                    label="Pengurusan Pengguna"
+                                    active={isActive('admin.users.*')}
+                                />
+                            )}
                             <NavLink
                                 href={route('suppliers.index')}
                                 icon="◈"

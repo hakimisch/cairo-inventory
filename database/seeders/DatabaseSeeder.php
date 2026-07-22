@@ -15,28 +15,51 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        // ─── 1. Users ────────────────────────────────────────────────────────
+        // ─── 1. Users (5 roles for RBAC testing) ──────────────────────────────
         
-        // YOUR CUSTOM ADMIN ACCOUNT
+        // 1. superadmin — full system access, can manage users
         $superAdmin = User::create([
-            'name'     => 'Super Admin',
-            'email'    => 'user@gmail.com',
-            'password' => Hash::make('password'),
-            'role'     => 'admin',
+            'name'              => 'Super Admin',
+            'email'             => 'user@gmail.com',
+            'password'          => Hash::make('password'),
+            'role'              => 'superadmin',
+            'email_verified_at' => now(),
         ]);
 
+        // 2. admin — can verify, CRUD assets, view reports
         $admin = User::create([
-            'name'     => 'Pentadbir Sistem CAIRO',
-            'email'    => 'admin@cairo.utm',
-            'password' => Hash::make('password'),
-            'role'     => 'admin',
+            'name'              => 'Pentadbir Sistem CAIRO',
+            'email'             => 'admin@cairo.utm',
+            'password'          => Hash::make('password'),
+            'role'              => 'admin',
+            'email_verified_at' => now(),
         ]);
 
+        // 3. manager — can view reports only
+        User::create([
+            'name'              => 'Dr. Ahmad Faizal',
+            'email'             => 'manager@cairo.utm',
+            'password'          => Hash::make('password'),
+            'role'              => 'manager',
+            'email_verified_at' => now(),
+        ]);
+
+        // 4. auditor — can view reports only
+        User::create([
+            'name'              => 'En. Azman Hashim',
+            'email'             => 'auditor@cairo.utm',
+            'password'          => Hash::make('password'),
+            'role'              => 'auditor',
+            'email_verified_at' => now(),
+        ]);
+
+        // 5. user / staff — no special permissions, can only receive/scan/import
         $staff = User::create([
-            'name'     => 'Ts. Dr. Mohd Ibrahim',
-            'email'    => 'ibrahim@cairo.utm',
-            'password' => Hash::make('password'),
-            'role'     => 'user',
+            'name'              => 'Ts. Dr. Mohd Ibrahim',
+            'email'             => 'ibrahim@cairo.utm',
+            'password'          => Hash::make('password'),
+            'role'              => 'user',
+            'email_verified_at' => now(),
         ]);
 
         // ─── 2. Receivings (KEW.PA-1) ────────────────────────────────────────
@@ -287,5 +310,8 @@ class DatabaseSeeder extends Seeder
 
         // ─── 8. Seed master equipment register (156 items from Excel) ────────
         $this->call(MasterItemSeeder::class);
+
+        // ─── 9. Deterministic admin account (for deployments) ────────────
+        $this->call(AdminUserSeeder::class);
     }
 }

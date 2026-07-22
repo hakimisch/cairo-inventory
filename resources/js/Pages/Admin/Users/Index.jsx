@@ -19,18 +19,67 @@ const inputStyle = { width: '100%', padding: '9px 12px', borderRadius: 8, border
 const inputSmallStyle = { ...inputStyle, padding: '7px 10px', fontSize: '12px' };
 const labelStyle = { display: 'block', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.07em', color: UTM.gray500, marginBottom: 4 };
 
+// ─── Role badge colours (UTM maroon palette) ──────────────────────────────────
+const ROLE_STYLES = {
+    superadmin: { bg: '#5C001F', text: '#FFFFFF', border: '#5C001F' },
+    admin:      { bg: '#F3E0E5', text: '#5C001F', border: '#E8C0CB' },
+    manager:    { bg: '#FFF8E8', text: '#B8860B', border: '#F0E0B0' },
+    auditor:    { bg: '#E0F4F4', text: '#0B7A7A', border: '#B0E0E0' },
+    user:       { bg: '#E6F4EC', text: '#1A7A3C', border: '#B2DFC2' },
+};
+
+const ROLE_LABELS = {
+    superadmin: 'Super Admin',
+    admin:      'Pentadbir',
+    manager:    'Pengurus',
+    auditor:    'Auditor',
+    user:       'Staf Biasa',
+};
+
+// ─── Permission label translations ────────────────────────────────────────────
+const PERM_LABELS = {
+    manage_users: 'Urus Pengguna',
+    verify:       'Verifikasi',
+    crud_assets:  'Urus Aset',
+    view_reports: 'Laporan',
+    view_admin:   'Admin',
+};
+
 function RoleBadge({ role }) {
-    const isAdmin = role === 'admin';
+    const s = ROLE_STYLES[role] || ROLE_STYLES.user;
     return (
         <span style={{
             display: 'inline-block', padding: '3px 10px', borderRadius: '999px', fontSize: '11px', fontWeight: 700,
-            background: isAdmin ? '#F3E0E5' : '#E6F4EC',
-            color: isAdmin ? UTM.maroon : '#1A7A3C',
-            border: `1px solid ${isAdmin ? '#E8C0CB' : '#B2DFC2'}`,
+            background: s.bg,
+            color: s.text,
+            border: `1px solid ${s.border}`,
             whiteSpace: 'nowrap',
         }}>
-            {isAdmin ? 'Pentadbir Utama' : 'Staf Biasa'}
+            {ROLE_LABELS[role] || role}
         </span>
+    );
+}
+
+function PermissionTags({ role, roles }) {
+    const cfg = roles?.[role];
+    const perms = cfg?.can;
+    if (!perms || perms.length === 0) {
+        return <span style={{ fontSize: '10px', color: UTM.gray500, fontStyle: 'italic' }}>Tiada kebenaran</span>;
+    }
+    return (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+            {perms.map(p => (
+                <span key={p} style={{
+                    display: 'inline-block', padding: '1px 7px', borderRadius: 4, fontSize: '9px', fontWeight: 600,
+                    background: UTM.gray100,
+                    color: UTM.gray700,
+                    border: `1px solid ${UTM.gray300}`,
+                    whiteSpace: 'nowrap',
+                }}>
+                    {PERM_LABELS[p] || p}
+                </span>
+            ))}
+        </div>
     );
 }
 
@@ -38,16 +87,21 @@ function SelectRole({ value, onChange, small }) {
     const style = small ? inputSmallStyle : inputStyle;
     return (
         <select style={style} value={value} onChange={onChange}>
-            <option value="user">Staf Biasa (User)</option>
+            <option value="superadmin">Super Admin</option>
             <option value="admin">Pentadbir (Admin)</option>
+            <option value="manager">Pengurus (Manager)</option>
+            <option value="auditor">Auditor</option>
+            <option value="user">Staf Biasa (Pengguna)</option>
         </select>
     );
 }
 
-export default function UserIndex({ users }) {
+export default function UserIndex({ users, roles }) {
     const [showAddForm, setShowAddForm] = useState(false);
     const [editingUserId, setEditingUserId] = useState(null);
     const [deleteConfirmId, setDeleteConfirmId] = useState(null);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [roleFilter, setRoleFilter] = useState('all');
 
     const { data, setData, post, put, delete: destroy, processing, errors, reset, clearErrors } = useForm({
         name: '',
@@ -56,7 +110,17 @@ export default function UserIndex({ users }) {
         role: 'user',
     });
 
-    // ── Handlers ───────────────────────────────────────────────────────────────
+    // ── Derived data ──────────────────────────────────────────────────────────
+
+    const filteredUsers = users.filter(user => {
+        const matchesSearch = searchTerm === '' ||
+            user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.email.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+        return matchesSearch && matchesRole;
+    });
+
+    // ── Handlers ──────────────────────────────────────────────────────────────
 
     const openAddForm = () => {
         clearErrors();
@@ -150,6 +214,33 @@ export default function UserIndex({ users }) {
             <div style={{ background: UTM.gray50, minHeight: '100vh', padding: '28px 24px' }}>
                 <div style={{ maxWidth: 1000, margin: '0 auto' }}>
 
+                    {/* ── Search & Filter Bar ── */}
+                    <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                        <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+                            <input
+                                type="text"
+                                placeholder="Cari pengguna (nama atau e-mel)..."
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                                style={{ ...inputStyle, padding: '9px 12px', fontSize: '13px' }}
+                            />
+                        </div>
+                        <div style={{ flex: '0 1 200px', minWidth: 0 }}>
+                            <select
+                                value={roleFilter}
+                                onChange={e => setRoleFilter(e.target.value)}
+                                style={{ ...inputStyle, padding: '9px 12px', fontSize: '13px' }}
+                            >
+                                <option value="all">Semua Peranan</option>
+                                <option value="superadmin">Super Admin</option>
+                                <option value="admin">Pentadbir</option>
+                                <option value="manager">Pengurus</option>
+                                <option value="auditor">Auditor</option>
+                                <option value="user">Staf Biasa</option>
+                            </select>
+                        </div>
+                    </div>
+
                     <div style={{ background: UTM.white, borderRadius: 12, boxShadow: '0 1px 4px rgba(92,0,31,0.07)', overflow: 'hidden' }}>
                         <div style={{ overflowX: 'auto', width: '100%' }}>
                             <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse' }}>
@@ -157,7 +248,7 @@ export default function UserIndex({ users }) {
                                     <tr>
                                         <th style={thStyle}>Nama Penuh</th>
                                         <th style={thStyle}>E-mel</th>
-                                        <th style={thStyle}>Peranan (Role)</th>
+                                        <th style={thStyle}>Peranan & Kebenaran</th>
                                         <th style={thStyle}>Tarikh Daftar</th>
                                         <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
                                     </tr>
@@ -203,7 +294,7 @@ export default function UserIndex({ users }) {
                                     )}
 
                                     {/* ── User Rows ── */}
-                                    {users.map((user, idx) => {
+                                    {filteredUsers.map((user, idx) => {
                                         const isEditing = editingUserId === user.id;
                                         return (
                                             <tr key={user.id} style={{ background: idx % 2 === 0 ? UTM.white : UTM.gray50, transition: 'background 0.12s' }} onMouseEnter={e => { if (!isEditing) e.currentTarget.style.background = '#FFF5E8'; }} onMouseLeave={e => { if (!isEditing) e.currentTarget.style.background = idx % 2 === 0 ? UTM.white : UTM.gray50; }}>
@@ -249,6 +340,7 @@ export default function UserIndex({ users }) {
                                                         <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>{user.email}</td>
                                                         <td style={{ padding: '14px 20px' }}>
                                                             <RoleBadge role={user.role} />
+                                                            <PermissionTags role={user.role} roles={roles} />
                                                         </td>
                                                         <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>{new Date(user.created_at).toLocaleDateString('ms-MY')}</td>
                                                         <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
@@ -279,14 +371,21 @@ export default function UserIndex({ users }) {
                                         );
                                     })}
 
-                                    {users.length === 0 && !showAddForm && (
-                                        <tr><td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: UTM.gray500, fontSize: '14px' }}>Tiada pengguna didaftarkan. Klik "+ Pengguna Baru" untuk mendaftar.</td></tr>
+                                    {filteredUsers.length === 0 && !showAddForm && (
+                                        <tr><td colSpan={5} style={{ padding: '48px', textAlign: 'center', color: UTM.gray500, fontSize: '14px' }}>
+                                            {roleFilter !== 'all' || searchTerm !== ''
+                                                ? 'Tiada pengguna dijumpai dengan kriteria tersebut.'
+                                                : 'Tiada pengguna didaftarkan. Klik "+ Pengguna Baru" untuk mendaftar.'}
+                                        </td></tr>
                                     )}
                                 </tbody>
                             </table>
                         </div>
                         <div style={{ padding: '12px 20px', borderTop: `1px solid ${UTM.gray100}`, background: UTM.gray50, fontSize: '12px', color: UTM.gray500 }}>
-                            Jumlah Pengguna: <strong style={{ color: UTM.maroon }}>{users.length}</strong>
+                            Jumlah Pengguna: <strong style={{ color: UTM.maroon }}>{filteredUsers.length}</strong>
+                            {filteredUsers.length !== users.length && (
+                                <span style={{ marginLeft: 8, color: UTM.gray300 }}>(ditapis daripada {users.length})</span>
+                            )}
                         </div>
                     </div>
 

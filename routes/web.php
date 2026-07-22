@@ -40,17 +40,19 @@ Route::get('/', function () {
 });
 
 // ─── Admin Group ───
-Route::middleware(['auth', 'verified', 'admin'])->prefix('admin')->name('admin.')->group(function () {
+Route::middleware(['auth', 'verified', 'permission:view_admin'])->prefix('admin')->name('admin.')->group(function () {
     
     // Admin Dashboard: /admin/dashboard
     Route::get('/dashboard', [AdminDashboardController::class, 'index'])->name('dashboard');
     
-    // Admin Users
-    Route::resource('users', AdminUserController::class)->except(['create', 'show', 'edit']);
+    // Admin Users — requires manage_users permission
+    Route::middleware('permission:manage_users')->group(function () {
+        Route::resource('users', AdminUserController::class)->except(['create', 'show', 'edit']);
+    });
 });
  
 // ── Annual report forms (admin-only) ─────────────────────────────────────────
-Route::middleware(['auth', 'verified', 'admin'])->prefix('reports')->name('reports.')->group(function () {
+Route::middleware(['auth', 'verified', 'permission:view_reports'])->prefix('reports')->name('reports.')->group(function () {
  
     // KEW.PA-4 — Senarai Harta Tetap
     Route::get('/kewpa4',          [ReportController::class, 'kewpa4'])->name('kewpa4');
@@ -106,10 +108,14 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/vehicle-disposals',  [VehicleDisposalAssessmentController::class, 'indexAll'])->name('vehicle-disposals.index');
     Route::get('/disposals',          [AssetDisposalController::class, 'index'])->name('disposals.index');
     Route::get('/loss-reports',       [AssetLossReportController::class, 'index'])->name('loss-reports.index');
-    Route::post('/assets', [AssetController::class, 'store'])->name('assets.store'); // For the Add Asset form
+
+    // ── Asset CRUD — admin-only (create / update / delete) ──────────────────
+    Route::middleware('permission:crud_assets')->group(function () {
+        Route::post('/assets', [AssetController::class, 'store'])->name('assets.store');
+        Route::put('/assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
+        Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
+    });
     Route::get('/assets/{asset}/edit', [AssetController::class, 'edit'])->name('assets.edit');
-    Route::put('/assets/{asset}', [AssetController::class, 'update'])->name('assets.update');
-    Route::delete('/assets/{asset}', [AssetController::class, 'destroy'])->name('assets.destroy');
     Route::post('/assets/{asset}/placements', [AssetController::class, 'storePlacement'])->name('assets.placements.store');
     Route::get('/assets/{asset}/kewpa2', [AssetController::class, 'kewpa2'])->name('assets.kewpa2');
     Route::get('/assets/{asset}/kewpa3', [AssetController::class, 'kewpa3'])->name('assets.kewpa3');
@@ -306,7 +312,7 @@ Route::permanentRedirect('/items', '/verification?tab=registry');
 Route::middleware(['auth', 'verified'])->prefix('verification')->name('verification.')->group(function () {
     Route::get('/',                    [VerificationController::class, 'index'])->name('index');
     Route::post('/{masterItem}/receive', [VerificationController::class, 'receive'])->name('receive');
-    Route::post('/{masterItem}/verify', [VerificationController::class, 'verify'])->name('verify');
+    Route::post('/{masterItem}/verify', [VerificationController::class, 'verify'])->middleware('permission:verify')->name('do-verify');
     Route::get('/stats',               [VerificationController::class, 'stats'])->name('stats');
 });
 
@@ -338,7 +344,7 @@ Route::middleware(['auth', 'verified'])->prefix('pdf-import')->name('pdf-import.
 // ── Unified Import (PDF + CSV + Excel + Paste) ─────────────────────────────
 Route::middleware(['auth', 'verified'])->prefix('import')->name('import.')->group(function () {
     Route::get('/',              [\App\Http\Controllers\ImportController::class, 'index'])->name('index');
-    Route::post('/preview',      [\App\Http\Controllers\ImportController::class, 'preview'])->name('preview');
+    Route::match(['get', 'post'], '/preview', [\App\Http\Controllers\ImportController::class, 'preview'])->name('preview');
     Route::post('/confirm',      [\App\Http\Controllers\ImportController::class, 'confirm'])->name('confirm');
 });
 
