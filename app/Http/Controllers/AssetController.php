@@ -39,8 +39,8 @@ class AssetController extends Controller
             'status'         => 'required|in:active,repair,disposed',
         ]);
 
-        // Enforce classification by price (RM1000 threshold)
-        $validated['asset_type'] = $validated['purchase_price'] > 1000 ? 'fixed_asset' : 'inventory';
+        // Enforce classification by price (RM2000 threshold — KEW.PA-2/PA-3 boundary)
+        $validated['asset_type'] = $validated['purchase_price'] >= 2000 ? 'fixed_asset' : 'inventory';
 
         Asset::create($validated);
         return redirect()->back();
@@ -54,9 +54,9 @@ class AssetController extends Controller
 
         $receiving->update(['status' => 'accepted']);
 
-        // Auto-classify by price
+        // Auto-classify by price (RM2000 threshold — KEW.PA-2/PA-3 boundary)
         $price             = $receiving->unit_price ?? 0.00;
-        $enforcedAssetType = $price > 1000 ? 'fixed_asset' : 'inventory';
+        $enforcedAssetType = $price >= 2000 ? 'fixed_asset' : 'inventory';
 
         // ─── Single asset creation ──────────────────────────────────────────
         $newAsset = Asset::create([

@@ -270,9 +270,12 @@ class VerificationController extends Controller
             'warranty_expiry'=> 'nullable|date',
         ]);
 
-        // Don't re-verify already-verified items
+        // Don't re-verify already-verified items, and don't bypass receive step
         if ($masterItem->status === 'verified') {
             return back()->withErrors(['item' => 'This item is already verified.']);
+        }
+        if ($masterItem->status !== 'diterima') {
+            return back()->withErrors(['item' => 'This item must be received before verification.']);
         }
 
         DB::transaction(function () use ($request, $masterItem) {
@@ -306,7 +309,7 @@ class VerificationController extends Controller
                 $today = date('Ymd');
                 $maxSeq = DB::table('assets')
                     ->where('asset_tag', 'LIKE', "AST-{$today}-%")
-                    ->max(DB::raw("CAST(SUBSTRING(asset_tag FROM 'AST-[0-9]{8}-([0-9]+)') AS INTEGER)"));
+                    ->max(DB::raw("CAST(SUBSTR(asset_tag, 14) AS INTEGER)"));
 
                 $seqNo = ($maxSeq ?? 0) + 1;
 
