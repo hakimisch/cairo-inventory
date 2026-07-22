@@ -36,12 +36,19 @@ class ImportController extends Controller
         $metadata = [];
         $sourceType = null;
 
+        // GET request — just redirect back to import form
+        if ($request->isMethod('get')) {
+            return redirect()->route('import.index');
+        }
+
         // Case 1: File upload
         if ($request->hasFile('file')) {
             $file = $request->file('file');
             $ext = strtolower($file->getClientOriginalExtension());
 
             if ($ext === 'pdf') {
+                // PDF OCR can take 60-180s — allow unlimited execution
+                set_time_limit(0);
                 $result = $this->parsePdf($file, $request->input('type_hint', 'auto'));
                 $items = $result['items'];
                 $metadata = $result['metadata'];

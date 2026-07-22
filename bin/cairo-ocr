@@ -54,20 +54,16 @@ from typing import Optional
 # ─── Attempt imports with helpful errors ─────────────────────────────────────
 
 def _find_tesseract():
-    """Locate tesseract executable — check common Windows + WSL paths."""
+    """Locate tesseract executable — check common paths."""
     candidates = [
         r"C:\Program Files\Tesseract-OCR\tesseract.exe",
         r"C:\Program Files (x86)\Tesseract-OCR\tesseract.exe",
         "/usr/bin/tesseract",
         "/usr/local/bin/tesseract",
-    ]
-    # Also check WSL mount
-    for p in [
+        # WSL mount of Windows tesseract
         "/mnt/c/Program Files/Tesseract-OCR/tesseract.exe",
         "/mnt/c/Program Files (x86)/Tesseract-OCR/tesseract.exe",
-    ]:
-        if os.path.exists(p):
-            return p
+    ]
     for p in candidates:
         if os.path.exists(p):
             return p
@@ -126,6 +122,9 @@ class ExtractedItem:
     category: Optional[str] = None
     section: Optional[str] = None
     notes: Optional[str] = None
+    # Bundle support: parent_item_code links sub-items to their parent
+    parent_item_code: Optional[str] = None
+    is_bundle_component: bool = False
 
 
 @dataclass
@@ -145,6 +144,78 @@ class ExtractionResult:
 
 
 # ─── Core OCR Engine ─────────────────────────────────────────────────────────
+
+def _get_ocr_tempdir() -> str:
+    """Get a temp directory accessible from both WSL and Windows tesseract.
+
+    On WSL: returns a /mnt/c/... path that Windows tesseract can read.
+    On Windows: returns the system temp directory (already accessible).
+    """
+    _is_wsl = os.path.exists('/proc/version') and 'microsoft' in open('/proc/version').read().lower()
+    if _is_wsl:
+        for _p in ['/mnt/c/Windows/Temp', '/mnt/c/Hakimi/Internship/System/cairo-inventory/tmp']:
+            if os.access(_p, os.W_OK) or os.access(os.path.dirname(_p), os.W_OK):
+                os.makedirs(_p, exist_ok=True)
+                return _p
+    return tempfile.gettempdir()
+
+
+def _get_ocr_langs() -> str:
+    """Determine OCR languages — prefer eng+msa, fall back to eng.
+
+    Checks:
+      1. TESSDATA_PREFIX env var → look for msa.traineddata
+      2. Common WSL path (/home/miisch/tessdata)
+      3. Windows tessdata directories (Program Files, AppData)
+      4. Downloads msa to writable AppData on Windows if missing
+    """
+    _data_dirs = []
+
+    # Env var
+    _env = os.environ.get('TESSDATA_PREFIX', '')
+    if _env:
+        _data_dirs.append(_env)
+
+    # WSL-specific
+    if os.path.exists('/proc/version'):
+        _data_dirs.append('/home/miisch/tessdata')
+
+    # Windows paths
+    for _base in [os.environ.get('ProgramFiles', r'C:\\Program Files'),
+                  os.environ.get('ProgramFiles(x86)', r'C:\\Program Files (x86)')]:
+        _p = os.path.join(_base, 'Tesseract-OCR', 'tessdata')
+        _data_dirs.append(_p)
+
+    # Check each directory for msa.traineddata
+    for _d in _data_dirs:
+        if os.path.exists(os.path.join(_d, 'msa.traineddata')):
+            return 'eng+msa'
+        if os.path.exists(os.path.join(_d, 'eng.traineddata')):
+            # msa not here, but eng is — use eng only for this dir
+            pass  # continue checking other dirs
+
+    # Try to download msa to a writable AppData location
+    if os.name == 'nt' or ('TESSDATA_PREFIX' not in os.environ
+                           and os.path.exists('/proc/version')
+                           and 'microsoft' in open('/proc/version').read().lower()):
+        _local = os.environ.get('LOCALAPPDATA',
+                                os.path.join(os.path.expanduser('~'), 'AppData', 'Local'))
+        _target = os.path.join(_local, 'Tesseract-OCR', 'tessdata', 'msa.traineddata')
+        if not os.path.exists(_target):
+            try:
+                os.makedirs(os.path.dirname(_target), exist_ok=True)
+                import urllib.request
+                urllib.request.urlretrieve(
+                    'https://github.com/tesseract-ocr/tessdata/raw/main/msa.traineddata',
+                    _target
+                )
+                # Also copy eng if needed (likely already exists)
+                return 'eng+msa'
+            except Exception:
+                pass
+
+    return 'eng'
+
 
 class OcrEngine:
     """Handles PDF text extraction — digital or scanned."""
@@ -252,19 +323,124 @@ class OcrEngine:
             mean = stat.mean[0]
             if mean < 50:  # Mostly black → invert
                 pil_img = ImageOps.invert(pil_img)
+                mean = 255 - mean
+
+            # Auto-contrast enhancement for very faint scanned pages
+            # Only apply when mean > 245 (very white, barely visible text)
+            if mean > 245:
+                from PIL import ImageOps as _imgops
+                # Moderate contrast stretch
+                pil_img = _imgops.autocontrast(pil_img, cutoff=3)
+                stat2 = ImageStat.Stat(pil_img)
+                mean = stat2.mean[0]
+
+            # Check image statistics for scribble/handwriting-only page detection
+            from PIL import ImageStat
+            stat = ImageStat.Stat(pil_img)
+            mean = stat.mean[0]
+
+            # ── OCR with direct subprocess ─────────────────────────────────
+            # pytesseract creates temp files in WSL /tmp/ and passes WSL
+            # paths to Windows tesseract.exe which can't read them.
+            # Use direct subprocess with proper native paths instead.
+            import subprocess as _sp, uuid as _uuid, shutil as _shutil
+            _tess = pytesseract.pytesseract.tesseract_cmd
+            _uid = _uuid.uuid4().hex[:8]
+            _on_wsl = os.path.exists('/proc/version') and 'microsoft' in open('/proc/version').read().lower()
+
+            # Use TESSDATA_PREFIX from environment if set (recommended for native Windows)
+            _tessdata_env = os.environ.get('TESSDATA_PREFIX', '')
+            if _tessdata_env and os.path.isdir(_tessdata_env):
+                _tessdata_dir = _tessdata_env
+            else:
+                _tess_bin_dir = os.path.dirname(_tess)
+                _tessdata_dir = os.path.join(_tess_bin_dir, 'tessdata')
+
+            # Ensure msa+eng traineddata are available in the tessdata dir
+            # On WSL, copy to a writable Windows-accessible location
+            if _on_wsl:
+                _tessdata_dir = '/mnt/c/Windows/Temp/tessdata_cairo'
+                for _tf in ['msa.traineddata', 'eng.traineddata']:
+                    _src = os.path.join('/home/miisch/tessdata', _tf)
+                    _dst = os.path.join(_tessdata_dir, _tf)
+                    if os.path.exists(_src) and not os.path.exists(_dst):
+                        _shutil.copy2(_src, _dst)
+
+            # Build temp file paths — native for the OS we're running on
+            if _on_wsl:
+                _tmp_dir = '/mnt/c/Windows/Temp'
+                _img_path = os.path.join(_tmp_dir, 'cairo_img_' + _uid + '.png')
+                _out_base = os.path.join(_tmp_dir, 'cairo_out_' + _uid)
+                _img_win = _img_path.replace('/mnt/c/', 'C:\\\\').replace('/', '\\\\')
+                _out_win = _out_base.replace('/mnt/c/', 'C:\\\\').replace('/', '\\\\')
+                _td_win = _tessdata_dir.replace('/mnt/c/', 'C:\\\\').replace('/', '\\\\')
+            else:
+                _tmp_dir = os.environ.get('TEMP', os.environ.get('TMP', tempfile.gettempdir()))
+                _img_path = os.path.join(_tmp_dir, 'cairo_img_' + _uid + '.png')
+                _out_base = os.path.join(_tmp_dir, 'cairo_out_' + _uid)
+                _img_win = _img_path
+                _out_win = _out_base
+                _td_win = _tessdata_dir
+
+            pil_img.save(_img_path)
+
+            # TESSDATA_PREFIX env var is ignored by some tesseract versions
+            # on WSL. Use --tessdata-dir CLI arg instead.
+            _tess_env = os.environ.copy()
 
             # Try PSM 12 first, fall back to PSM 1
-            text = pytesseract.image_to_string(
-                pil_img, lang="eng+msa", config="--psm 12"
-            )
-            if len(text.strip()) < 50:
-                text2 = pytesseract.image_to_string(
-                    pil_img, lang="eng+msa", config="--psm 1"
-                )
-                if len(text2.strip()) > len(text.strip()):
-                    text = text2
+            text = ""
+            for _psm in ['12', '1']:
+                try:
+                    _sp.run(
+                        [_tess, _img_win, _out_win, '-l', 'eng+msa', '--psm', _psm,
+                         '--tessdata-dir', _td_win],
+                        capture_output=True, text=True, env=_tess_env, timeout=30
+                    )
+                    _out_file = _out_base + '.txt'
+                    if os.path.exists(_out_file):
+                        with open(_out_file) as _f:
+                            _t = _f.read().strip()
+                        if len(_t) > len(text):
+                            text = _t
+                        os.remove(_out_file)
+                        if len(_t) > 50:
+                            break
+                except Exception:
+                    pass
 
-            return text.strip()
+            # Clean up temp image
+            try:
+                os.remove(_img_path)
+            except OSError:
+                pass
+
+            if not text:
+                return ""
+
+            # ── Scribble/handwriting page detection ──────────────────────
+            # Handwritten annotation pages have very high mean brightness
+            # and produce OCR output with lots of special chars and short lines
+            if mean > 240 and len(text) > 0:
+                lines = text.split("\n")
+                non_empty = [l for l in lines if l.strip()]
+                if non_empty:
+                    # Count "scribble" lines: very short, mostly special chars, or matching
+                    # known scribble patterns (e.g. "~key", "SUC 260", "~o", "¥")
+                    special_chars = sum(1 for l in non_empty
+                                        if sum(1 for c in l if not c.isalnum() and not c.isspace()) > 3
+                                        or len(l.strip()) < 5)
+                    scribble_ratio = special_chars / len(non_empty) if non_empty else 1.0
+                    if scribble_ratio > 0.6:
+                        return "[SCRIBBLE PAGE — handwritten annotations, no structured text]"
+
+            # Low output check: if OCR produced very little meaningful text on a
+            # high-brightness page, it's likely unreadable handwriting
+            meaningful = sum(1 for c in text if c.isalnum())
+            if mean > 235 and meaningful < 20 and len(text) > 0:
+                return "[SCRIBBLE PAGE — handwritten annotations, no structured text]"
+
+            return text
         except Exception as e:
             return f"[OCR error: {e}]"
 
@@ -650,36 +826,155 @@ class DocumentParser:
         return items
 
     def _parse_do_items(self) -> list:
-        """Parse DO items — handles two formats:
+        """Parse DO items — tries all known DO formats and picks the best result.
 
-        Format A (DOTCOM DO — ACKNOWLEDGEMENT GOODS):
-          Item codes like 1.1.3, 1.1.3.2, 1.5.1.9
-          Category headers: Office Equipments, Security Access, Multimedia, etc.
-          S/N lines: 1. S/N : XXXX or S/N: XXXX
-          "no SN" → has_serial = False
+        Delegates to _parse_do_items_hybrid() which runs Format A, Format B,
+        and Table Format parsers, then selects or merges the best output.
+        """
+        return self._parse_do_items_hybrid()
 
-        Format B (SNS DO — Delivery Order):
-          Numbered items 1-18
-          Quantity explicitly listed (e.g. "36" for 36 sensors)
-          "no SN" → has_serial = False
-          "refer attachment" → generic item
+    def _extract_bundle_components(self, description: str) -> list[dict]:
+        """Scan a DO item's description for bundled accessories.
+
+        Detects patterns like:
+          - "Wireless Mouse 14" / "Wireless Keyboard 14"
+          - "Wireless Headphones 1" / "Wired Keyboard"
+          - "4TB External SSD 4" (when bundled as sub-item)
+
+        Each component is returned as {name, qty, brand} dict.
+        """
+        components = []
+        if not description:
+            return components
+
+        # Known accessory patterns (case-insensitive)
+        ACCESSORY_PATTERNS = [
+            r"(Wireless\s+Mouse)\s*(\d+)?",
+            r"(Wired\s+Keyboard)\s*(\d+)?",
+            r"(Wireless\s+Keyboard)\s*(\d+)?",
+            r"(Wireless\s+Headphones?)\s*(\d+)?",
+            r"(Mouse)\s*(\d+)?",
+            r"(Keyboard)\s*(\d+)?",
+            r"(Headphones?)\s*(\d+)?",
+            r"(External\s+SSD)\s*(\d+)?",
+            r"(Micro\s+SD\s+Card)\s*(\d+)?",
+        ]
+
+        lines = description.replace(", ", "\n").split("\n")
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            i += 1
+            if not line:
+                continue
+
+            for pat in ACCESSORY_PATTERNS:
+                m = re.match(pat, line, re.IGNORECASE)
+                if m:
+                    name = m.group(1).strip()
+                    qty = int(m.group(2)) if m.group(2) else 1
+                    brand = None
+                    # Next line might be the brand/model (e.g. "LOGITECH / MX Master 3S")
+                    if i < len(lines):
+                        next_line = lines[i].strip()
+                        if "/" in next_line or any(b in next_line.upper()
+                           for b in ["LOGITECH", "SONY", "ASUS", "SAMSUNG", "ADATA"]):
+                            brand = self._extract_brand(next_line)
+                            i += 1
+                    components.append({"name": name, "qty": qty, "brand": brand})
+                    break
+
+        return components
+
+    # ── Hybrid DO format: run all parsers, pick best ──────────────────────
+
+    def _parse_do_items_hybrid(self) -> list:
+        """Run Format A, Format B, and Table Format parsers, return best result.
+
+        The SNS DO PDF can contain any combination of:
+          - Format A: item codes like 1.1.1.1, 2.4.3.9 (DOTCOM-style)
+          - Format B: numbered items 1-18 (SNS table-style)
+          - Table Format: "NO. Serial Number ITEM/PART NO./DESCRIPTION QTy" columns
+
+        Strategy: run each parser and pick/merge the best result.
+        """
+        def _score_items(items: list) -> float:
+            """Score item quality: 0.0 (worst) to 1.0 (best)."""
+            if not items:
+                return 0.0
+            total = len(items)
+            has_good_desc = sum(1 for i in items
+                                if i.description and len(i.description) > 15)
+            has_brand = sum(1 for i in items if i.brand)
+            has_code = sum(1 for i in items if i.item_code)
+            has_sn = sum(1 for i in items if i.serial_number)
+            # Description quality: penalize garbage text (high special-char ratio)
+            clean_desc = 0
+            for i in items:
+                if i.description:
+                    words = [w for w in i.description.split()
+                             if any(c.isalpha() for c in w)]
+                    special_ratio = sum(1 for c in i.description
+                                        if not c.isalnum() and not c.isspace()) / max(len(i.description), 1)
+                    if special_ratio < 0.3 and len(words) >= 2:
+                        clean_desc += 1
+            score = 0.0
+            score += 0.25 * (has_good_desc / total)
+            score += 0.20 * (has_brand / total)
+            score += 0.20 * (has_code / total)
+            score += 0.15 * (has_sn / total)
+            score += 0.20 * (clean_desc / total)
+            return score
+
+        # ── Try each parser ────────────────────────────────────────────
+        results = []
+        for name, parser_fn in [
+            ("Format A (item codes)", self._parse_do_format_a),
+            ("Format B (numbered items)", self._parse_do_format_b),
+            ("Table Format (NO. Serial Number...)", self._parse_do_table_format),
+        ]:
+            try:
+                items = parser_fn()
+                score = _score_items(items)
+                results.append((score, items, name))
+            except Exception as e:
+                results.append((0.0, [], f"{name} error: {e}"))
+
+        # Pick best
+        results.sort(key=lambda x: x[0], reverse=True)
+        best_score, best_items, best_name = results[0]
+
+        # Try merging if two parsers scored similarly
+        if len(results) > 1:
+            second_score = results[1][0]
+            if second_score > 0.2 and second_score >= best_score * 0.6:
+                merged = self._merge_do_results(results)
+                if len(merged) > len(best_items):
+                    return merged
+
+        return best_items
+
+    def _merge_do_results(self, results: list) -> list:
+        """Merge results from multiple DO parsers, deduplicating by description."""
+        seen_descs = set()
+        merged = []
+        for score, items, name in sorted(results, key=lambda x: x[0], reverse=True):
+            for item in items:
+                key = (item.description or "").strip().lower()[:50]
+                if key and key not in seen_descs:
+                    seen_descs.add(key)
+                    merged.append(item)
+        return merged
+
+    def _parse_do_format_a(self) -> list:
+        """Parse Format A: DOTCOM-style item codes like '1.1.3.2 POE Switch'.
+        
+        Handles SNS DO documents that use Format A-style item codes
+        on pages that DON'T have the "NO. Serial Number..." table header.
         """
         items = []
         current_category = "GENERAL"
 
-        # ── Detect DO format ─────────────────────────────────────────────
-        text_upper = self.text.upper()
-        # Format B (SNS): numbered items like "1", "2"... in a table with NO. and QTY columns
-        has_numbered_table = bool(re.search(r'(?:^|\n)\s*NO\.?\s', text_upper))
-        has_sns_header = "SNS NETWORK" in text_upper[:300] or "SNS" in text_upper[:100]
-        has_item_codes_dotcom = bool(re.search(r'(?:^|\n)\s*\d+\.\d+\.\d', text_upper))
-        # SNS DO has items numbered 1-18 on their own lines (use MULTILINE for $)
-        has_simple_numbered_items = bool(re.search(
-            r'^([1-9]|1[0-8])\s*$', text_upper, re.MULTILINE))
-        is_sns_format = (has_numbered_table and has_sns_header) or \
-                        (has_simple_numbered_items and not has_item_codes_dotcom)
-
-        # Known DO category headers (uppercase keywords)
         CATEGORY_MAP = {
             "SECURITY ACCESS": "Security Access",
             "MULTIMEDIA EQUIPMENTS": "Multimedia Equipments",
@@ -698,7 +993,6 @@ class DocumentParser:
             "FIELD ROBOTICS": "Field Robotics Lab",
         }
 
-        # ── Utility: detect category from a line ─────────────────────────
         def _detect_category(line: str) -> Optional[str]:
             up = line.upper()
             for kw, name in CATEGORY_MAP.items():
@@ -706,29 +1000,17 @@ class DocumentParser:
                     return name
             return None
 
-        # ── Utility: extract serial numbers from a block of text ─────────
         def _extract_serials(text_block: str) -> list:
-            """Find serial numbers in text like '1. S/N : XXXX' or 'S/N: XXXX'."""
             serials = []
-            patterns = [
-                r'(?:S\/N|SIN|SN)[:\s]*[:\-]?\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
-                r'(?:^|\s)(\d{2,}\.\s*(?:S\/N|SIN|SN)\s*[:\-]\s*([A-Za-z0-9][A-Za-z0-9\-]{4,}))',
-            ]
-            # Pattern 1: "S/N : XXXX", "S/N: XXXX", "SIN: XXXX"
-            for m in re.finditer(r'(?:S\/N|SIN|SN)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
+            for m in re.finditer(r'(?:S\/N|SIN|SN|ISIN|5IN)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
                                  text_block, re.IGNORECASE):
                 serials.append(m.group(1))
-            # Pattern 2: numbered "1. S/N : XXXX" 
             for m in re.finditer(r'\d+\.\s*S\/N\s*:?\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
                                  text_block, re.IGNORECASE):
                 serials.append(m.group(1))
             return serials
 
-        # ── Utility: extract brand/model from description ────────────────
         def _extract_brand_model(desc: str) -> tuple:
-            """Extract brand and model from description.
-            Patterns: 'COUNTRY / BRAND / MODEL', 'BRAND / MODEL'
-            """
             brand_pats = [
                 r'(?:China|USA|Japan|Netherlands|Sweden|Korea|Taiwan|Germany)\s*/\s*([A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9\s\.\-/]+)',
                 r'([A-Z][A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9][A-Za-z0-9\s\.\-/]+)',
@@ -738,227 +1020,66 @@ class DocumentParser:
                 if m:
                     brand = m.group(1).strip()
                     model = m.group(2).strip()
-                    # Clean up common OCR noise
                     brand = re.sub(r'\s+', ' ', brand).strip()
                     model = re.sub(r'\s+', ' ', model).strip()
                     return brand, model
             return None, None
 
-        # ── FORMAT B: SNS-style numbered items ──────────────────────────
-        if is_sns_format:
-            # Pre-scan: find REAL item number positions (1-18, followed by a description line,
-            # not by "no SN", empty space, or delivery footer)
-            item_positions = []
-            for idx, ln in enumerate(self.lines):
-                m = re.match(r'^(\d{1,2})\s*$', ln.strip())
-                if not m:
-                    continue
-                n = int(m.group(1))
-                if n < 1 or n > 18:
-                    continue
+        # Item code patterns
+        item_code_on_line = re.compile(r'^(\d+\.\d+(?:\.\d+)*(?:\.\d+)?)(?:\s*\([ivx]+\))?\s+(.+)')
+        item_code_alone = re.compile(r'^(\d+\.\d+(?:\.\d+)*(?:\.\d+)?)(?:\s*\([ivx]+\))?$')
 
-                # Check next non-empty line — if it's a real description (brand, model, product name),
-                # it's an item number. If it's noise/footer/no-SN it's not.
-                next_line = ""
-                for ni in range(idx + 1, min(idx + 5, len(self.lines))):
-                    nl = self.lines[ni].strip()
-                    if nl:
-                        next_line = nl.upper()
-                        break
+        SKIP_PATTERNS = [
+            "DOTCOM", "TELECOMMUNICATIONS", "ACKNOWLEDGEMENT GOODS",
+            "SOLD TO", "SHIP TO", "CENTER FOR", "ARTIFICIAL INTELLIGENCE",
+            "AND ROBOTICS", "CAIRO", "PEJABAT", "PEJABET",
+            "BANGUNAN", "UNIVERSITI", "UNIVERSITY", "TEKNOLOGI",
+            "MALAYSIA", "JALAN SULTAN", "54100", "54700",
+            "ATTN", "TEL :", "TEL:", "ACK NO", "ACK DATE", "YOUR P/O",
+            "SALES REP", "TERMS", "NO OF PAGE", "NO of PAGE",
+            "RECEIVED THE", "FOLLOWING", "IN GOOD ORDER",
+            "SIGNATURE", "COMPUTER GENERATED",
+            "ENDACH", "ENDAH", "TAMAN SRI", "BANDAR BARU",
+            "PETALING", "57000", "KUALA LUMPUR",
+            "NENNY", "RUTHFALYDIA", "PEGAWAI", "PENYELIDIK",
+            "PUSAT", "KECERDIKAN", "BUATAN",
+            "UTMCAIRO", "PPTK", "REOSIVED", "REOEIVED",
+            "{TEM", "REMARKS", "pay inet", "Brn seen",
+            "SNS NETWORK", "NETWORK", "www.sns", "sns.com",
+        ]
 
-                # Heuristic: real item numbers precede descriptions with brand/MAC/spec
-                # patterns. Fake ones precede "no SN", empty, or footer text.
-                is_real = True
-                if not next_line:
-                    is_real = False
-                elif any(s in next_line for s in ["NO SN", "DELIVERY TO:", "ACCEPT ABOVE",
-                                                   "AUTHORISED BY", "CUSTOMER STAMP"]):
-                    is_real = False
-                elif re.match(r'^[A-Z\s]{3,15}$', next_line) and len(next_line) < 20:
-                    # All-caps short line is probably a table header, not description
-                    is_real = False
-
-                if is_real:
-                    item_positions.append((idx, n))
-
-            # If no real item positions found, try broader approach
-            if not item_positions:
-                for idx, ln in enumerate(self.lines):
-                    m = re.match(r'^(\d{1,2})\s*$', ln.strip())
-                    if m:
-                        n = int(m.group(1))
-                        if 1 <= n <= 18:
-                            item_positions.append((idx, n))
-
-            # Use positions to extract content between item numbers
-            for pi in range(len(item_positions)):
-                start_idx, item_num = item_positions[pi]
-                end_idx = item_positions[pi + 1][0] if pi + 1 < len(item_positions) else len(self.lines)
-
-                content_lines = []
-                for li in range(start_idx + 1, end_idx):
-                    ln = self.lines[li].strip()
-                    if not ln:
-                        continue
-                    if any(s in ln.upper() for s in ["DELIVERY TO:", "ACCEPT ABOVE",
-                                                      "AUTHORISED BY", "CUSTOMER STAMP",
-                                                      "RECEIVED", "STAMP & SIGNATURE"]):
-                        break
-                    content_lines.append(ln)
-
-                desc_parts = []
-                qty = 1
-                has_serial = True
-                serial_line = ""
-
-                for cl in content_lines:
-                    if re.match(r'^[A-Za-z0-9]{6,}$', cl) and len(cl) >= 6:
-                        serial_line += " " + cl
-                        continue
-                    if "no SN" in cl.lower():
-                        has_serial = False
-                        continue
-                    if "refer" in cl.lower() and ("attachment" in cl.lower() or "attacment" in cl.lower()):
-                        continue
-                    qm = re.match(r'^(\d{1,3})\s*$', cl)
-                    if qm:
-                        q = int(qm.group(1))
-                        if 1 <= q <= 999:
-                            qty = q
-                            continue
-                    if len(cl) > 2:
-                        desc_parts.append(cl)
-
-                description = " ".join(desc_parts).strip() if desc_parts else ""
-                if len(description) < 5:
-                    continue
-
-                serials = _extract_serials(description + " " + serial_line)
-                serial_number = serials[0] if serials else (None if has_serial else None)
-                brand, model = _extract_brand_model(description)
-
-                items.append(ExtractedItem(
-                    item_code=str(item_num),
-                    description=description,
-                    brand=brand or self._extract_brand(description),
-                    model=model,
-                    serial_number=serial_number,
-                    quantity_ordered=qty,
-                    unit="unit",
-                    category=_detect_category(description) or current_category,
-                    notes="no SN" if not has_serial else None,
-                ))
-
-            # ── Post-process: split merged items by brand/product prefixes ──
-            SPLIT_PREFIXES = [
-                "MSI MS7E", "MSI PRO", "MSI CYBORG",
-                "SENSOR HUMID", "STMICROELECTRONICS", "NUCLEO-",
-                "ALFA AOA", "UBIQUITI", "TP-LINK", "PRO'SKIT SN-396",
-                "PELICAN", "SPACE ERGONOMIC",
-                "VIEWSONIC", "CHARDER", "DAHUA",
-                "HP VICTUS", "RASPBERRY PI",
-            ]
-            SPLIT_PREFIXES_SORTED = sorted(SPLIT_PREFIXES, key=len, reverse=True)
-            split_items = []
-            for item in items:
-                desc_upper = (item.description or "").upper()
-                if len(desc_upper) > 100:
-                    # Try to split at each known prefix
-                    parts = []
-                    last_end = 0
-                    positions = []
-                    for prefix in SPLIT_PREFIXES_SORTED:
-                        pu = prefix.upper()
-                        idx = desc_upper.find(pu, 10)
-                        if idx > 0:
-                            positions.append((idx, prefix))
-                    positions.sort()
-                    for pos, prefix in positions:
-                        if pos >= last_end + 10:
-                            part = item.description[last_end:pos].strip()
-                            if part and len(part) > 10:
-                                parts.append(part)
-                            last_end = pos
-                    if parts:
-                        # Add last segment
-                        last_part = item.description[last_end:].strip()
-                        if last_part and len(last_part) > 10:
-                            parts.append(last_part)
-                        # Create split items
-                        for pi, part in enumerate(parts):
-                            split_items.append(ExtractedItem(
-                                item_code=f"{item.item_code}.{pi+1}" if item.item_code else str(pi+1),
-                                description=part,
-                                brand=self._extract_brand(part),
-                                model=None,
-                                serial_number=item.serial_number if pi == 0 else None,
-                                quantity_ordered=item.quantity_ordered,
-                                unit=item.unit,
-                                category=item.category,
-                                notes=item.notes,
-                            ))
-                        continue  # skip original merged item
-                split_items.append(item)
-            items = split_items
-
-            return items
-
-        # ── FORMAT A: DOTCOM-style item codes ───────────────────────────
-        # Item code may be on same line as description ("1.1.3.2 POE Switch")
-        # OR on its own line ("1.1.3" next line "Security Access For Office")
-        item_code_on_line = re.compile(r'^(\d+\.\d+(?:\.\d+)*(?:\.\d+)?)\s+(.+)')
-        item_code_alone = re.compile(r'^(\d+\.\d+(?:\.\d+)*(?:\.\d+)?)$')
-        in_items_section = False
         i = 0
-
         while i < len(self.lines):
             line = self.lines[i].strip()
             i += 1
             if not line or len(line) < 3:
                 continue
 
-            # Skip header/noise lines
             up_line = line.upper()
-            if any(sig in up_line for sig in [
-                "DOTCOM", "TELECOMMUNICATIONS", "ACKNOWLEDGEMENT GOODS",
-                "SOLD TO", "SHIP TO", "CENTER FOR", "ARTIFICIAL INTELLIGENCE",
-                "AND ROBOTICS", "CAIRO", "PEJABAT", "PEJABET", "PEJABAT",
-                "BANGUNAN", "UNIVERSITI", "UNIVERSITY", "TEKNOLOGI",
-                "MALAYSIA", "JALAN SULTAN", "54100", "54700", "547100",
-                "ATTN", "TEL :", "TEL:", "ACK NO", "ACK DATE", "YOUR P/O",
-                "SALES REP", "TERMS", "NO OF PAGE", "NO of PAGE",
-                "RECEIVED THE", "FOLLOWING", "IN GOOD ORDER",
-                "SIGNATURE", "COMPUTER GENERATED",
-                "ENDACH", "ENDAH", "TAMAN SRI", "BANDAR BARU",
-                "PETALING", "57000", "KUALA LUMPUR",
-                "NENNY", "RUTHFALYDIA", "PEGAWAI", "PENYELIDIK",
-                "PUSAT", "KECERDIKAN", "BUATAN",
-                "UTMCAIRO", "PPTK", "REOSIVED", "REOEIVED",
-                "{TEM", "DESCRIPTION", "QUANTITY", "REMARKS",
-                "pay inet", "Brn seen",
-            ]):
+            skip = any(sig in up_line for sig in SKIP_PATTERNS)
+            if skip:
                 continue
 
-            # CamScanner garbage lines
+            # CamScanner / scribble garbage
             if re.match(r'^[^\w]*\d+[^\w]*$', line) and len(line) <= 10:
                 continue
             if re.match(r'^[a-z\s]{2,6}$', line) and len(line) <= 8:
                 continue
+            if re.match(r'^[^a-zA-Z0-9]{3,}$', line):
+                continue
 
-            # Check for category
             cat = _detect_category(line)
             if cat:
                 current_category = cat
-                in_items_section = True
                 continue
 
-            # Skip date-like patterns (e.g. "19.06.26" being confused with item codes)
+            # Skip date patterns that look like item codes
             if re.match(r'^\d{1,2}\.\d{1,2}\.\d{2,4}$', line):
                 parts = line.split('.')
                 if len(parts) == 3 and 1 <= int(parts[0]) <= 31 and 1 <= int(parts[1]) <= 12:
                     continue
 
-            # Check for item code on current line
+            # Check for item code
             m = item_code_on_line.match(line)
             item_code = None
             rest = None
@@ -967,7 +1088,6 @@ class DocumentParser:
                 item_code = m.group(1)
                 rest = m.group(2).strip()
             else:
-                # Try item code alone on line
                 m2 = item_code_alone.match(line)
                 if m2:
                     item_code = m2.group(1)
@@ -976,83 +1096,108 @@ class DocumentParser:
             if not item_code:
                 continue
 
-            in_items_section = True
-
-            # Collect description from subsequent lines
+            # Collect description — look backwards for product name
             desc_lines = [rest] if rest else []
             serial_lines = []
             qty = 1
 
+            # Look back 1-3 lines for the product name (SNS DO format)
+            for back in range(1, 4):
+                if i - back >= 2:
+                    prev = self.lines[i - back - 1].strip()
+                    if prev and not re.match(r'^\d+\.\d', prev) and not re.match(r'^\d{1,2}$', prev):
+                        up_prev = prev.upper()
+                        if not any(sig in up_prev for sig in SKIP_PATTERNS) and len(prev) > 5:
+                            desc_lines.insert(0, prev)
+                            break
+
+            # Collect forward
             j = 0
             while i + j < len(self.lines):
                 peek = self.lines[i + j].strip()
                 if not peek:
                     j += 1
                     continue
-                # Stop: next item code (same line or alone)
-                if re.match(r'^\d+\.\d+(?:\.\d+)*(?:\.\d+)?\s', peek) or \
-                   re.match(r'^\d+\.\d+(?:\.\d+)*(?:\.\d+)?$', peek):
+                # Stop: next item code
+                if re.match(r'^\d+\.\d+(?:\.\d+)*(?:\.\d+)?(?:\s*\([ivx]+\))?\s', peek) or \
+                   re.match(r'^\d+\.\d+(?:\.\d+)*(?:\.\d+)?(?:\s*\([ivx]+\))?$', peek):
                     break
-                # Stop: category header
+                # Stop: category / footer
                 if _detect_category(peek):
                     break
-                # Stop: section markers
-                if any(s in peek.upper() for s in ["RECEIVED THE", "** THIS", "NAME:", "DATE:", "COMPANY CHOP",
-                                                    "COMPANY CHO", "SIGNATURE"]):
+                if any(s in peek.upper() for s in ["RECEIVED THE", "** THIS", "NAME:", "DATE:",
+                                                    "COMPANY CHOP", "COMPANY CHO", "SIGNATURE",
+                                                    "DELIVERY TO:", "ACCEPT ABOVE",
+                                                    "AUTHORISED BY", "CUSTOMER STAMP",
+                                                    "ITEM(S) PACKED", "RECEIVED THE ABOVE"]):
                     break
 
-                # Quantity on its own line (just digits, 1-999)
                 qty_m = re.match(r'^(\d{1,3})\s*$', peek)
                 if qty_m and 1 <= int(qty_m.group(1)) <= 500:
                     qty = int(qty_m.group(1))
                     j += 1
                     continue
 
-                # CamScanner garbage
                 if re.match(r'^[^\w]*\d+[^\w]*$', peek) and len(peek) <= 10:
                     j += 1
                     continue
+                if re.match(r'^[^a-zA-Z0-9]{3,}$', peek):
+                    j += 1
+                    continue
 
-                # Serial number lines
-                if re.search(r'(?:S\/N|SIN|SN)\s*[:=]', peek, re.IGNORECASE) or \
+                if re.search(r'(?:S\/N|SIN|SN|ISIN|5IN)\s*[:=]', peek, re.IGNORECASE) or \
                    re.match(r'^(?:\d+\.\s*)?S\/N', peek, re.IGNORECASE) or \
                    re.match(r'^(?:\d+\.\s*)?SIN\b', peek, re.IGNORECASE):
                     serial_lines.append(peek)
                     j += 1
                     continue
 
-                # Include line as description
+                if peek.startswith("=== PAGE"):
+                    j += 1
+                    continue
+                if re.match(r'^\|?\[order', peek, re.IGNORECASE):
+                    j += 1
+                    continue
+
                 desc_lines.append(peek)
                 j += 1
 
             i += j
 
             description = " ".join(d for d in desc_lines if d and len(d) > 2).strip()
-            # Clean up
             description = re.sub(r'\s+', ' ', description).strip()
-            # Remove sub-item markers like "(i)", "(ii)", "(iii)" at the start
             description = re.sub(r'^\([ivx]+\)\s*', '', description).strip()
 
-            # Skip purely noise items
             if len(description) < 5 or re.match(r'^[A-Z\s]{4,}$', description):
                 continue
 
-            # Extract serials
             all_serials_text = " ".join(serial_lines)
             serials = _extract_serials(all_serials_text)
-            serial_number = serials[0] if serials else None
 
-            # Check "no SN" in description
+            # Also try extracting bare S/Ns from description
+            if not serials:
+                sn_bare = re.findall(r'\b([A-Z0-9]{5,})\b', description)
+                likely_sns = [s for s in sn_bare
+                              if len(s) >= 6 and re.search(r'\d', s)
+                              and not s.isdigit()
+                              and s not in ['RTX5060', 'RTX4050', '500GB', '512GB',
+                                             '16GB', '32GB', '8GB', '20TB', '2TB',
+                                             'W11H', 'W11P', '3YR', '2YR', '4K']]
+                if likely_sns:
+                    serials = likely_sns
+
+            serial_number = ', '.join(serials) if serials else None
             has_no_sn = "no SN" in description.lower()
             if has_no_sn:
                 serial_number = None
 
             brand, model = _extract_brand_model(description)
-            if "INCLUDING" in description.upper() or "COME WITH" in description.upper():
-                # Single item with accessories
-                pass
-
-            brand, model = _extract_brand_model(description)
+            if not brand:
+                up_desc = description.upper()
+                for known in sorted(self.KNOWN_BRANDS, key=len, reverse=True):
+                    if known in up_desc:
+                        brand = known.title()
+                        break
 
             item = ExtractedItem(
                 item_code=item_code,
@@ -1066,6 +1211,357 @@ class DocumentParser:
                 notes="no SN" if has_no_sn else None,
             )
             items.append(item)
+
+        # Post-process: extract bundle components from descriptions
+        bundle_items = []
+        for item in items:
+            components = self._extract_bundle_components(item.description or "")
+            for ci, comp in enumerate(components):
+                bundle_items.append(ExtractedItem(
+                    item_code=f"{item.item_code}.{ci + 1}" if item.item_code else str(ci + 1),
+                    description=comp["name"],
+                    brand=comp.get("brand"),
+                    quantity_ordered=comp["qty"],
+                    unit="unit",
+                    category=item.category,
+                    parent_item_code=item.item_code,
+                    is_bundle_component=True,
+                    notes="bundle component",
+                ))
+        items.extend(bundle_items)
+
+        return items
+
+    def _parse_do_format_b(self) -> list:
+        """Parse Format B: SNS-style numbered items (1-18 in a table).
+        
+        Relaxed validation: '1 no SN' and '2 refer attachment' are accepted.
+        Also handles the "NO. Serial Number" table header variant where item numbers
+        are on the same line as their descriptions.
+        """
+        items = []
+        current_category = "GENERAL"
+
+        CATEGORY_MAP = {
+            "SECURITY ACCESS": "Security Access",
+            "MULTIMEDIA EQUIPMENTS": "Multimedia Equipments",
+            "SUPPORT EQUIPMENTS": "Support Equipments",
+            "SUPPORT EQUIPMENT": "Support Equipments",
+            "ICT EQUIPMENT": "ICT Equipment",
+            "SMART MANUFACTURING": "Smart Manufacturing Lab",
+            "ROBOTIC EQUIPMENTS": "Robotic Equipments",
+            "ROBOTIC": "Robotic Equipments",
+            "NETWORK EQUIPMENT": "Network Equipment",
+            "NETWORK FOR OFFICE": "Network Equipment",
+            "DESKTOP AND LAPTOP": "Desktop and Laptop",
+            "OFFICE EQUIPMENTS": "Office Equipments",
+            "AGRICULTURE": "Agriculture Lab",
+            "HEALTHCARE": "Healthcare Lab",
+            "FIELD ROBOTICS": "Field Robotics Lab",
+        }
+
+        def _detect_category(line: str) -> Optional[str]:
+            up = line.upper()
+            for kw, name in CATEGORY_MAP.items():
+                if kw in up:
+                    return name
+            return None
+
+        def _extract_serials(text_block: str) -> list:
+            serials = []
+            for m in re.finditer(r'(?:S\/N|SIN|SN|ISIN|5IN)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
+                                 text_block, re.IGNORECASE):
+                serials.append(m.group(1))
+            for m in re.finditer(r'\d+\.\s*S\/N\s*:?\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
+                                 text_block, re.IGNORECASE):
+                serials.append(m.group(1))
+            return serials
+
+        def _extract_brand_model(desc: str) -> tuple:
+            brand_pats = [
+                r'(?:China|USA|Japan|Netherlands|Sweden|Korea|Taiwan|Germany)\s*/\s*([A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9\s\.\-/]+)',
+                r'([A-Z][A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9][A-Za-z0-9\s\.\-/]+)',
+            ]
+            for pat in brand_pats:
+                m = re.search(pat, desc)
+                if m:
+                    brand = m.group(1).strip()
+                    model = m.group(2).strip()
+                    brand = re.sub(r'\s+', ' ', brand).strip()
+                    model = re.sub(r'\s+', ' ', model).strip()
+                    return brand, model
+            return None, None
+
+        # ── First pass: find item number positions (1-25, relaxed) ─────────
+        item_positions = []
+        for idx, ln in enumerate(self.lines):
+            m = re.match(r'^(\d{1,2})\s*$', ln.strip())
+            if not m:
+                continue
+            n = int(m.group(1))
+            if n < 1 or n > 25:
+                continue
+
+            next_line = ""
+            for ni in range(idx + 1, min(idx + 5, len(self.lines))):
+                nl = self.lines[ni].strip()
+                if nl:
+                    next_line = nl.upper()
+                    break
+
+            # Relaxed: only reject if clearly footer/delivery info
+            skip = bool(next_line and any(s in next_line for s in ["DELIVERY TO:", "ACCEPT ABOVE",
+                                                                     "AUTHORISED BY", "CUSTOMER STAMP"]))
+            if not skip:
+                item_positions.append((idx, n))
+
+        # Fallback: accept all numbered positions
+        if not item_positions:
+            for idx, ln in enumerate(self.lines):
+                m = re.match(r'^(\d{1,2})\s*$', ln.strip())
+                if m:
+                    n = int(m.group(1))
+                    if 1 <= n <= 25:
+                        item_positions.append((idx, n))
+
+        # Deduplicate by item number
+        seen_nums = set()
+        unique_positions = []
+        for idx, n in item_positions:
+            if n not in seen_nums:
+                seen_nums.add(n)
+                unique_positions.append((idx, n))
+        item_positions = unique_positions
+
+        # Extract content between item numbers
+        for pi in range(len(item_positions)):
+            start_idx, item_num = item_positions[pi]
+            end_idx = item_positions[pi + 1][0] if pi + 1 < len(item_positions) else len(self.lines)
+
+            content_lines = []
+            for li in range(start_idx + 1, end_idx):
+                ln = self.lines[li].strip()
+                if not ln:
+                    continue
+                if any(s in ln.upper() for s in ["DELIVERY TO:", "ACCEPT ABOVE",
+                                                  "AUTHORISED BY", "CUSTOMER STAMP",
+                                                  "RECEIVED", "STAMP & SIGNATURE"]):
+                    break
+                content_lines.append(ln)
+
+            desc_parts = []
+            qty = 1
+            has_serial = True
+            serial_line = ""
+
+            for cl in content_lines:
+                if re.match(r'^[A-Za-z0-9]{6,}$', cl) and len(cl) >= 6:
+                    serial_line += " " + cl
+                    continue
+                if "no SN" in cl.lower():
+                    has_serial = False
+                    continue
+                if "refer" in cl.lower() and ("attachment" in cl.lower() or "attacment" in cl.lower()):
+                    continue
+                qm = re.match(r'^(\d{1,3})\s*$', cl)
+                if qm:
+                    q = int(qm.group(1))
+                    if 1 <= q <= 999:
+                        qty = q
+                        continue
+                if len(cl) > 2:
+                    desc_parts.append(cl)
+
+            description = " ".join(desc_parts).strip() if desc_parts else ""
+            if len(description) < 5:
+                continue
+
+            serials = _extract_serials(description + " " + serial_line)
+            serial_number = ', '.join(serials) if serials else (None if has_serial else None)
+            brand, model = _extract_brand_model(description)
+
+            items.append(ExtractedItem(
+                item_code=str(item_num),
+                description=description,
+                brand=brand or self._extract_brand(description),
+                model=model,
+                serial_number=serial_number,
+                quantity_ordered=qty,
+                unit="unit",
+                category=_detect_category(description) or current_category,
+                notes="no SN" if not has_serial else None,
+            ))
+
+        # Post-process: split merged items by known brand prefixes
+        SPLIT_PREFIXES = [
+            "MSI MS7E", "MSI PRO", "MSI CYBORG",
+            "SENSOR HUMID", "STMICROELECTRONICS", "NUCLEO-",
+            "ALFA AOA", "UBIQUITI", "TP-LINK", "PRO'SKIT SN-396",
+            "PELICAN", "SPACE ERGONOMIC",
+            "VIEWSONIC", "CHARDER", "DAHUA",
+            "HP VICTUS", "RASPBERRY PI",
+        ]
+        SPLIT_PREFIXES_SORTED = sorted(SPLIT_PREFIXES, key=len, reverse=True)
+        split_items = []
+        for item in items:
+            desc_upper = (item.description or "").upper()
+            if len(desc_upper) > 100:
+                parts = []
+                last_end = 0
+                positions = []
+                for prefix in SPLIT_PREFIXES_SORTED:
+                    pu = prefix.upper()
+                    idx = desc_upper.find(pu, 10)
+                    if idx > 0:
+                        positions.append((idx, prefix))
+                positions.sort()
+                for pos, prefix in positions:
+                    if pos >= last_end + 10:
+                        part = item.description[last_end:pos].strip()
+                        if part and len(part) > 10:
+                            parts.append(part)
+                        last_end = pos
+                if parts:
+                    last_part = item.description[last_end:].strip()
+                    if last_part and len(last_part) > 10:
+                        parts.append(last_part)
+                    for pi, part in enumerate(parts):
+                        split_items.append(ExtractedItem(
+                            item_code=f"{item.item_code}.{pi+1}" if item.item_code else str(pi+1),
+                            description=part,
+                            brand=self._extract_brand(part),
+                            model=None,
+                            serial_number=item.serial_number if pi == 0 else None,
+                            quantity_ordered=item.quantity_ordered,
+                            unit=item.unit,
+                            category=item.category,
+                            notes=item.notes,
+                        ))
+                    continue
+            split_items.append(item)
+        items = split_items
+
+        return items
+
+    def _parse_do_table_format(self) -> list:
+        """Parse SNS table format: 'NO. Serial Number ITEM/PART NO./DESCRIPTION QTy'.
+
+        Found on SNS DO pages 17-20 with format:
+          NO. Serial Number ITEM/PART NO./DESCRIPTION QTy ATTENTION
+          1 refer attacment MSI Cyborg 15 A13VEK-887MY... 3
+          4 no SN SENSOR HUMID/TEMP 5V I2C 2% SHT31-D 36
+        """
+        items = []
+
+        # Find table header
+        table_start = -1
+        table_end = len(self.lines)
+
+        for idx, ln in enumerate(self.lines):
+            up = ln.upper()
+            if "NO." in up and "SERIAL NUMBER" in up and "DESCRIPTION" in up:
+                table_start = idx + 1
+                break
+
+        if table_start < 0:
+            return items  # No table found
+
+        for idx in range(table_start, len(self.lines)):
+            up = self.lines[idx].upper()
+            if any(s in up for s in ["DELIVERY TO:", "ACCEPT ABOVE",
+                                      "CUSTOMER STAMP", "AUTHORISED BY"]):
+                table_end = idx
+                break
+
+        # Parse rows from table
+        table_rows = []
+        i = table_start
+        while i < table_end:
+            ln = self.lines[i].strip()
+            i += 1
+            if not ln:
+                continue
+
+            # Row starts with a number
+            m = re.match(r'^(\d{1,2})\s+(.+)$', ln)
+            if m:
+                item_no = int(m.group(1))
+                rest = m.group(2).strip()
+                table_rows.append({"no": item_no, "text": rest, "start_line": i - 1})
+            elif table_rows:
+                # Continuation of last row
+                table_rows[-1]["text"] += " " + ln
+
+        # Parse each row
+        for row in table_rows:
+            text = row["text"]
+
+            # Extract S/N
+            serials = []
+            for m in re.finditer(r'(?:S\/N|SIN|SN|ISIN|5IN)\s*[:=]\s*([A-Za-z0-9][A-Za-z0-9\-]{4,})',
+                                 text, re.IGNORECASE):
+                serials.append(m.group(1))
+
+            notes = None
+            has_no_sn = "no SN" in text.lower()
+            has_refer = "refer" in text.lower() and ("attachment" in text.lower() or "attacment" in text.lower())
+
+            if has_no_sn:
+                notes = "no SN"
+            if has_refer:
+                notes = "refer attachment"
+
+            # Clean text
+            clean = text
+            clean = re.sub(r'^(?:refer\s+(?:attacment|attachment)\s+)', '', clean, flags=re.IGNORECASE)
+            clean = re.sub(r'^(?:no\s+SN\s+)', '', clean, flags=re.IGNORECASE)
+
+            # Extract quantity
+            qty = 1
+            text_before_sn = re.split(r'(?:S\/N|SIN|SN|ISIN|5IN)\s*[:=]', clean)[0]
+            qty_matches = re.findall(r'(\d+)\s*$', text_before_sn.strip())
+            if qty_matches:
+                val = int(qty_matches[-1])
+                if 1 <= val <= 999:
+                    qty = val
+                    clean = re.sub(r'\s+' + str(val) + r'\s*$', '', clean.strip())
+            else:
+                qty_m = re.search(r'\b(\d{1,3})\b(?!.*\b\d{1,3}\b)', text_before_sn)
+                if qty_m:
+                    val = int(qty_m.group(1))
+                    if 2 <= val <= 999:
+                        qty = val
+                        clean = clean.replace(' ' + str(val), '', 1)
+
+            description = clean.strip()
+            if not description or len(description) < 5:
+                continue
+
+            serial_number = ', '.join(serials) if serials else None
+            if has_no_sn:
+                serial_number = None
+
+            # Try bare S/N extraction if none found with prefix
+            if not serials and not has_no_sn:
+                bare_sns = re.findall(r'\b([A-Z0-9]{8,})\b', description)
+                tech_sns = [s for s in bare_sns
+                            if re.search(r'\d', s) and not s.isdigit()
+                            and s not in ['RTX5060', 'RTX4050', '500GB', '512GB', '16GB', '32GB']]
+                if tech_sns:
+                    serial_number = ', '.join(tech_sns[:5])
+
+            brand = self._extract_brand(description)
+
+            items.append(ExtractedItem(
+                item_code=str(row["no"]),
+                description=description,
+                brand=brand,
+                serial_number=serial_number,
+                quantity_ordered=qty,
+                unit="unit",
+                category="GENERAL",
+                notes=notes,
+            ))
 
         return items
 
@@ -1231,6 +1727,7 @@ class DocumentParser:
             desc_parts = [rest] if rest else []
             qty = 1
             unit = "unit"
+            price_matches = []  # unit_price, total_price from sequential number lines
 
             j = i + 1
             lookahead_limit = 60  # cap lookahead — OCR fragments items within ~60 lines
@@ -1265,7 +1762,15 @@ class DocumentParser:
                         break
                     continue
 
-                # Skip noise lines
+                # Detect price lines: e.g. "5,926.00", "82,964.00"
+                price_match = re.match(r'^\$?([\d,]+(?:\.\d{1,2})?)\s*$', peek)
+                if price_match:
+                    val = float(price_match.group(1).replace(',', ''))
+                    if val >= 1.0:  # skip 0.00 noise
+                        price_matches.append(val)
+                    continue
+
+                # Skip noise lines (but not price-like ones handled above)
                 if _is_noise(peek):
                     continue
 
@@ -1288,11 +1793,21 @@ class DocumentParser:
             if len(description) < 3:
                 continue
 
+            # Extract prices: quotation format has [unit_price, total_price, sst?] in sequence
+            unit_price = None
+            total_price = None
+            if price_matches:
+                unit_price = price_matches[0]
+                if len(price_matches) >= 2:
+                    total_price = price_matches[1]
+
             item = ExtractedItem(
                 item_code=item_code,
                 description=description,
                 quantity_ordered=qty,
                 unit=unit,
+                unit_price=unit_price,
+                total_price=total_price,
                 category=current_category,
                 section=current_section,
             )
@@ -1332,12 +1847,43 @@ class DocumentParser:
         return items
 
     def _extract_brand(self, text: str) -> Optional[str]:
-        """Try to extract known brand from text."""
+        """Try to extract known brand from text, then clean metadata."""
         text_upper = text.upper()
         for brand in sorted(self.KNOWN_BRANDS, key=len, reverse=True):
             if brand in text_upper:
-                return brand.title()
+                raw = brand.title()
+                return self._clean_brand(raw)
         return None
+
+    @staticmethod
+    def _clean_brand(brand: str) -> str:
+        """Strip quantity/metadata notes appended to brand values.
+
+        Handles patterns like:
+          - 'EPSON ECOTANK L3250; 3 unit' → 'Epson'
+          - 'IKEA MILSBO; 3 unit' → 'Ikea'
+          - 'PELICAN 1490 ...; tiada nombor siri' → 'Pelican'
+          - 'DELL PC16250; Smart Manufacturing, 11 unit' → 'Dell'
+        """
+        if not brand:
+            return brand
+        cleaned = brand
+        # Remove everything after semicolon or comma that contains quantity/notes keywords
+        import re
+        for sep in [';', ',']:
+            parts = cleaned.split(sep)
+            if len(parts) > 1:
+                # Check if second part contains unit/tiada/termasuk/sebahagian etc.
+                tail = parts[-1].strip().lower()
+                if any(kw in tail for kw in ['unit', 'tiada', 'termasuk', 'sebahagian',
+                                               'item', 'daripada', 'seperti']):
+                    cleaned = sep.join(parts[:-1]).strip()
+        # Trim trailing " N unit" pattern (e.g. "10 unit" → "")
+        cleaned = re.sub(r'\s+\d+\s*unit\s*$', '', cleaned, flags=re.IGNORECASE).strip()
+        # If nothing meaningful remains, return None
+        if not cleaned or re.match(r'^\d+\s*unit', cleaned, re.IGNORECASE):
+            return None
+        return cleaned
 
 
 # ─── Main CLI ────────────────────────────────────────────────────────────────
@@ -1394,6 +1940,7 @@ Examples:
     # Override method from extraction
     result.method = extraction.method
     result.warnings = extraction.warnings
+    result.page_count = extraction.page_count
 
     # Output
     if args.only_items:
