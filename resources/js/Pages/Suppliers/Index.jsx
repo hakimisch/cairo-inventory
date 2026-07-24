@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 
 export default function Index({ suppliers, filters }) {
+    const user = usePage().props.auth.user;
     const [search, setSearch] = useState(filters?.search || '');
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -176,7 +177,9 @@ export default function Index({ suppliers, filters }) {
                                     <td style={tdStyle}>
                                         <div style={{ display: 'flex', gap: 4 }}>
                                             <button onClick={() => openEdit(s)} style={actionBtnStyle}>Edit</button>
+                                            {['admin', 'superadmin'].includes(user.role) && (
                                             <button onClick={() => handleDelete(s.id)} style={{ ...actionBtnStyle, color: '#DC2626' }}>Delete</button>
+                                            )}
                                         </div>
                                     </td>
                                 </tr>

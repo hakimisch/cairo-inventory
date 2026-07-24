@@ -3,19 +3,21 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 
 class AssetPlacement extends Model
 {
-    use LogsActivity;
+    use LogsActivity, SoftDeletes;
+
     protected $fillable = [
         'asset_id', 
         'custodian_name', 
         'staff_id',
-        'borrower_phone',       // NEW — PA-9A: No. Tel. Bimbit Peminjam
-        'matric_no',            // NEW — PA-9A: No. Staf/Matrik Peminjam
-        'authorizer_name',      // NEW — PA-9A: Pemberi Pinjam Alatan
+        'borrower_phone',
+        'matric_no',
+        'authorizer_name',
         'location', 
         'quantity_placed',
         'specific_serial_no',

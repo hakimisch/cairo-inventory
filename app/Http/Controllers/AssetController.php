@@ -14,14 +14,16 @@ class AssetController extends Controller
     {
         return Inertia::render('Assets/Index', [
             'assets'     => Asset::latest()->get(),
+            'trashed'    => Asset::onlyTrashed()->latest()->get(),
             'totalValue' => Asset::sum('purchase_price'),
             'stats'      => [
-                'total'       => Asset::count(),
+                'total'       => Asset::withTrashed()->count(),
                 'active'      => Asset::where('status', 'active')->count(),
                 'repair'      => Asset::where('status', 'repair')->count(),
                 'disposed'    => Asset::where('status', 'disposed')->count(),
                 'fixed_asset' => Asset::where('asset_type', 'fixed_asset')->count(),
                 'inventory'   => Asset::where('asset_type', 'inventory')->count(),
+                'trashed'     => Asset::onlyTrashed()->count(),
             ],
         ]);
     }
@@ -134,11 +136,13 @@ class AssetController extends Controller
     {
         return Inertia::render('Assets/ReceivingIndex', [
             'receivings' => Receiving::latest()->get(),
+            'trashed'    => Receiving::onlyTrashed()->latest()->get(),
             'stats'      => [
-                'total'    => Receiving::count(),
+                'total'    => Receiving::withTrashed()->count(),
                 'pending'  => Receiving::where('status', 'pending')->count(),
                 'accepted' => Receiving::where('status', 'accepted')->count(),
                 'rejected' => Receiving::where('status', 'rejected')->count(),
+                'trashed'  => Receiving::onlyTrashed()->count(),
             ],
         ]);
     }
@@ -201,9 +205,24 @@ class AssetController extends Controller
             return redirect()->back()->with('error', 'Hanya rekod berstatus "Menunggu" boleh dipadam.');
         }
 
-        $receiving->delete();
+        $receiving->delete(); // soft delete
 
-        return redirect()->route('receivings.index')->with('success', 'Rekod penerimaan dipadam.');
+        return redirect()->route('receivings.index')->with('success', 'Rekod penerimaan dipadam dan dipindahkan ke Tong.');
+    }
+
+    /**
+     * Restore a soft-deleted receiving record.
+     */
+    public function restoreReceiving($id)
+    {
+        $receiving = Receiving::withTrashed()->findOrFail($id);
+        $receiving->restore();
+
+        activity()
+            ->performedOn($receiving)
+            ->log('restored');
+
+        return redirect()->back()->with('success', "Penerimaan {$receiving->receive_no} telah dipulihkan.");
     }
 
     public function storePlacement(Request $request, Asset $asset)
@@ -349,7 +368,7 @@ class AssetController extends Controller
     }
 
     /**
-     * Remove the specified asset.
+     * Remove the specified asset (soft delete).
      */
     public function destroy(Asset $asset)
     {
@@ -366,10 +385,26 @@ class AssetController extends Controller
             + $asset->damageReports()->count()
             + $asset->upgrades()->count();
 
-        $asset->delete();
+        $asset->delete(); // soft delete — asset still in DB with deleted_at set
 
         return redirect()->route('assets.index')
-            ->with('success', "Aset {$name} ({$tag}) telah dipadam. ({$relatedCount} rekod berkaitan turut dipadam.)");
+            ->with('success', "Aset {$name} ({$tag}) telah dipadam dan dipindahkan ke Tong. ({$relatedCount} rekod berkaitan.)");
+    }
+
+    /**
+     * Restore a soft-deleted asset.
+     */
+    public function restore($id)
+    {
+        $asset = Asset::withTrashed()->findOrFail($id);
+        $asset->restore();
+
+        activity()
+            ->performedOn($asset)
+            ->log('restored');
+
+        $tag = $asset->asset_tag;
+        return redirect()->back()->with('success', "Aset {$tag} telah dipulihkan.");
     }
 
     public function downloadKewpa3(Asset $asset)

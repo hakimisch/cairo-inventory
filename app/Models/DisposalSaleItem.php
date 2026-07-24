@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Spatie\Activitylog\Support\LogOptions;
@@ -10,7 +11,7 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 
 class DisposalSaleItem extends Model
 {
-    use LogsActivity;
+    use LogsActivity, SoftDeletes;
     protected $fillable = [
         'disposal_sale_id',
         'asset_id',

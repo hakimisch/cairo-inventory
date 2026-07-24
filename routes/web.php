@@ -122,28 +122,28 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // Aduan Kerosakan (KEW.PA-9)
     Route::post('/assets/{asset}/damage-reports', [DamageReportController::class, 'store'])->name('assets.damage-reports.store');
     Route::put('/assets/{asset}/damage-reports/{damageReport}', [DamageReportController::class, 'update'])->name('assets.damage-reports.update');
-    Route::delete('/assets/{asset}/damage-reports/{damageReport}', [DamageReportController::class, 'destroy'])->name('assets.damage-reports.destroy');
+    Route::delete('/assets/{asset}/damage-reports/{damageReport}', [DamageReportController::class, 'destroy'])->middleware('permission:crud_assets')->name('assets.damage-reports.destroy');
     Route::get('/damage-reports/{damageReport}/kewpa9/download', [DamageReportController::class, 'downloadKewpa9'])->name('damage-reports.kewpa9.download');
     Route::post('/assets/{asset}/inspections', [AssetInspectionController::class, 'store'])->name('assets.inspections.store');
     Route::put('/assets/{asset}/inspections/{inspection}', [AssetInspectionController::class, 'update'])->name('assets.inspections.update');
-    Route::delete('/assets/{asset}/inspections/{inspection}', [AssetInspectionController::class, 'destroy'])->name('assets.inspections.destroy');
+    Route::delete('/assets/{asset}/inspections/{inspection}', [AssetInspectionController::class, 'destroy'])->middleware('permission:crud_assets')->name('assets.inspections.destroy');
 
     // ── Phase 2: New Routes ──────────────────────────────────────────────────
 
     // KEW.PA-13/14 — Penyelenggaraan (Maintenance)
     Route::post('/assets/{asset}/maintenances', [AssetMaintenanceController::class, 'store'])->name('assets.maintenances.store');
     Route::put('/assets/{asset}/maintenances/{maintenance}', [AssetMaintenanceController::class, 'update'])->name('assets.maintenances.update');
-    Route::delete('/assets/{asset}/maintenances/{maintenance}', [AssetMaintenanceController::class, 'destroy'])->name('assets.maintenances.destroy');
+    Route::delete('/assets/{asset}/maintenances/{maintenance}', [AssetMaintenanceController::class, 'destroy'])->middleware('permission:crud_assets')->name('assets.maintenances.destroy');
 
     // KEW.PA-17/18/19 — Pelupusan (Disposal)
     Route::post('/assets/{asset}/disposals', [AssetDisposalController::class, 'store'])->name('assets.disposals.store');
     Route::put('/assets/{asset}/disposals/{disposal}', [AssetDisposalController::class, 'update'])->name('assets.disposals.update');
-    Route::delete('/assets/{asset}/disposals/{disposal}', [AssetDisposalController::class, 'destroy'])->name('assets.disposals.destroy');
+    Route::delete('/assets/{asset}/disposals/{disposal}', [AssetDisposalController::class, 'destroy'])->middleware('permission:crud_assets')->name('assets.disposals.destroy');
 
     // KEW.PA-28→32 — Kehilangan (Loss Report)
     Route::post('/assets/{asset}/loss-reports', [AssetLossReportController::class, 'store'])->name('assets.loss-reports.store');
     Route::put('/assets/{asset}/loss-reports/{lossReport}', [AssetLossReportController::class, 'update'])->name('assets.loss-reports.update');
-    Route::delete('/assets/{asset}/loss-reports/{lossReport}', [AssetLossReportController::class, 'destroy'])->name('assets.loss-reports.destroy');
+    Route::delete('/assets/{asset}/loss-reports/{lossReport}', [AssetLossReportController::class, 'destroy'])->middleware('permission:crud_assets')->name('assets.loss-reports.destroy');
 
     // KEW.PA-30 — Laporan Akhir Kehilangan (Final Loss Investigation)
     Route::get('/assets/{asset}/loss-reports/{lossReport}/kewpa30',        [AssetLossReportController::class, 'kewpa30'])->name('assets.loss-reports.kewpa30');
@@ -164,12 +164,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // KEW.PA-6 — Daftar Pergerakan (Transfer/Movement)
     Route::post('/assets/{asset}/transfers', [AssetTransferController::class, 'store'])->name('assets.transfers.store');
     Route::put('/assets/{asset}/transfers/{transfer}', [AssetTransferController::class, 'update'])->name('assets.transfers.update');
-    Route::delete('/assets/{asset}/transfers/{transfer}', [AssetTransferController::class, 'destroy'])->name('assets.transfers.destroy');
+    Route::delete('/assets/{asset}/transfers/{transfer}', [AssetTransferController::class, 'destroy'])->middleware('permission:crud_assets')->name('assets.transfers.destroy');
 
     // Naiktaraf (Upgrades) — Bahagian B on KEW.PA-2/PA-3
     Route::post('/assets/{asset}/upgrades', [AssetUpgradeController::class, 'store'])->name('assets.upgrades.store');
     Route::put('/assets/{asset}/upgrades/{upgrade}', [AssetUpgradeController::class, 'update'])->name('assets.upgrades.update');
-    Route::delete('/assets/{asset}/upgrades/{upgrade}', [AssetUpgradeController::class, 'destroy'])->name('assets.upgrades.destroy');
+    Route::delete('/assets/{asset}/upgrades/{upgrade}', [AssetUpgradeController::class, 'destroy'])->middleware('permission:crud_assets')->name('assets.upgrades.destroy');
 
     // ── Phase 4: New View & Download Routes ──────────────────────────────────
 
@@ -220,7 +220,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     // KEW.PA-16 — Perakuan Pelupusan Kenderaan
     Route::get('/assets/{asset}/vehicle-disposal', [VehicleDisposalAssessmentController::class, 'index'])->name('assets.vehicle-disposal.index');
     Route::post('/assets/{asset}/vehicle-disposal', [VehicleDisposalAssessmentController::class, 'store'])->name('assets.vehicle-disposal.store');
-    Route::delete('/assets/{asset}/vehicle-disposal', [VehicleDisposalAssessmentController::class, 'destroy'])->name('assets.vehicle-disposal.destroy');
+    Route::delete('/assets/{asset}/vehicle-disposal', [VehicleDisposalAssessmentController::class, 'destroy'])->middleware('permission:crud_assets')->name('assets.vehicle-disposal.destroy');
     Route::get('/assets/{asset}/vehicle-disposal/kewpa16', [VehicleDisposalAssessmentController::class, 'kewpa16'])->name('assets.vehicle-disposal.kewpa16');
     Route::get('/assets/{asset}/vehicle-disposal/kewpa16/download', [VehicleDisposalAssessmentController::class, 'downloadKewpa16'])->name('assets.vehicle-disposal.kewpa16.download');
 });
@@ -234,19 +234,19 @@ Route::middleware(['auth', 'verified'])->prefix('disposal-sales')->name('disposa
     Route::post('/',            [DisposalSaleController::class, 'store'])->name('store');
     Route::get('/{sale}',       [DisposalSaleController::class, 'show'])->name('show');
     Route::put('/{sale}',       [DisposalSaleController::class, 'update'])->name('update');
-    Route::delete('/{sale}',    [DisposalSaleController::class, 'destroy'])->name('destroy');
+    Route::delete('/{sale}',    [DisposalSaleController::class, 'destroy'])->middleware('permission:crud_assets')->name('destroy');
 
     // Sale Items (nested)
     Route::get('/{sale}/items',             [DisposalSaleItemController::class, 'index'])->name('items.index');
     Route::post('/{sale}/items',            [DisposalSaleItemController::class, 'store'])->name('items.store');
     Route::put('/{sale}/items/{item}',      [DisposalSaleItemController::class, 'update'])->name('items.update');
-    Route::delete('/{sale}/items/{item}',   [DisposalSaleItemController::class, 'destroy'])->name('items.destroy');
+    Route::delete('/{sale}/items/{item}',   [DisposalSaleItemController::class, 'destroy'])->middleware('permission:crud_assets')->name('items.destroy');
 
     // Bids (nested under items)
     Route::get('/{sale}/items/{item}/bids',            [SaleBidController::class, 'index'])->name('items.bids.index');
     Route::post('/{sale}/items/{item}/bids',           [SaleBidController::class, 'store'])->name('items.bids.store');
     Route::put('/{sale}/items/{item}/bids/{bid}',      [SaleBidController::class, 'update'])->name('items.bids.update');
-    Route::delete('/{sale}/items/{item}/bids/{bid}',   [SaleBidController::class, 'destroy'])->name('items.bids.destroy');
+    Route::delete('/{sale}/items/{item}/bids/{bid}',   [SaleBidController::class, 'destroy'])->middleware('permission:crud_assets')->name('items.bids.destroy');
 
     // KEW.PA Form Views
     Route::get('/{sale}/kewpa21',   [DisposalSaleController::class, 'kewpa21'])->name('kewpa21');
@@ -274,7 +274,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/committee-appointments', [CommitteeAppointmentController::class, 'index'])->name('committee-appointments.index');
     Route::post('/committee-appointments', [CommitteeAppointmentController::class, 'store'])->name('committee-appointments.store');
     Route::put('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'update'])->name('committee-appointments.update');
-    Route::delete('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'destroy'])->name('committee-appointments.destroy');
+    Route::delete('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'destroy'])->middleware('permission:crud_assets')->name('committee-appointments.destroy');
 });
 
 Route::middleware('auth')->group(function () {
@@ -296,12 +296,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     Route::get('/receivings/{receiving}/kewpa1/download', [AssetController::class, 'downloadKewpa1'])->name('receivings.kewpa1.download');
     Route::put('/receivings/{receiving}', [AssetController::class, 'updateReceiving'])->name('receivings.update');
-    Route::delete('/receivings/{receiving}', [AssetController::class, 'destroyReceiving'])->name('receivings.destroy');
+    Route::delete('/receivings/{receiving}', [AssetController::class, 'destroyReceiving'])->middleware('permission:crud_assets')->name('receivings.destroy');
 
     // Asset downloads (was unprotected — moved into auth group)
     Route::get('/assets/{asset}/kewpa2/download', [AssetController::class, 'downloadKewpa2'])->name('assets.kewpa2.download');
     Route::get('/assets/{asset}/kewpa3/download', [AssetController::class, 'downloadKewpa3'])->name('assets.kewpa3.download');
     Route::get('/assets/{asset}/label', [AssetController::class, 'downloadLabel'])->name('assets.label');
+
+    // Restore soft-deleted records — admin/superadmin only
+    Route::post('/assets/{id}/restore', [AssetController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.restore');
+    Route::post('/receivings/{id}/restore', [AssetController::class, 'restoreReceiving'])->middleware('permission:crud_assets')->name('receivings.restore');
 
 });
 
@@ -321,7 +325,7 @@ Route::middleware(['auth', 'verified'])->prefix('suppliers')->name('suppliers.')
     Route::get('/',          [SupplierController::class, 'index'])->name('index');
     Route::post('/',         [SupplierController::class, 'store'])->name('store');
     Route::put('/{supplier}', [SupplierController::class, 'update'])->name('update');
-    Route::delete('/{supplier}', [SupplierController::class, 'destroy'])->name('destroy');
+    Route::delete('/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:crud_assets')->name('destroy');
 });
 
 // ── Scanner Module — GET routes redirect, API routes stay ──────────────────
@@ -380,5 +384,38 @@ Route::get('/_dev/dedup-master-items', function () {
             ->value(\DB::raw('COUNT(*) - COUNT(DISTINCT item_no)')),
     ]);
 })->name('dev.dedup');
+
+// ── Utility: Deduplicate suppliers ─────────────────────────────────────────
+Route::get('/_dev/dedup-suppliers', function () {
+    $map = [
+        // Dotcom: keep ID 1, merge 6 (abbreviated) and 7 (dotcom telecom)
+        6 => 1,
+        7 => 1,
+        // SNS: keep ID 3, merge 8 (sns network)
+        8 => 3,
+    ];
+
+    $updated = 0;
+    $deleted = 0;
+    foreach ($map as $fromId => $toId) {
+        $from = \DB::table('suppliers')->where('id', $fromId)->first();
+        if (!$from) continue;
+
+        $affected = \DB::table('master_items')->where('supplier_id', $fromId)->update(['supplier_id' => $toId]);
+        $updated += $affected;
+
+        \DB::table('suppliers')->where('id', $fromId)->delete();
+        $deleted++;
+    }
+
+    $to = \DB::table('suppliers')->where('id', 1)->first();
+
+    return response()->json([
+        'merged' => $deleted,
+        'master_items_updated' => $updated,
+        'remaining' => \DB::table('suppliers')->count(),
+        'canonical_dotcom' => $to?->name,
+    ]);
+})->name('dev.dedup-suppliers');
 
 require __DIR__.'/auth.php';

@@ -768,7 +768,11 @@ class DocumentParser:
 
                 # Quantity (just digits, 1-999)
                 if re.match(r'^\d{1,3}$', peek) and len(peek) <= 3:
-                    qty = int(peek)
+                    qty_val = int(peek)
+                    # Prefer larger qty values — skip smaller ones to prevent
+                    # stray values like "1" from overriding the real qty (e.g. "15")
+                    if qty_val > qty:
+                        qty = qty_val
                     j += 1
                     continue
 
@@ -1011,6 +1015,22 @@ class DocumentParser:
             return serials
 
         def _extract_brand_model(desc: str) -> tuple:
+            up_desc = desc.upper()
+            # 1) First check KNOWN_BRANDS list (longest match first)
+            for known in sorted(self.KNOWN_BRANDS, key=len, reverse=True):
+                idx = up_desc.find(known)
+                if idx != -1:
+                    brand = known.title()
+                    # 2) Get text after the brand name as model
+                    after_brand = desc[idx + len(known):].strip()
+                    if after_brand:
+                        # Strip leading separators
+                        after_brand = re.sub(r'^[\s/\-:]+', '', after_brand).strip()
+                        model = re.sub(r'\s+', ' ', after_brand).strip()
+                    else:
+                        model = None
+                    return brand, model
+            # 3) Fall back to old '/' split if no known brand found
             brand_pats = [
                 r'(?:China|USA|Japan|Netherlands|Sweden|Korea|Taiwan|Germany)\s*/\s*([A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9\s\.\-/]+)',
                 r'([A-Z][A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9][A-Za-z0-9\s\.\-/]+)',
@@ -1096,6 +1116,17 @@ class DocumentParser:
             if not item_code:
                 continue
 
+            # --- Convert roman numeral suffix (i)/(ii)/(iii) to -A/-B/-C ---
+            ROMAN_MAP = {'i': 'A', 'ii': 'B', 'iii': 'C', 'iv': 'D', 'v': 'E'}
+            _rs = re.match(
+                r'^\d+\.\d+(?:\.\d+)*(?:\.\d+)?\s*\(([ivx]+)\)', line
+            )
+            if _rs:
+                rv = _rs.group(1).lower()
+                if rv in ROMAN_MAP:
+                    item_code = f"{item_code}-{ROMAN_MAP[rv]}"
+            # -----------------------------------------------------------------
+
             # Collect description — look backwards for product name
             desc_lines = [rest] if rest else []
             serial_lines = []
@@ -1134,7 +1165,11 @@ class DocumentParser:
 
                 qty_m = re.match(r'^(\d{1,3})\s*$', peek)
                 if qty_m and 1 <= int(qty_m.group(1)) <= 500:
-                    qty = int(qty_m.group(1))
+                    qty_val = int(qty_m.group(1))
+                    # Prefer larger qty values — skip smaller ones to prevent
+                    # stray values like "1" from overriding the real qty
+                    if qty_val > qty:
+                        qty = qty_val
                     j += 1
                     continue
 
@@ -1168,11 +1203,34 @@ class DocumentParser:
             description = re.sub(r'\s+', ' ', description).strip()
             description = re.sub(r'^\([ivx]+\)\s*', '', description).strip()
 
+            # --- Extract embedded S/N patterns from description ---
+            # Patterns like: S/N XXXX, Serial No: XXXX, No.Siri: XXXX, SN: XXXX
+            embedded_sns = []
+            sn_pattern = re.compile(
+                r'(?i)(?:S\/N|Serial\s*(?:No|Number|#)|No\.?\s*Siri|SN)\s*[:=]?\s*'
+                r'([A-Z0-9][-A-Z0-9]+(?:\s*[,;]\s*[A-Z0-9][-A-Z0-9]+)*)'
+            )
+            desc_clean = description
+            for sn_m in sn_pattern.finditer(description):
+                raw = sn_m.group(1).strip()
+                # Split multi-value entries (comma/semicolon separated)
+                for part in re.split(r'\s*[,;]\s*', raw):
+                    part = part.strip()
+                    if part and len(part) >= 4:
+                        embedded_sns.append(part)
+                desc_clean = desc_clean.replace(sn_m.group(0), '').strip()
+            description = re.sub(r'\s+', ' ', desc_clean).strip()
+            # -------------------------------------------------------
+
             if len(description) < 5 or re.match(r'^[A-Z\s]{4,}$', description):
                 continue
 
             all_serials_text = " ".join(serial_lines)
             serials = _extract_serials(all_serials_text)
+
+            # Merge embedded S/Ns found in description
+            if embedded_sns:
+                serials = embedded_sns + serials
 
             # Also try extracting bare S/Ns from description
             if not serials:
@@ -1192,12 +1250,6 @@ class DocumentParser:
                 serial_number = None
 
             brand, model = _extract_brand_model(description)
-            if not brand:
-                up_desc = description.upper()
-                for known in sorted(self.KNOWN_BRANDS, key=len, reverse=True):
-                    if known in up_desc:
-                        brand = known.title()
-                        break
 
             item = ExtractedItem(
                 item_code=item_code,
@@ -1278,6 +1330,22 @@ class DocumentParser:
             return serials
 
         def _extract_brand_model(desc: str) -> tuple:
+            up_desc = desc.upper()
+            # 1) First check KNOWN_BRANDS list (longest match first)
+            for known in sorted(self.KNOWN_BRANDS, key=len, reverse=True):
+                idx = up_desc.find(known)
+                if idx != -1:
+                    brand = known.title()
+                    # 2) Get text after the brand name as model
+                    after_brand = desc[idx + len(known):].strip()
+                    if after_brand:
+                        # Strip leading separators
+                        after_brand = re.sub(r'^[\s/\-:]+', '', after_brand).strip()
+                        model = re.sub(r'\s+', ' ', after_brand).strip()
+                    else:
+                        model = None
+                    return brand, model
+            # 3) Fall back to old '/' split if no known brand found
             brand_pats = [
                 r'(?:China|USA|Japan|Netherlands|Sweden|Korea|Taiwan|Germany)\s*/\s*([A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9\s\.\-/]+)',
                 r'([A-Z][A-Za-z0-9\s\.\-]+?)\s*/\s*([A-Za-z0-9][A-Za-z0-9\s\.\-/]+)',

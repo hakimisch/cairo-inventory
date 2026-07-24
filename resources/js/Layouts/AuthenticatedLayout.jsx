@@ -583,6 +583,30 @@ export default function AuthenticatedLayout({ header, children }) {
                                         Admin
                                     </span>
                                 )}
+                                {user.role === 'superadmin' && (
+                                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#FCA5A5',
+                                                   textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                        Super Admin
+                                    </span>
+                                )}
+                                {user.role === 'manager' && (
+                                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#6EE7B7',
+                                                   textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                        Pengurus
+                                    </span>
+                                )}
+                                {user.role === 'auditor' && (
+                                    <span style={{ fontSize: '10px', fontWeight: 700, color: '#93C5FD',
+                                                   textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                        Auditor
+                                    </span>
+                                )}
+                                {user.role === 'user' && (
+                                    <span style={{ fontSize: '10px', fontWeight: 700, color: 'rgba(255,245,171,0.5)',
+                                                   textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                                        Pengguna
+                                    </span>
+                                )}
                             </div>
                         </div>
                         <Link

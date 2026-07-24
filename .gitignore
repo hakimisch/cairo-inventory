@@ -31,5 +31,6 @@ Homestead.json
 Homestead.yaml
 Thumbs.db
 
+__pycache__/
 /plans
 table_name.php

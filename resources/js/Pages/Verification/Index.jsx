@@ -271,6 +271,8 @@ function VerifyModal({ item, onClose }) {
     const [custodianName, setCustodianName] = useState('');
     const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0, 10));
     const [warrantyExpiry, setWarrantyExpiry] = useState('');
+    const [budgetVot, setBudgetVot] = useState('');
+    const [voucherNo, setVoucherNo] = useState('');
     const [processing, setProcessing] = useState(false);
 
     const hasExplicitSerials = initialSerials.length > 0;
@@ -287,6 +289,8 @@ function VerifyModal({ item, onClose }) {
             serial_numbers: selectedSerials.join(', '),
             location: commonLocation,
             custodian_name: custodianName,
+            budget_vot: budgetVot,
+            voucher_no: voucherNo,
             received_date: receivedDate,
             warranty_expiry: warrantyExpiry,
         }, {
@@ -416,6 +420,23 @@ function VerifyModal({ item, onClose }) {
                         </div>
                     </div>
 
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
+                        <div>
+                            <label style={labelStyle}>Vot Peruntukan (Budget) <span style={{ fontWeight: 400, color: UTM.gray300 }}>(optional)</span></label>
+                            <input type="text" value={budgetVot}
+                                onChange={e => setBudgetVot(e.target.value)}
+                                placeholder="e.g. D001-2025-001"
+                                style={inputStyle} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>No. Baucer (Voucher) <span style={{ fontWeight: 400, color: UTM.gray300 }}>(optional)</span></label>
+                            <input type="text" value={voucherNo}
+                                onChange={e => setVoucherNo(e.target.value)}
+                                placeholder="e.g. BK-2025-001"
+                                style={inputStyle} />
+                        </div>
+                    </div>
+
                     <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
                         <button type="button" onClick={onClose}
                             style={{ padding: '9px 18px', borderRadius: 8, border: `1.5px solid ${UTM.gray100}`, background: UTM.white, fontSize: 13, fontWeight: 600, cursor: 'pointer', color: UTM.gray600 }}>
@@ -444,6 +465,8 @@ function ReceiveModal({ item, onClose }) {
     const [techOfficerPosition, setTechOfficerPosition] = useState('');
     const [receivedDate, setReceivedDate] = useState(new Date().toISOString().slice(0, 10));
     const [doNo, setDoNo] = useState('');
+    const [purchaseOrderNo, setPurchaseOrderNo] = useState('');
+    const [qtyReceived, setQtyReceived] = useState(item.quantity ?? 1);
     const [invoiceNo, setInvoiceNo] = useState('');
     const [damageDesc, setDamageDesc] = useState('');
     const [notes, setNotes] = useState('');
@@ -455,6 +478,8 @@ function ReceiveModal({ item, onClose }) {
         router.post(`/verification/${item.id}/receive`, {
             received_date: receivedDate,
             do_no: doNo,
+            purchase_order_no: purchaseOrderNo,
+            quantity_received: qtyReceived,
             receiver_name: receiverName,
             receiver_position: receiverPosition,
             technical_officer_name: techOfficerName,
@@ -512,6 +537,21 @@ function ReceiveModal({ item, onClose }) {
                             <label style={labelStyle}>DO No.</label>
                             <input type="text" value={doNo} onChange={e => setDoNo(e.target.value)}
                                 placeholder="e.g. UTMCARD/2025/005" style={inputStyle} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>PO No.</label>
+                            <input type="text" value={purchaseOrderNo} onChange={e => setPurchaseOrderNo(e.target.value)}
+                                placeholder="e.g. PPTK170300122025000272" style={inputStyle} />
+                        </div>
+                        <div>
+                            <label style={labelStyle}>Qty Received</label>
+                            <input type="number" min="1" max={item.quantity ?? 999} value={qtyReceived}
+                                onChange={e => setQtyReceived(parseInt(e.target.value) || 1)} style={inputStyle} />
+                            {qtyReceived < (item.quantity ?? 1) && (
+                                <p style={{ fontSize: 10, color: '#E65100', margin: '2px 0 0' }}>
+                                    ⚠ Partial — {item.quantity - qtyReceived} unit lagi belum diterima
+                                </p>
+                            )}
                         </div>
                         <div>
                             <label style={labelStyle}>Invoice No.</label>
@@ -577,7 +617,7 @@ function TabBar({ tabs, activeTab, onTabChange }) {
 }
 
 // ─── Pipeline View ─────────────────────────────────────────────────────────────
-function PipelineView({ items, stats, categories, filters }) {
+function PipelineView({ items, stats, categories, filters, user }) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [catFilter, setCatFilter] = useState(filters.category ?? '');
     const [statusFilter, setStatusFilter] = useState(filters.status ?? '');
@@ -827,6 +867,7 @@ function PipelineView({ items, stats, categories, filters }) {
                                                     <span style={{ color: UTM.gray300, fontSize: 12 }}>Verified</span>
                                                 )
                                             ) : item.status === 'diterima' ? (
+                                                ['admin', 'superadmin'].includes(user.role) ? (
                                                 <button onClick={() => setVerifyItem(item)}
                                                     style={{
                                                         padding: '6px 12px', borderRadius: 6, border: 'none',
@@ -835,6 +876,11 @@ function PipelineView({ items, stats, categories, filters }) {
                                                     }}>
                                                     Verify
                                                 </button>
+                                                ) : (
+                                                <span style={{ color: UTM.gray500, fontSize: 11, fontStyle: 'italic' }}>
+                                                    Menunggu pengesahan pentadbir
+                                                </span>
+                                                )
                                             ) : (
                                                 <button onClick={() => setReceiveItem(item)}
                                                     style={{
@@ -1160,6 +1206,7 @@ function RegistryView({ registryItems, registryCounts, filters }) {
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 export default function VerificationIndex({ items, stats, categories, filters, registry_items, registry_counts }) {
+    const user = usePage().props.auth.user;
     const { errors: pageErrors } = usePage().props;
     const [activeTab, setActiveTab] = useState(filters.tab === 'registry' ? 'registry' : 'pipeline');
 
@@ -1187,6 +1234,7 @@ export default function VerificationIndex({ items, stats, categories, filters, r
                         stats={stats}
                         categories={categories}
                         filters={filters}
+                        user={user}
                     />
                 ) : (
                     <RegistryView

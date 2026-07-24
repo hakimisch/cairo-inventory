@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
  
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -161,10 +161,11 @@ function StatCard({ label, count, color }) {
     );
 }
 
-export default function Index({ assets, totalValue, stats }) {
+export default function Index({ assets, trashed, totalValue, stats }) {
+    const user = usePage().props.auth.user;
     const [search, setSearch]         = useState('');
-    const [typeFilter, setTypeFilter] = useState('all'); 
-    const [expandedId, setExpandedId] = useState(null); 
+    const [typeFilter, setTypeFilter] = useState('all');
+    const [expandedId, setExpandedId] = useState(null);
     const [dateFrom, setDateFrom]     = useState('');
     const [dateTo, setDateTo]         = useState('');
 
@@ -283,6 +284,12 @@ export default function Index({ assets, totalValue, stats }) {
                             label="Inventori" count={inventoryCount}
                             active={typeFilter === 'inventory'} onClick={() => setTypeFilter('inventory')}
                         />
+                        {['admin', 'superadmin'].includes(user.role) && (
+                            <FilterTab
+                                label={"🚮 Tong"} count={trashed?.length ?? 0}
+                                active={typeFilter === 'trashed'} onClick={() => setTypeFilter('trashed')}
+                            />
+                        )}
                     </div>
 
                     {/* ── Stats row ── */}
@@ -325,7 +332,55 @@ export default function Index({ assets, totalValue, stats }) {
                     </div>
 
                     {/* ── Table Container (Scrollable) ── */}
-                    <div style={{ background: UTM.white, borderRadius: 10,
+                    {typeFilter === 'trashed' ? (
+                        <div style={{ background: UTM.white, borderRadius: 10,
+                                      border: `1.5px solid ${UTM.gray100}`, overflow: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 800 }}>
+                                <thead>
+                                    <tr style={{ background: '#FEF2F2', borderBottom: `1.5px solid #FECACA` }}>
+                                        <th style={thStyle}>Tag Aset</th>
+                                        <th style={thStyle}>Nama Aset</th>
+                                        <th style={thStyle}>Kategori</th>
+                                        <th style={thStyle}>Dipadam Pada</th>
+                                        <th style={thStyle, { textAlign: 'right' }}>Tindakan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(trashed ?? []).length === 0 ? (
+                                        <tr>
+                                            <td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center', color: UTM.gray500, fontSize: 13 }}>
+                                                Tong sampah kosong.
+                                            </td>
+                                        </tr>
+                                    ) : (trashed ?? []).map(asset => (
+                                        <tr key={asset.id} style={{ borderBottom: `1px solid ${UTM.gray100}` }}>
+                                            <td style={{ padding: '10px 12px', fontWeight: 700 }}>{asset.asset_tag}</td>
+                                            <td style={{ padding: '10px 12px' }}>{asset.name}</td>
+                                            <td style={{ padding: '10px 12px', color: UTM.gray500 }}>{asset.category}</td>
+                                            <td style={{ padding: '10px 12px', fontSize: 11, color: UTM.gray500 }}>
+                                                {fmtDT(asset.deleted_at)}
+                                            </td>
+                                            <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm(`Pulihkan aset "${asset.name}" (${asset.asset_tag})?`)) {
+                                                            router.post(route('assets.restore', asset.id), {}, { preserveScroll: true });
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        padding: '5px 14px', borderRadius: 6, fontSize: '12px', fontWeight: 700,
+                                                        background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    Pulihkan
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    ) : (<><div style={{ background: UTM.white, borderRadius: 10,
                                   border: `1.5px solid ${UTM.gray100}`, overflow: 'auto' }}>
                         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, minWidth: 1000 }}>
                             <thead>
@@ -497,10 +552,11 @@ export default function Index({ assets, totalValue, stats }) {
                                                         Edit
                                                     </Link>
 
-                                                    {/* Delete Button */}
+                                                    {/* Delete Button — admin/superadmin only */}
+                                                    {['admin', 'superadmin'].includes(user.role) && (
                                                     <button
                                                         onClick={() => {
-                                                            if (window.confirm(`Padam aset "${asset.name}" (${asset.asset_tag})?\nSemua rekod berkaitan akan turut dipadam.`)) {
+                                                            if (window.confirm(`Padam aset "${asset.name}" (${asset.asset_tag})?\nAset akan dipindahkan ke Tong. Boleh dipulihkan dalam masa 30 hari.`)) {
                                                                 router.delete(route('assets.destroy', asset.id));
                                                             }
                                                         }}
@@ -518,6 +574,7 @@ export default function Index({ assets, totalValue, stats }) {
                                                     >
                                                         Hapus
                                                     </button>
+                                                    )}
                                                 </td>
                                             </tr>
 
@@ -612,7 +669,8 @@ export default function Index({ assets, totalValue, stats }) {
                             <strong style={{ color: UTM.maroon }}>{assets.length}</strong> aset
                         </div>
                     </div>
- 
+                    </>)}
+
                 </div>
             </div>
         </AuthenticatedLayout>

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -291,7 +291,8 @@ function EditReceivingForm({ record, onDone }) {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-export default function ReceivingIndex({ receivings, stats }) {
+export default function ReceivingIndex({ receivings, trashed, stats }) {
+    const user = usePage().props.auth.user;
     const [selectedItem, setSelectedItem] = useState(null);
     const [expandedId, setExpandedId]     = useState(null);
     const [editingId, setEditingId]       = useState(null);
@@ -345,7 +346,7 @@ export default function ReceivingIndex({ receivings, stats }) {
     };
 
     const handleDelete = (item) => {
-        if (window.confirm(`Padam penerimaan ${item.receive_no} (${item.supplier_name})? Tindakan ini tidak boleh dibatalkan.`)) {
+        if (window.confirm(`Padam penerimaan ${item.receive_no} (${item.supplier_name})? Rekod akan dipindahkan ke Tong. Boleh dipulihkan dalam masa 30 hari.`)) {
             router.delete(route('receivings.destroy', item.id), { preserveScroll: true });
         }
     };
@@ -570,39 +571,41 @@ export default function ReceivingIndex({ receivings, stats }) {
                                                                     marginRight : 8,
                                                                 }}
                                                            >
-                                                                Tolak
-                                                            </Link>
-                                                            <button
-                                                                onClick={() => { setEditingId(editingId === item.id ? null : item.id); if (expandedId === item.id) setExpandedId(null); }}
-                                                                style={{
-                                                                    padding     : '5px 12px',
-                                                                    borderRadius: 6,
-                                                                    fontSize    : '12px',
-                                                                    fontWeight  : 700,
-                                                                    background  : editingId === item.id ? '#FDE68A' : '#E6F4EC',
-                                                                    color       : editingId === item.id ? '#92400E' : '#065F46',
-                                                                    border      : 'none',
-                                                                    cursor      : 'pointer',
-                                                                    marginRight : 8,
-                                                                }}
-                                                            >
-                                                                {editingId === item.id ? 'Batal' : 'Edit'}
-                                                            </button>
-                                                            <button
-                                                                onClick={() => handleDelete(item)}
-                                                                style={{
-                                                                    padding     : '5px 12px',
-                                                                    borderRadius: 6,
-                                                                    fontSize    : '12px',
-                                                                    fontWeight  : 700,
-                                                                    background  : '#FEE2E2',
-                                                                    color       : '#991B1B',
-                                                                    border      : 'none',
-                                                                    cursor      : 'pointer',
-                                                                }}
-                                                            >
-                                                                Hapus
-                                                            </button>
+                                                               Tolak
+                                                           </Link>
+                                                           <button
+                                                               onClick={() => { setEditingId(editingId === item.id ? null : item.id); if (expandedId === item.id) setExpandedId(null); }}
+                                                               style={{
+                                                                   padding     : '5px 12px',
+                                                                   borderRadius: 6,
+                                                                   fontSize    : '12px',
+                                                                   fontWeight  : 700,
+                                                                   background  : editingId === item.id ? '#FDE68A' : '#E6F4EC',
+                                                                   color       : editingId === item.id ? '#92400E' : '#065F46',
+                                                                   border      : 'none',
+                                                                   cursor      : 'pointer',
+                                                                   marginRight : 8,
+                                                               }}
+                                                           >
+                                                               {editingId === item.id ? 'Batal' : 'Edit'}
+                                                           </button>
+                                                           {['admin', 'superadmin'].includes(user.role) && (
+                                                           <button
+                                                               onClick={() => handleDelete(item)}
+                                                               style={{
+                                                                   padding     : '5px 12px',
+                                                                   borderRadius: 6,
+                                                                   fontSize    : '12px',
+                                                                   fontWeight  : 700,
+                                                                   background  : '#FEE2E2',
+                                                                   color       : '#991B1B',
+                                                                   border      : 'none',
+                                                                   cursor      : 'pointer',
+                                                               }}
+                                                           >
+                                                               Hapus
+                                                           </button>
+                                                           )}
                                                         </>
                                                     )}
                                                 </td>
@@ -974,6 +977,55 @@ export default function ReceivingIndex({ receivings, stats }) {
                     </div>
                 </div>
             )}
+
+            {['admin', 'superadmin'].includes(user.role) && (trashed ?? []).length > 0 && (
+                <div style={{ marginTop: 24, background: UTM.white, borderRadius: 12,
+                              border: '1.5px solid #FECACA', overflow: 'hidden' }}>
+                    <div style={{ padding: '12px 20px', background: '#FEF2F2',
+                                  borderBottom: '1px solid #FECACA', fontSize: 13, fontWeight: 700, color: '#991B1B' }}>
+                        Tong Sampah ({trashed.length})
+                    </div>
+                    <div style={{ overflowX: 'auto' }}>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12, minWidth: 700 }}>
+                            <thead>
+                                <tr style={{ background: '#FEF2F2' }}>
+                                    <th style={thStyle}>No. Penerimaan</th>
+                                    <th style={thStyle}>Pembekal</th>
+                                    <th style={thStyle}>Dipadam Pada</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {trashed.map(item => (
+                                    <tr key={item.id} style={{ borderBottom: '1px solid #FECACA' }}>
+                                        <td style={{ padding: '8px 12px', fontWeight: 700 }}>{item.receive_no}</td>
+                                        <td style={{ padding: '8px 12px', color: UTM.gray700 }}>{item.supplier_name}</td>
+                                        <td style={{ padding: '8px 12px', color: UTM.gray500, fontSize: 11 }}>
+                                            {new Date(item.deleted_at).toLocaleString('ms-MY')}
+                                        </td>
+                                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                                            <button
+                                                onClick={() => {
+                                                    if (window.confirm('Pulihkan penerimaan ' + item.receive_no + '?')) {
+                                                        router.post(route('receivings.restore', item.id), {}, { preserveScroll: true });
+                                                    }
+                                                }}
+                                                style={{
+                                                    padding: '4px 12px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+                                                    background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer',
+                                                }}
+                                            >
+                                                Pulihkan
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            )}
+
         </AuthenticatedLayout>
     );
 }

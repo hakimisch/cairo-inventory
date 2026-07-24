@@ -3,19 +3,20 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 use Spatie\Activitylog\Support\LogOptions;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 
 class AssetInspection extends Model
 {
-    use LogsActivity;
+    use LogsActivity, SoftDeletes;
+
     protected $fillable = [
         'asset_id',
         'inspection_date',
         'status',
         'inspector_name',
         'notes',
-        // NEW — KEW.PA-10/PA-11 compliance fields
         'is_record_complete',
         'is_record_updated',
         'actual_location',
