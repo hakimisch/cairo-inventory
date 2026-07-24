@@ -34,3 +34,4 @@ Thumbs.db
 __pycache__/
 /plans
 table_name.php
+item_documents/
