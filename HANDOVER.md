@@ -2,7 +2,7 @@
 
 > **Project handover** — for the next developer continuing CAIRO Inventory development after the original author's departure.
 >
-> **Author:** Hakimi (hakimisch) — Last updated: 2026-07-24
+> **Author:** Hakimi (hakimisch) — Last updated: 2026-08-08
 > **Stack:** Laravel 12 + React 18 (Inertia.js SPA) + PostgreSQL 18
 > **Repo:** https://github.com/hakimisch/cairo-inventory.git
 > **Deployment:** AWS Elastic Beanstalk + RDS PostgreSQL + S3
@@ -81,11 +81,11 @@ php artisan serve
 
 | Check | Command | Expected |
 |-------|---------|----------|
-| Migrations ran | `php artisan migrate:status` | All 56 migrations show "Y" (ran) |
+| Migrations ran | `php artisan migrate:status` | All 59 migrations show "Y" (ran) |
 | Seed users exist | Check DB: `SELECT email, role FROM users;` | 7 users across 5 roles |
-| Master items exist | Check DB: `SELECT COUNT(*) FROM master_items;` | 170 rows |
+| Master items exist | Check DB: `SELECT COUNT(*) FROM master_items;` | 156 rows |
 | Build is clean | `npm run build` | ✓ built in ~18s, 0 errors |
-| Tests pass | `php artisan test` | 117 tests, 538 assertions |
+| Tests pass | `php artisan test` | 116 passed / 2 failed / 482 assertions (2 stale failures — see Known Issues #3) |
 
 ### Potential Gotchas
 
@@ -167,13 +167,13 @@ pip install -r requirements.txt
 ┌─────────────────────────────────────────────────────────────────┐
 │                       Laravel Backend                            │
 │                                                                  │
-│  Routes → Controllers (37) → Eloquent Models (20) → PostgreSQL   │
+│  Routes → Controllers (37) → Eloquent Models (21) → PostgreSQL   │
 │                              │                                   │
 │            ┌─────────────────┼─────────────────┐                │
 │            ▼                 ▼                  ▼                │
 │     PDF Engine          OCR Pipeline       Services              │
-│    (35 Blade tpls)   (2,069-line Python)   (Import, OCR)         │
-│     Browsershot        Tesseract                                 │
+│    (35 Blade tpls)   (2,080-line Python)   (Import, OCR,         │
+│     Browsershot        Tesseract           AssetTagGenerator)    │
 │                                                                  │
 │  Middleware: auth, verified, PermissionMiddleware, RoleMiddleware │
 └─────────────────────────────────────────────────────────────────┘
@@ -188,13 +188,13 @@ Supplier PDF/CSV
 Editable Preview Grid (/import or /pdf-import)
        │
        ▼  Confirm Import
-master_items (170 items, status: belum_diterima)
+master_items (156 items, status: belum_diterima)
        │
        ▼  /verification page
-Receive ──→ diterima ──→ PA-1 created (receivings table)
+Receive ──→ diterima ──→ receiver metadata stored as JSON (receive_meta)
   │
-  ▼  (admin/superadmin only)
-Verify ──→ verified ──→ Assets created (assets table, per-S/N split)
+  ▼  (permission:verify — superadmin/admin/user)
+Verify ──→ verified ──→ PA-1 (receivings) + Assets (assets table, per-S/N split) created atomically
   │
   ▼
 KEW.PA-2 / PA-3 forms with individual S/Ns
@@ -221,11 +221,12 @@ Assets ──→ Movements (PA-6) ──→ Loans (PA-9A)
 
 | Table | Purpose | Key Columns |
 |-------|---------|-------------|
-| `master_items` | Equipment register — unique by `item_no`. The source of truth for all pipeline imports. | `id`, `item_no`, `name`, `category`, `brand`, `serial_numbers`, `unit_price`, `quantity`, `status` ('belum_diterima'/'diterima'/'verified'), `supplier_id`, `is_bundle_component`, `parent_item_id`, `location`, `deleted_at` |
-| `receivings` | PA-1 records — created at Receive time. One per receive action (not one per item). | `id`, `master_item_id`, `status`, `received_date`, `receiver_name`, `receiver_position`, `technical_officer_name`, `technical_officer_position`, `damage_description`, `notes`, `invoice_no`, `purchase_order_no`, `delivery_order_no`, `quantity_received`, `signatures`, `deleted_at` |
+| `master_items` | Equipment register — unique by `item_no`. The source of truth for all pipeline imports. | `id`, `item_no`, `name`, `category`, `brand`, `serial_numbers`, `unit_price`, `quantity`, `status` ('belum_diterima'/'diterima'/'verified'), `supplier_id`, `is_bundle_component`, `parent_item_id`, `location`, `receive_meta` (JSON), `deleted_at` |
+| `receivings` | PA-1 records — created at **Verify** time (pipeline) or immediately at scanner quick-receive. One per receive action (not one per item). | `id`, `master_item_id`, `status`, `received_date`, `receiver_name`, `receiver_position`, `technical_officer_name`, `technical_officer_position`, `damage_description`, `notes`, `invoice_no`, `purchase_order_no`, `delivery_order_no`, `quantity_received`, `rejection_reason`, `rejected_at`, `signatures`, `deleted_at` |
 | `assets` | Individual assets — created at Verify time. One per S/N after split. | `id`, `asset_tag` ('AST-XXXXXXXX'), `name`, `category`, `brand`, `serial_number`, `unit_price`, `purchase_price`, `quantity` (always 1 after split), `location`, `custodian_name`, `warranty_expiry`, `budget_vot`, `voucher_no`, `supplier_name`, `received_date`, `status`, `verified_by_scan`, `deleted_at` |
-| `suppliers` | Supplier registry. Currently has duplicates (needs dedup). | `id`, `name`, `contact_person`, `email`, `phone`, `address`, `deleted_at` |
+| `suppliers` | Supplier registry. **Dedup executed 2026-07-31 — 2 canonical rows remain.** | `id`, `name`, `contact_person`, `email`, `phone`, `address`, `deleted_at` |
 | `scans` | Scanner lookup log. Currently empty — never exercised. | `id`, `serial_number`, `master_item_id`, `asset_id`, `scanned_at`, `action` |
+| `locations` | Location lookup table (Phase 1 cleanup). Currently empty — seed via `LocationSeeder`. | `id`, `name`, `code`, `deleted_at` |
 | `users` | 7 users across 5 roles. | `id`, `name`, `email`, `password`, `role` ('superadmin'/'admin'/'manager'/'auditor'/'user'), `email_verified_at` |
 
 ### Lifecycle Tables (scaffolded, most are empty)
@@ -253,8 +254,9 @@ Assets ──→ Movements (PA-6) ──→ Loans (PA-9A)
 master_items.status:
   belum_diterima ──[Receive]──→ diterima ──[Verify]──→ verified
                                     │                      │
-                                PA-1 created          Assets created
-                                (receivings)          (one per S/N)
+                           receive_meta JSON      PA-1 (receivings) +
+                           stored (no PA-1)       Assets created atomically
+                                                  (one per S/N)
 ```
 
 ### Dropped Tables (no longer exist — cleaned up during refactor)
@@ -274,7 +276,7 @@ master_items.status:
 
 | File | What It Does |
 |------|-------------|
-| `bin/cairo-ocr` (2,069 lines) | Python OCR engine — parses PO/DO/Quotation PDFs, extracts items with confidence scoring. Detects CamScanner watermarks, handles 4 document formats. |
+| `bin/cairo-ocr` (2,080 lines) | Python OCR engine — parses PO/DO/Quotation PDFs, extracts items with confidence scoring. Detects CamScanner watermarks, handles 4 document formats. |
 | `app/Http/Controllers/ImportController.php` | Web UI import — handles CSV/Excel/pasted text uploads at `/import`. `parseCsv()` and `parseExcel()` could be unified. |
 | `app/Http/Controllers/PdfImportController.php` | Web UI PDF import at `/pdf-import` — uploads PDF, runs OCR via `OcrService`, shows preview grid. |
 | `app/Console/Commands/ImportPdfData.php` | CLI version — `php artisan cairo:import-pdf --file=... --type=... --supplier=...` |
@@ -285,20 +287,22 @@ master_items.status:
 
 | File | What It Does |
 |------|-------------|
-| `app/Http/Controllers/VerificationController.php` | The main pipeline controller. `index()` shows master items + scanner panel. `receive()` creates PA-1 + updates status to `diterima`. `verify()` splits by S/N and creates Assets. |
-| `resources/js/Pages/Verification/Index.jsx` | React page with Registry tab, Receive modal (with partial qty + PO/DO/invoice fields), Verify modal (with S/N split table + budget_vot/voucher_no), Scanner panel. |
-| `app/Http/Controllers/ScanController.php` | Scanner — status-aware lookup. Returns `belum_diterima`/`diterima`/`verified` info for the frontend to decide next action. |
+| `app/Http/Controllers/VerificationController.php` | The main pipeline controller. `index()` shows master items + scanner panel. `receive()` stores receiver/DO metadata as JSON in `master_items.receive_meta` and updates status to `diterima` (no PA-1 yet). `verify()` reads the metadata and creates **PA-1 (Receiving) + Asset(s) atomically** in one transaction — per-S/N split, location/custodian/warranty/budget_vot/voucher_no capture. |
+| `app/Services/AssetTagGenerator.php` | **Unified tag generation** — one parsing rule (`SUBSTR`), `Cache::lock` against races, `AST-YYYYMMDD-NNNNNN` (assets) / `REC-YYYYMMDD-NNNN` (receivings). Used by verify, scanner, `acceptReceiving`, `storeReceiving`. Legacy `CAIRO/…` + `RC-` formats retired. |
+| `resources/js/Pages/Verification/Index.jsx` | React page with Registry tab, Receive modal (partial qty + PO/DO/invoice fields), Verify modal (S/N split table + budget_vot/voucher_no), Scanner panel. NOTE: Verify button still hardcoded to `['admin','superadmin']` — backend grants `user` role `verify` (known UI/backend mismatch). |
+| `app/Http/Controllers/ScanController.php` | Scanner — status-aware lookup. Returns `belum_diterima`/`diterima`/`verified` info. `receiveFromScan` creates PA-1 immediately (quick-receive path); `verifyFromScan` splits by S/N and creates assets. |
 
 ### RBAC System
 
 | File | What It Does |
 |------|-------------|
-| `config/roles.php` | Role-permission matrix defining all 5 roles and their granted permissions. |
+| `config/roles.php` | Role-permission matrix defining all 5 roles. **`user` role has `verify`** (added 2026-07-31) — staff can verify, cannot delete. |
 | `app/Middleware/PermissionMiddleware.php` | Route-level gate — checks `$request->user()->hasPermission($permission)`. Used as `->middleware('permission:verify')` etc. |
 | `app/Middleware/RoleMiddleware.php` | Route-level role check — `->middleware('role:superadmin')`. |
 | `app/Models/User.php` | `role` column (string), `hasPermission()`, `hasRole()` methods. `MustVerifyEmail` interface implemented. |
 | `app/Http/Controllers/Admin/AdminUserController.php` | CRUD at `/admin/users` — manage users, assign roles (superadmin only). |
-| `database/seeders/AdminUserSeeder.php` | Seeds 7 users across all 5 roles. |
+| `database/seeders/DatabaseSeeder.php` | Creates the 5 demo accounts (user@gmail.com / admin@cairo.utm / manager@cairo.utm / auditor@cairo.utm / ibrahim@cairo.utm) + master items via `MasterItemSeeder` (156). |
+| `database/seeders/AdminUserSeeder.php` | Creates only the deployment admin `admin@cairo.test` (NOT the 5 demo accounts — those come from `DatabaseSeeder`). |
 
 ### Soft Delete + Recycle Bin
 
@@ -306,10 +310,9 @@ master_items.status:
 |------|-------------|
 | `database/migrations/2026_07_24_000001_add_soft_deletes_to_all_tables.php` | Adds `deleted_at` to 19 tables in one migration. |
 | All 19 models in `app/Models/` | `use SoftDeletes;` trait. |
-| `app/Http/Controllers/AssetController.php` | `destroy()` soft-deletes assets/receivings. `restore()` / `restoreReceiving()` restores with activity logging. |
-| `routes/web.php` | All DELETE routes gated with `permission:crud_assets`. Restore routes: `POST /assets/{id}/restore`, `POST /receivings/{id}/restore`. |
-| `resources/js/Pages/Assets/Index.jsx` | "Tong" tab shows soft-deleted assets with "Pulihkan" button. Hapus button gated to admin/superadmin. |
-| `resources/js/Pages/Assets/ReceivingIndex.jsx` | "Tong Sampah" section at page bottom with restore. |
+| `app/Http/Controllers/*.php` (11 controllers) | `destroy()` soft-deletes. `restore()` methods + trashed data for 13 modules (Assets, Receivings, Transfers, Damage Reports, Placements, Inspections, Maintenances, Disposals, Loss Reports, Vehicle Disposals, Disposal Sales, Suppliers, Committees) — with activity logging. |
+| `routes/web.php` | All DELETE routes gated with `permission:crud_assets`. Restore routes: `POST /{resource}/{id}/restore` per module. |
+| `resources/js/Pages/*/Index.jsx` (11 pages) | "Tong (N)" toggle (admin/superadmin only) revealing trashed table with "Pulihkan" button. Hapus button gated to admin/superadmin. |
 
 ### Pages & Components (Frontend)
 
@@ -319,107 +322,122 @@ master_items.status:
 | `resources/js/Pages/Verification/` | The pipeline hub: Receive/Verify/Scanner |
 | `resources/js/Pages/Assets/` | KEW.PA-2/PA-3 registration, list, show |
 | `resources/js/Layouts/AuthenticatedLayout.jsx` | Sidebar + header + role badges (all 5 roles) |
-| `resources/js/Components/` | 15 reusable components |
+| `resources/js/Components/` | 16 reusable components |
 | `resources/views/pdfs/` | 35 Blade PDF templates — all 34 KEW.PA forms |
 
 ### Routes
 
 | File | Routes |
 |------|--------|
-| `routes/web.php` | ~175 route definitions — everything is here (auth, pipeline, lifecycle, reports). No separate API routes. |
+| `routes/web.php` | ~200 route definitions — everything is here (auth, pipeline, lifecycle, reports). No separate API routes. |
 
 ---
 
 ## 6. Current State — Snapshot
 
-**Date:** 2026-07-24
+**Date:** 2026-07-31 (verified 2026-08-08)
 
 ### What's Built vs What's Exercised
 
 | Area | Built | Exercised With Real Data |
 |------|-------|-------------------------|
-| **Phase 1 — 16 Lifecycle Modules** | ✅ All CRUD, PDFs, sidebar, seed data | ✅ Demo seed data only |
-| **OCR Engine** (bin/cairo-ocr) | ✅ 2,069 lines, 4 doc format detectors | ✅ Real PO + DO PDFs |
-| **Import Pipeline** (PDF/CSV/Excel) | ✅ All interfaces work | ✅ 170 master items imported |
-| **Receive → PA-1** | ✅ Full modal with signature block, partial qty | 
-| **Verify → Assets** | ✅ Per-S/N split, atomic tags, budget_vot/voucher_no | 
-| **Scanner** | ✅ Status-aware lookup panel | 
+| **Phase 1 — 16 Lifecycle Modules** | ✅ All CRUD, PDFs, sidebar, seed data | ✅ Demo seed data (DB reset 2026-07-31 — tables empty, re-seed via `DatabaseSeeder`) |
+| **OCR Engine** (bin/cairo-ocr) | ✅ 2,080 lines, 4 doc format detectors | ✅ Real PO + DO PDFs |
+| **Import Pipeline** (PDF/CSV/Excel) | ✅ All interfaces work | ✅ 156 master items imported |
+| **Receive** | ✅ Modal with partial qty, metadata stored as JSON (`receive_meta`) | ✅ Pipeline exercised |
+| **Verify → PA-1 + Assets** | ✅ Per-S/N split, atomic creation, AssetTagGenerator | ✅ **15 assets, 2 PA-1 records** (2026-07-27) |
+| **Scanner** | ✅ Status-aware lookup panel | ✅ Used during pipeline exercise |
 | **RBAC (5 roles)** | ✅ PermissionMiddleware, RoleMiddleware, email verification | ✅ Tested via test suite |
-| **Soft Delete + Tong** | ✅ 19 models, restore endpoints, UI buttons | ✅ Tested via test suite |
-| **Supplier Dedup** | ✅ `GET /_dev/dedup-suppliers` route | 
+| **Soft Delete + Tong (13 modules)** | ✅ 19 models, restore endpoints, UI buttons | ✅ Tested via test suite |
+| **Supplier Dedup** | ✅ `php artisan cairo:dedup-suppliers --force` | ✅ **Executed — 5 → 2 suppliers** |
+| **Registration Gating** | ✅ `REGISTRATION_ENABLED` (default off) | ✅ Route unregistered when disabled |
 
-### Database Row Counts
+### Database Row Counts (verified 2026-08-08)
 
 | Table | Count | Status |
 |-------|-------|--------|
-| `master_items` | 170 | All `belum_diterima` |
-| `assets` | 0 | Pipeline never run |
-| `receivings` | 12 | Legacy seed only (fictional companies, no FK to pipeline) |
-| `suppliers` | 5 | Has duplicates (Dotcom ×3: IDs 1,6,7; SNS ×2: IDs 3,8) |
+| `master_items` | 156 | 154 `belum_diterima`, 2 `verified` |
+| `assets` | 15 | From pipeline exercise (14 from Jul-27 batch + 1) |
+| `receivings` | 2 | PA-1 records created at Verify |
+| `suppliers` | 2 | Canonical — dedup executed (Dotcom id 1, SNS id 3) |
 | `scans` | 0 | Never used |
 | `users` | 7 | 1 superadmin, 2 admin, 1 manager, 1 auditor, 2 staff |
-| `activity_log` | ~970 | Active audit trail |
-| `committee_appointments` | 12 | Placeholder (DummyKewpaSeeder) |
+| `activity_log` | ~988 | Active audit trail |
+| `locations` | 0 | `LocationSeeder` available |
+| Demo tables (14) | 0 | DB was reset 2026-07-31 |
 
 ### Codebase Size
 
 | Metric | Count |
 |--------|-------|
 | React Pages | 65 |
-| Components | 15 |
-| Eloquent Models | 20 |
+| Components | 16 |
+| Eloquent Models | 21 |
 | Controllers | 37 (28 business + 9 auth) |
-| Migrations | 56 |
+| Migrations | 59 |
 | Blade PDFs | 35 |
-| Routes | ~175 |
-| OCR Engine | 2,069 lines Python |
-| Tests | 117 tests, 538 assertions |
+| Routes | ~200 |
+| OCR Engine | 2,080 lines Python |
+| Tests | 118 tests, 482 assertions (116 pass / 2 fail — stale tests, see Known Issues #3) |
 | Build | ✅ 0 errors (Vite) |
 
 ### Master Items by Status
 
 | Status | Count | With Asset |
 |--------|-------|------------|
-| `belum_diterima` | 170 | 0 |
+| `belum_diterima` | 154 | 0 |
 | `diterima` | 0 | 0 |
-| `verified` | 0 | 0 |
+| `verified` | 2 | 15 |
 
-**The entire pipeline is ready but never exercised.** This is the single most important task for whoever picks this up.
+**The pipeline is now exercised** (15 assets, 2 PA-1 records). **154 master items remain `belum_diterima`** — the next step is to Receive→Verify them in batches to build the production asset register.
 
 ---
 
 ## 7. Uncommitted Changes Basket
 
-**31 modified files, 9 untracked files** — changes from the last working session that are NOT yet committed.
+**46 modified files, 11 untracked files** — changes from the last two working sessions (2026-07-24 + 2026-07-31) that are NOT yet committed.
 
-### Modified Files (31)
-
-```
-app/Console/Commands/ImportPdfData.php       ← Uses MasterItemImportService
-app/Http/Controllers/AssetController.php     ← Soft-delete + restore methods
-app/Http/Controllers/ImportController.php    ← Uses MasterItemImportService
-app/Http/Controllers/PdfImportController.php ← Uses MasterItemImportService
-app/Http/Controllers/VerificationController.php ← PO field, partial qty, budget_vot/voucher_no
-app/Models/*.php (19 models)                 ← SoftDeletes trait
-bin/cairo-ocr                                ← Brand extraction fix, S/N parsing, qty fix, roman numeral format
-resources/js/Layouts/AuthenticatedLayout.jsx ← Role badges (all 5 roles)
-resources/js/Pages/Assets/Index.jsx          ← Tong tab + gate delete
-resources/js/Pages/Assets/ReceivingIndex.jsx ← Tong section + gate delete
-resources/js/Pages/Suppliers/Index.jsx       ← Gate delete
-resources/js/Pages/Verification/Index.jsx    ← Gate Verify + PO field + partial qty + budget_vot
-routes/web.php                               ← crud_assets gates, restore routes, dedup route
-```
-
-### Untracked Files (9)
+### Modified Files (46 — highlights)
 
 ```
-app/Services/MasterItemImportService.php     ← New shared import service
-database/migrations/2026_07_24_000001_add_soft_deletes_to_all_tables.php  ← New migration
-scripts/seed_rbac_users.php                  ← Utility
-scripts/validate_seeder_prices.py            ← Utility
-scripts/verify_analysis.py                   ← Utility
-scripts/test-mail.php                        ← Utility
-item_documents/DO SNS.pdf                    ← Reference PDF
+README.md                                        ← login table + pipeline description fixed
+app/Console/Commands/ImportPdfData.php           ← Uses MasterItemImportService, imported/skipped shape
+app/Http/Controllers/AssetController.php         ← Soft-delete + restore, rejectReceiving redesign, tag via service
+app/Http/Controllers/VerificationController.php  ← receive_meta JSON, PA-1 at verify, tags via generator
+app/Http/Controllers/ScanController.php          ← off-by-one fix, split guard, threshold config
+app/Http/Controllers/ImportController.php        ← Uses MasterItemImportService
+app/Http/Controllers/PdfImportController.php     ← Uses MasterItemImportService
+app/Http/Controllers/{AssetDisposal,AssetInspection,AssetLossReport,AssetMaintenance,AssetTransfer,AssetUpgrade,CommitteeAppointment,DamageReport,DisposalSale,Supplier,VehicleDisposalAssessment}Controller.php  ← restore() methods
+app/Http/Middleware/HandleInertiaRequests.php    ← flash → Inertia props (FlashToaster)
+app/Models/MasterItem.php, app/Models/Receiving.php  ← receive_meta, rejection fields
+app/Services/MasterItemImportService.php         ← transaction + dedup + skipped counts
+bin/cairo-ocr                                    ← 32 regex escapes fixed, qty cross-check
+bootstrap/app.php                                ← AdminMiddleware alias removed, route groups merged
+config/roles.php                                 ← user role gains verify
+database/seeders/DatabaseSeeder.php              ← calls Location/Supplier/MasterItem seeders
+phpunit.xml                                      ← REGISTRATION_ENABLED=true for tests
+resources/js/Components/Toast.jsx                ← no-emoji icons ✓ ✕ ! i
+resources/js/Layouts/AuthenticatedLayout.jsx     ← Role badges + FlashToaster bridge
+resources/js/Pages/* (13 JSX)                    ← Trash tab UI + permission gating + Welcome 34 forms
+routes/auth.php                                  ← registration gated
+routes/web.php                                   ← /_dev/dedup-* removed, restore routes, crud_assets gates
+tests/Feature/MasterItemLifecycleTest.php        ← dedup tests → artisan command
+```
+
+### Untracked Files (11)
+
+```
+app/Console/Commands/DedupMasterItems.php        ← NEW — cairo:dedup-master-items (--dry-run/--force)
+app/Console/Commands/DedupSuppliers.php          ← NEW — cairo:dedup-suppliers (executed on live DB)
+app/Console/Commands/ResetPipeline.php           ← NEW — cairo:reset-pipeline
+app/Models/Location.php                          ← NEW
+app/Services/AssetTagGenerator.php               ← NEW — unified AST-/REC- numbering
+config/cairo.php                                 ← NEW — asset_threshold, receive_no_prefix, registration_enabled
+database/migrations/2026_07_24_000002_create_locations_table.php  ← NEW
+database/migrations/2026_07_31_000001_add_receive_meta_to_master_items.php  ← NEW
+database/migrations/2026_07_31_000002_add_rejection_fields_to_receivings.php  ← NEW (applied)
+database/seeders/LocationSeeder.php              ← NEW
+ocr_total_debug_tmp.py                           ← OCR debug helper — pending deletion approval (H1)
 ```
 
 ### What's in the diff
@@ -427,10 +445,9 @@ item_documents/DO SNS.pdf                    ← Reference PDF
 ```bash
 # View the full uncommitted diff:
 git diff HEAD --stat
-# 31 files changed, 464 insertions(+), 187 deletions(-)
 ```
 
-**Recommendation:** Commit these changes before the handover. They represent a coherent batch of work (soft delete + RBAC hardening + pipeline polish + OCR hardening). A single commit message like `feat: soft delete, RBAC hardening, pipeline completion` would be appropriate.
+**Recommendation:** Commit these in logical groups before handover (see Housekeeping H2): Phase 0 (security), Phase 1 (data integrity), or per-feature. Do **not** commit `ocr_total_debug_tmp.py` — delete it first.
 
 ---
 
@@ -440,79 +457,100 @@ git diff HEAD --stat
 
 | # | Issue | Impact | Fix |
 |---|-------|--------|-----|
-| 1 | **Suppliers have duplicates** — Dotcom (IDs 1,6,7) and SNS (IDs 3,8) | Importing new items links to wrong supplier ID | Hit `GET /_dev/dedup-suppliers` to merge. After that, confirm 14 master_items references updated. |
-| 2 | **Pipeline never exercised** — 170 master items all `belum_diterima`. 0 assets. 0 receivings. | No production data exists | Run Receive then Verify on a batch of items. Start small (5-10 items) to validate the flow. |
-| 3 | **12 legacy receivings** have no FK to pipeline (fictional companies: TechZone, Global Tech, etc.) | They're noise in the PA-1 listing | Either delete them or hide behind a filter. |
+| 1 | **2 stale tests failing** — `EndToEndPipelineTest` (asserts PA-1 exists at Receive — old pipeline) + `RbacTest > staff cannot verify` (pre-RBAC-fix) | Suite is 116 pass / 2 fail / 482 assertions — CI/red flag | Move Receiving assertions to after verify step; rewrite staff test to assert staff CAN verify (`user` role has `verify`). See backlog item 17. |
+| 2 | **Verify button UI/backend mismatch** — backend grants `user` role `verify`, but `Verification/Index.jsx:891` hides the button for non-`['admin','superadmin']` | Staff can verify via direct POST but see "Menunggu pengesahan pentadbir" with no button | Pass `can_verify` prop from controller and gate the button on it. See backlog item 16. |
+| 3 | **`acceptReceiving()` validates only `photo`** (`AssetController.php:51-105`) | Garbage category/campus/location/warranty values persist silently | Mirror `update()` rules + `$request->safe()->only([...])`. See backlog item 14. |
+| 4 | **Jul-27 asset fate** — 14 assets (ids 1-14, `AST-20260727-000001…014`) created from a **qty=1** master item (mi=3, "Single Core", 14 S/Ns) under old split logic; source list has duplicate S/N `BZMKCH4` | Current code would create ONE asset with concatenated S/Ns for qty=1 — inconsistent with the 14 existing assets | Decide: collapse 14 → 1 asset or keep (verify against source DO). See backlog item 19. |
 
 ### 🟡 Functional
 
 | # | Issue | Notes |
 |---|-------|-------|
-| 4 | **Dashboard** uses free-text `custodian_name` matching instead of user FK | Low priority — only matters once assets exist with real custodian data |
-| 5 | **Duplicate `/dashboard` route** defined twice in `routes/web.php` | No runtime impact — Laravel uses the last definition |
-| 6 | **Many lifecycle tables empty** (12/22 tables have 0 records) | By design — scaffolded for future use. Not a bug. |
-| 7 | **DummyKewpaSeeder seeds 12 placeholder committee_appointments** | Low priority — delete when real data is ready |
+| 5 | **Dashboard** uses free-text `custodian_name` matching instead of user FK | Low priority — only matters once assets exist with real custodian data |
+| 6 | **OCR `total_amount` still None** on scanned DO docs — Tesseract text contains no JUMLAH/TOTAL/RM markers | Capture quality is the limit; multi-line pattern + preprocessing options in backlog F1 |
+| 7 | **OCR supplier capture includes noise** — `[^\n]*` grabs to EOL (e.g. "Dotcom Telecommunications Sdn BAG Â« …") | Tighten capture class to `[A-Za-z0-9 .&()\-]+` (backlog F2) |
+| 8 | **JADUAL HARGA multi-page scan takes 10+ min to OCR** | Blocks PHP worker when invoked via web — add page-range option / async (backlog F3) |
+| 9 | **Welcome page has no sidebar link** | Authenticated users must type `/` to see it |
+| 10 | **`acceptReceiving()` hardcodes `>= 2000` threshold** (line 61) instead of `config('cairo.asset_threshold')` | One-line fix (backlog item 15) |
 
 ### 🔵 Technical Debt
 
 | # | Issue | Location | Suggested Fix |
 |---|-------|----------|---------------|
-| 8 | `bin/cairo-ocr` self-re-exec logic doubles execution time when called directly | `bin/cairo-ocr:__main__` | PdfImportController uses OcrService (no re-exec). The re-exec is only needed for direct CLI use. |
-| 9 | `ImportController::parseCsv` and `parseExcel` share no common base | `ImportController.php` | Extract a shared CSV/Excel parser service |
-| 10 | SNS Network DO PDFs have ~61% extraction accuracy | `bin/cairo-ocr` | Harder format — the SNS PDF has less tabular structure |
+| 11 | `bin/cairo-ocr` self-re-exec logic doubles execution time when called directly | `bin/cairo-ocr:__main__` | PdfImportController uses OcrService (no re-exec). The re-exec is only needed for direct CLI use. |
+| 12 | `ImportController::parseCsv` and `parseExcel` share no common base | `ImportController.php` | Extract a shared CSV/Excel parser service |
+| 13 | SNS Network DO PDFs have ~61% extraction accuracy | `bin/cairo-ocr` | Harder format — the SNS PDF has less tabular structure |
+| 14 | **Dead code**: `ItemsController` + `Items/Index.jsx` (zero routes), orphaned `Scanner/Index.jsx` + `History.jsx`, `Adminmiddleware.php` (no alias registered), `DummyKewpaSeeder` + `DashboardTestSeeder` unreferenced | Various | Remove — `git grep` each name → zero references (backlog item 20) |
+| 15 | `orWhereYear` ungrouped in kewpa12/kewpa20 | `ReportController.php:196-199` | Wrap in `where(fn ($q) => ...)` (backlog item 22) |
 
-### ✅ Recently Fixed (committed in the uncommitted diff)
+### ✅ Recently Fixed (2026-07-31 — uncommitted)
 
 | Fix | What Changed |
 |-----|-------------|
-| Brand extraction | KNOWN_BRANDS list checked first (was falling through to `/` split) |
-| Embedded S/N extraction | Regex patterns now extract S/N from description text |
-| Qty override bug | Prefers larger qty values (was taking the first number found) |
-| Roman numeral format | `(i)/(ii)/(iii)` in item codes converted to `-A/-B/-C` |
-| PO reference field | Added to Receive modal (was hardcoded to `'N/A'`) |
-| Partial receive qty | Quantity Received field with partial warning |
-| budget_vot + voucher_no | Added to Verify modal (was 0% fill rate) |
-| MasterItemImportService | Replaced 3 duplicate implementations |
+| Supplier dedup EXECUTED | 5 → 2 suppliers (Dotcom id 1, SNS id 3); 156 master_items re-pointed via `cairo:dedup-suppliers --force` |
+| Pipeline exercised | 15 assets + 2 PA-1 records created (2026-07-27) |
+| Legacy receivings gone | 12 fictional-company receivings removed with DB reset (2026-07-31) |
+| PA-1 moved to Verify | `receive()` stores `receive_meta` JSON; `verify()` creates PA-1 + Assets atomically |
+| Ungated `/dev/dedup-*` routes removed | Converted to `cairo:dedup-master-items` / `cairo:dedup-suppliers` artisan commands (--dry-run/--force) |
+| Registration gated | `REGISTRATION_ENABLED` (default off); routes unregistered, Register link auto-hides |
+| 32 OCR regex escapes fixed | Double-backslash corruption across 7 raw strings (supplier, total, generic fallback) |
+| rejectReceiving redesign | No more fake zero-value `REJ-` disposed asset — records `rejection_reason` + `rejected_at` |
+| Import atomicity | `DB::transaction` + dedup guard + `['imported','skipped']` return shape |
+| Scanner off-by-one fixed | Returns actual created tag/number, not next sequence value |
+| AssetTagGenerator service | Unified `AST-`/`REC-` numbering with `Cache::lock`; legacy `CAIRO/…` + `RC-` retired |
+| Session flashes → toasts | FlashToaster auto-renders `success`/`error` — permission denials finally visible |
+| `user` role gains `verify` | RBAC fix — staff can verify, cannot delete |
 
 ---
 
 ## 9. Roadmap — Prioritised Next Steps
 
-### P0 — Exercise the Pipeline (est. 1 day)
+> Full detail + execution order: `plans/2026-07-31_future-work-backlog.md` (self-contained, written at session close).
+
+### P0 — Commit the working tree (est. 30 min)
 
 | # | Task | Est. | Details |
 |---|------|------|---------|
-| 1 | Commit uncommitted changes | 5 min | `git add -A && git commit -m "..."` |
-| 2 | Run `GET /_dev/dedup-suppliers` | 1 min | Merge Dotcom (IDs 1,6,7→1) and SNS (IDs 3,8→3) |
-| 3 | Exercise Receive flow | 30 min | Select 5-10 master items, Receive them → verify PA-1 created |
-| 4 | Exercise Verify flow | 30 min | Verify received items → verify Assets created with correct S/N split |
-| 5 | Write a smoke test | 15 min | Quick assertion that pipeline produces 1 asset per S/N |
+| 1 | Delete `ocr_total_debug_tmp.py` | 1 min | OCR debug helper — pending deletion approval (Housekeeping H1) |
+| 2 | Commit Phase 0 + Phase 1 changes in logical groups | 30 min | Security (Phase 0), data integrity (Phase 1), or per-feature. Do NOT commit the debug tmp file. |
 
-### P1 — Production Readiness (est. 2-3 days)
+### P1 — Green suite + clerk UX (est. half day)
 
 | # | Task | Est. | Details |
 |---|------|------|---------|
-| 6 | Barcode label printing from verification page | 30 min | Currently only from Asset show page. Add print button to Verify modal. |
-| 7 | Dashboard custodian_name → user FK | 30 min | Replace string matching with proper user relationship |
-| 8 | Import remaining SNS DO data | 1 hr | If DO SNS.pdf hasn't been imported yet |
-| 9 | Remove DummyKewpaSeeder placeholder data | 10 min | 12 pre-seeded rows |
+| 3 | Fix 2 stale tests (backlog #17) | 30 min | EndToEndPipelineTest (PA-1 at Verify now) + RbacTest staff-can-verify → suite 118 pass / 0 fail |
+| 4 | `acceptReceiving()` validation (backlog #14) | 30 min | Mirror `update()` rules, `$request->safe()->only([...])` |
+| 5 | Threshold → config (backlog #15) | 5 min | `AssetController.php:61` hardcoded `>= 2000` → `config('cairo.asset_threshold')` |
+| 6 | Verify-button permission sync (backlog #16) | 30 min | Pass `can_verify` prop; gate button on it instead of hardcoded roles |
+| 7 | OCR confidence enforcement (backlog #13) | 2-3 hrs | Show score in preview, warn/block below ~50, log low-confidence imports |
 
-### P2 — Polish & Tech Debt (est. 1-2 days)
+### P2 — Tests & docs (est. half day)
 
 | # | Task | Est. | Details |
 |---|------|------|---------|
-| 10 | Unify CSV/Excel parsers in ImportController | 15 min | Extract shared base class |
-| 11 | Add PA-4/PA-5/PA-8 Blade PDF templates | 1 hr | Currently React-only output; add Blade for consistent PDF style |
-| 12 | Add PA-15/PA-29 letter-format PDF | 30 min | Committee appointment letters |
+| 8 | README overhaul (backlog #18) | 1 hr | Counts verified 2026-08-08: 156 master items, 59 migrations, 21 models, 16 components, 15 assets, 2 receivings, 2 suppliers, 118 tests/482 assertions (2 failing) |
+| 9 | Jul-27 asset fate (backlog #19) | 30 min | 14 assets from qty=1 item — collapse or keep after checking source DO |
+| 10 | Dead-code cleanup (backlog #20) | 30 min | ItemsController, orphaned Scanner pages, Adminmiddleware.php, unused seeders |
+
+### P3 — Polish & Tech Debt (est. 1-2 days)
+
+| # | Task | Est. | Details |
+|---|------|------|---------|
+| 11 | Barcode label printing from verification page | 30 min | Currently only from Asset show page. Add print button to Verify modal. |
+| 12 | Dashboard custodian_name → user FK | 30 min | Replace string matching with proper user relationship |
+| 13 | Unify CSV/Excel parsers in ImportController | 15 min | Extract shared base class |
+| 14 | OCR follow-ups F1/F2/F3 | half day | total_amount capture, supplier noise, slow multi-page scans |
+| 15 | Exercise remaining 154 master items | 1-2 hrs | Receive→Verify in batches to build the production asset register |
 
 ### Stretch — Nice To Have
 
 | # | Task | Notes |
 |---|------|-------|
-| 13 | Docker Compose for reproducible dev environment | Laravel + PostgreSQL + OCR in containers |
-| 14 | Bilingual support (BM/EN toggle) | Current UI is mixed — some labels in BM, some in EN |
-| 15 | SAGA integration | Sync asset data with Malaysia's national SAGA system |
-| 16 | E2E test suite | Automated browser tests for all CRUD workflows |
+| 16 | Docker Compose for reproducible dev environment | Laravel + PostgreSQL + OCR in containers |
+| 17 | Bilingual support (BM/EN toggle) | Current UI is mixed — some labels in BM, some in EN |
+| 18 | SAGA integration | Sync asset data with Malaysia's national SAGA system |
+| 19 | E2E test suite | Automated browser tests for all CRUD workflows |
+| 20 | DB-level pagination (backlog #21) + `orWhereYear` grouping (backlog #22) | Performance — defer until data grows past a few thousand |
 
 ---
 
@@ -567,23 +605,24 @@ eb logs cairo-inventory-env
 
 ## 11. Test Suite
 
-**117 tests, 538 assertions** across 13 test files:
+**118 tests, 482 assertions — 116 passed / 2 failed** (2 stale failures, see Known Issues #1 / backlog item 17) across 13 feature files + Auth suite:
 
 | Test File | Tests | Assertions | Coverage |
 |-----------|-------|------------|----------|
 | `ImportPipelineTest.php` | 13 | 57 | PDF import, CSV import, column matching, dedup |
-| `RbacTest.php` | 20 | 31 | Route permissions, role gating, middleware |
+| `RbacTest.php` | 20 | 31 | Route permissions, role gating, middleware (**1 stale test: staff-cannot-verify**) |
 | `RolesTest.php` | 15 | 29 | Role assignment, user management |
 | `VerificationPipelineTest.php` | 12 | 45 | Receive flow, Verify flow, item status transitions |
 | `ScannerTest.php` | 10 | 42 | Scanner lookup, status-aware actions |
-| `MasterItemLifecycleTest.php` | 8 | 22 | CRUD, filtering, master item status |
+| `MasterItemLifecycleTest.php` | 8 | 22 | CRUD, filtering, master item status, dedup commands |
 | `PaFormViewTest.php` | 6 | 9 | PDF form rendering, field presence |
 | `ProfileTest.php` | 5 | 16 | User profile, password change |
 | `VerifyEmailFullFlowTest.php` | 4 | 8 | Email verification lifecycle |
 | `EmailVerificationTest.php` | 3 | 5 | Verification mail, resend |
-| `EndToEndPipelineTest.php` | 1 | 51 | Full pipeline: import → receive → verify → asset check |
+| `EndToEndPipelineTest.php` | 1 | 51 | Full pipeline: import → receive → verify → asset check (**1 stale test: asserts PA-1 at Receive**) |
 | `ExampleTest.php` (Unit) | 1 | 1 | Default |
 | `EmailLogTest.php` | 1 | 3 | Mail log assertion |
+| `tests/Feature/Auth/*` | — | — | Breeze defaults (Authentication, Password Reset, Registration, etc.) |
 
 ```bash
 # Run all tests
@@ -596,6 +635,8 @@ php artisan test --filter=RbacTest
 # Run with coverage (requires Xdebug)
 php artisan test --coverage
 ```
+
+> **Note:** `phpunit.xml` sets `REGISTRATION_ENABLED=true` so registration tests pass — the app default is **off**.
 
 ---
 
@@ -616,6 +657,16 @@ php artisan migrate
 # Run seeders
 php artisan db:seed
 php artisan db:seed --class=AdminUserSeeder
+php artisan db:seed --class=LocationSeeder
+
+# Dedup master items / suppliers (replaces the removed /_dev/dedup-* routes)
+php artisan cairo:dedup-master-items --dry-run
+php artisan cairo:dedup-master-items --force
+php artisan cairo:dedup-suppliers --dry-run
+php artisan cairo:dedup-suppliers --force
+
+# Reset the pipeline (master items back to belum_diterima)
+php artisan cairo:reset-pipeline
 
 # Clear cache
 php artisan optimize:clear
@@ -656,7 +707,7 @@ powershell.exe -Command "psql -U postgres -d cairo_inventory -c 'SELECT COUNT(*)
 SELECT COUNT(*), status FROM master_items GROUP BY status;
 SELECT COUNT(*) FROM assets;
 SELECT COUNT(*) FROM receivings WHERE master_item_id IS NOT NULL;
-SELECT name, COUNT(*) as cnt FROM suppliers GROUP BY name HAVING COUNT(*) > 1;
+SELECT name, COUNT(*) as cnt FROM suppliers GROUP BY name HAVING COUNT(*) > 1;  -- expect 0 rows (dedup done)
 ```
 
 ### OCR Tests
@@ -675,15 +726,15 @@ python3 bin/cairo-ocr /path/to/document.pdf --debug
 
 | What | Where | Notes |
 |------|-------|-------|
-| **Architecture & Features** | `README.md` | Updated 2026-07-24 — describes all modules, pipeline, RBAC, soft delete |
-| **Current State + Roadmap** | `plans/current-state-and-roadmap.md` | Detailed system state, data flow, sidebar nav, edge cases, next steps |
-| **Last Progress Report** | `plans/progress-2026-07-24.md` | What was completed in the last working session |
-| **RBAC Implementation** | `plans/user-and-roles-module.md` | 5-role design, PermissionMiddleware, migration plan (ALL PHASES COMPLETE) |
-| **Director Feedback** | `plans/user-roles-and-sidebar-flow.md` | Original requirements for role separation and sidebar restructure |
+| **Architecture & Features** | `README.md` | Updated 2026-08-08 — all modules, pipeline, RBAC, soft delete, verified counts |
+| **System State + Changes** | `plans/2026-07-31_current-system-state.md` | Detailed current state, pipeline, RBAC, trash bin, Phase 0+1 execution record |
+| **Future Work Backlog** | `plans/2026-07-31_future-work-backlog.md` | Self-contained phased plan (Phase 2-4, OCR follow-ups, housekeeping) — start here |
+| **Current State + Roadmap** | `plans/current-state-and-roadmap.md` | Earlier state doc (2026-07-24) — superseded by the 2026-07-31 docs |
 | **Test Methodology** | `plans/test-methodology-and-coverage.md` | Test file breakdown, what each test covers |
-| **System Audit (stale)** | `plans/system-assessment.md` | From June 2026 — PO/DO tables described no longer exist. Use current-state-and-roadmap.md instead. |
+| **System Audit (stale)** | `plans/system-assessment.md` | From June 2026 — PO/DO tables described no longer exist. Use current-system-state.md instead. |
 | **Ground Truth Forms** | `KOLEKSI BORANG KEW.PA.pdf` | Official PDF of all 34 KEW.PA forms — the specification document |
-| **OCR Engine** | `bin/cairo-ocr` | 2,069-line Python — the code is the documentation |
+| **OCR Engine** | `bin/cairo-ocr` | 2,080-line Python — the code is the documentation |
+| **Compiled Assessment** | `C:\Hakimi\Stuff\assess\COMPILED_ASSESSMENT_2026-07-31.md` | 15/15 findings verified against code (ACTION_PLAN.md) |
 | **This Handover** | `HANDOVER.md` | You are here |
 
 

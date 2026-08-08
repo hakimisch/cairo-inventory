@@ -12,7 +12,7 @@
 | **Target** | UTM Asset Management Centre (Pusat Pengurusan Aset) |
 | **Scope** | 34 KEW.PA forms × 16 functional modules + procurement pipeline |
 | **Campus Coverage** | UTM Johor Bahru & UTM Kuala Lumpur |
-| **Status** | **Phase 1** (16 KEW.PA lifecycle modules) — all built, seeded with demo data, ground-truth verified. **Procurement pipeline** — 170 master items imported from real supplier documents, 2-step Receive→Verify pipeline ready. Pipeline ready but awaiting production asset entry. **RBAC** — 5 roles with granular permissions, email verification, soft-delete recycle bin. |
+| **Status** | **Phase 1** (16 KEW.PA lifecycle modules) — all built, seeded with demo data, ground-truth verified. **Procurement pipeline** — 156 master items imported from real supplier documents, 2-step Receive→Verify pipeline **exercised** (2026-07-27: 15 assets, 2 PA-1 records). **RBAC** — 5 roles with granular permissions, email verification, soft-delete recycle bin. |
 | **Purpose** | Thesis demonstration & pilot deployment |
 | **Deployment** | AWS Elastic Beanstalk + RDS + S3 (Singapore region) |
 
@@ -26,7 +26,7 @@
 | **Backend** | Laravel 12 (PHP 8.4) |
 | **Database** | PostgreSQL 18 |
 | **PDF Engine** | Spatie Laravel-PDF + Browsershot (Chromium) — 35 Blade templates covering all 34 KEW.PA forms |
-| **OCR Pipeline** | Python (PyMuPDF + Tesseract) — 2,069-line CLI engine `bin/cairo-ocr` |
+| **OCR Pipeline** | Python (PyMuPDF + Tesseract) — 2,080-line CLI engine `bin/cairo-ocr` |
 | **UI Components** | Headless UI + Tailwind CSS |
 | **Brand Identity** | UTM maroon (`#5C001F`) & gold (`#F8A617`) |
 | **Auth** | Laravel Breeze (session-based, 5 roles + email verification) |
@@ -51,12 +51,12 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 │                         Laravel Backend                           │
 │  ┌──────────┐  ┌─────────────────┐  ┌────────────────────────┐  │
 │  │ Routes   │  │ Controllers     │  │ Eloquent Models        │  │
-│  │ web.php  │──│ (28 business +  │──│ (20 models)           │  │
-│  │ ~175 rts │  │  9 auth = 37)   │  │                        │  │
+│  │ web.php  │──│ (28 business +  │──│ (21 models)           │  │
+│  │ ~200 rts │  │  9 auth = 37)   │  │                        │  │
 │  └──────────┘  └─────────────────┘  └───────────┬────────────┘  │
 │                                                  │                │
 │  ┌───────────────────────────────────────────────┘                │
-│  │  PostgreSQL (56 migrations — 17 business + 9 system tables)   │
+│  │  PostgreSQL (59 migrations — 17 business + 9 system tables)   │
 │  └──────────────────────────────────────────────────────────────┘ │
 │                              │
 │  ┌───────────────────────────┘
@@ -66,7 +66,7 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 │                              │
 │  ┌───────────────────────────┘
 │  │  OCR & Import Pipeline (Python + Tesseract)
-│  │  → 2,069-line engine parsing PO/DO/Quotation PDFs
+│  │  → 2,080-line engine parsing PO/DO/Quotation PDFs
 │  │  → CamScanner watermark + confidence scoring
 │  │  → CLI (`cairo:import-pdf`) + Web UI (`/import`)
 │  │  → Brand extraction (KNOWN_BRANDS priority), embedded S/N parsing
@@ -76,6 +76,7 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 │  │  Services Layer
 │  │  → MasterItemImportService (shared import logic)
 │  │  → OcrService (Python bridge without re-exec)
+│  │  → AssetTagGenerator (unified AST-/REC- numbering, Cache::lock)
 │  └──────────────────────────────────────────────────────────────┘
 └──────────────────────────────────────────────────────────────────┘
 
@@ -90,13 +91,13 @@ Inertia.js bridges Laravel and React without a separate API layer. Data flows di
 
 ```
 Upload at /import or /pdf-import
-    → OCR (bin/cairo-ocr — Python + Tesseract, 2,069 lines)
+    → OCR (bin/cairo-ocr — Python + Tesseract, 2,080 lines)
     → Preview & edit items in editable grid
     → Confirm → master_items table (canonical register, unique by item_no)
     → /verification page
-        → Receive (mark as diterima) → PA-1 created immediately
-        → Verify (admin/superadmin only) → per-S/N split into Assets
-            → warranty + budget_vot + voucher_no captured
+        → Receive (all roles) → stores receiver metadata, status → diterima
+        → Verify (permission:verify) → PA-1 + Assets created atomically
+            → per-S/N split; warranty + budget_vot + voucher_no captured
     → /scanner panel on verification page
         → Scan S/N → auto Receive (PA-1) or auto Verify based on status
     → Print KEW.PA-2 / PA-3 forms with individual S/Ns
@@ -158,7 +159,7 @@ The procurement pipeline bridges the gap between supplier PDF documents and the 
                                           ▼
                                 ┌─────────────────────┐
                                 │   master_items       │
-                                │   (170 items)        │
+                                │   (156 items)        │
                                 └─────────┬───────────┘
                                           │
                     ┌─────────────────────┼─────────────────────┐
@@ -166,10 +167,11 @@ The procurement pipeline bridges the gap between supplier PDF documents and the 
                     ▼                     ▼                     ▼
             ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
             │ Scanner S/N  │     │  Receive      │     │  Verify      │
-            │ (status-     │     │  (all roles)  │     │  (admin/     │
-            │  aware)      │     │  → PA-1       │     │  superadmin) │
-            │              │     │  created      │     │  → Assets    │
-            └──────────────┘     └──────────────┘     └──────────────┘
+            │ (status-     │     │  (all roles)  │     │  (permission:│
+            │  aware)      │     │  → metadata   │     │  verify)     │
+            │              │     │  stored       │     │  → PA-1 +    │
+            └──────────────┘     └──────────────┘     │  Assets      │
+                                                      └──────────────┘
                                                               │
                                                               ▼
                                                     ┌─────────────────────┐
@@ -183,13 +185,13 @@ The procurement pipeline bridges the gap between supplier PDF documents and the 
 ```
 belum_diterima  ──[Receive]──→  diterima  ──[Verify]──→  verified
                                      │                        │
-                                 PA-1 created            assets created
-                                 (signature block)        (warranty, budget_vot,
-                                                          voucher_no captured)
+                              receiver metadata        PA-1 + assets created
+                              stored as JSON           atomically (warranty,
+                              (receive_meta)           budget_vot, voucher_no)
 ```
 
-- **Receive**: Captures DO#, PO#, receiver name + position, tech officer name + position, damage description, notes, invoice no, **quantity_received** (supports partial). PA-1 created immediately.
-- **Verify**: Per-S/N asset splitting, location/custodian/warranty/budget_vot/voucher_no capture, atomic asset tag generation. **Gated to admin/superadmin only.**
+- **Receive**: Captures DO#, PO#, receiver name + position, tech officer name + position, damage description, notes, invoice no, **quantity_received** (supports partial). Stores the metadata on the master item and moves it to `diterima` — no PA-1 is created yet.
+- **Verify**: Reads the stored metadata and creates the **PA-1 (Receiving) + Asset(s) atomically in one transaction** — per-S/N asset splitting, location/custodian/warranty/budget_vot/voucher_no capture, atomic asset tag generation. **Gated by `permission:verify`** (superadmin / admin / user roles).
 
 ### Real Data Imported
 
@@ -204,7 +206,7 @@ belum_diterima  ──[Receive]──→  diterima  ──[Verify]──→  ver
 
 | Metric | Value |
 |--------|-------|
-| OCR engine size | **2,069 lines** (Python, PyMuPDF + Tesseract) |
+| OCR engine size | **2,080 lines** (Python, PyMuPDF + Tesseract) |
 | Document type detectors | 4 (PO, DO, Quotation, Unknown) |
 | CamScanner detection | >60% threshold → forces full OCR pass |
 | Brand extraction | KNOWN_BRANDS priority list with fallback `/` split |
@@ -244,14 +246,14 @@ Scanner panel on the Verification page (`/verification?scan=1`):
 | **admin** | `verify`, `crud_assets`, `view_reports`, `view_admin` |
 | **manager** | `view_reports` |
 | **auditor** | `view_reports` |
-| **user** (staff) | Can import, receive, scan, fill forms. Cannot verify or delete. |
+| **user** (staff) | Can import, receive, scan, fill forms, and **verify** (`verify` permission). Cannot delete. |
 
 ### Features
 
 - **PermissionMiddleware + RoleMiddleware** — route-level gating via `->middleware('permission:*')`
 - **Email verification** — `MustVerifyEmail` enforced on all routes
 - **Role badges** — Distinct coloured badges for all 5 roles in sidebar footer
-- **Verify gating** — Verify button hidden from non-admin (shows "Menunggu pengesahan pentadbir")
+- **Verify gating** — backend gated by `permission:verify` (superadmin/admin/user). Frontend button still gated to admin/superadmin — known UI/backend mismatch, see Known Issues #8
 - **Delete gating** — Hapus button hidden from non-admin/superadmin
 - **User management** — `/admin/users` with role assignment (superadmin only)
 
@@ -261,10 +263,9 @@ Scanner panel on the Verification page (`/verification?scan=1`):
 
 All 19 deletable models use `Illuminate\Database\Eloquent\SoftDeletes`. The UI:
 
-- **Assets page**: "Tong" filter tab shows soft-deleted assets with "Pulihkan" (Restore) button
-- **Receivings page**: "Tong Sampah" bottom section with restore
+- **13 modules have trash tabs** — every CRUD index page has a "Tong (N)" toggle (admin/superadmin only) showing soft-deleted records with "Pulihkan" (Restore) buttons: Assets, Receivings, Transfers, Damage Reports, Placements, Inspections, Maintenances, Disposals, Loss Reports, Vehicle Disposals, Disposal Sales, Suppliers, Committee Appointments
 - **Delete buttons** gated to `['admin', 'superadmin']` only
-- **Restore endpoint**: `POST /assets/{id}/restore` / `POST /receivings/{id}/restore`
+- **Restore endpoints**: `POST /{resource}/{id}/restore` per module (e.g. `/assets/{id}/restore`, `/receivings/{id}/restore`)
 - **Activity logging**: All soft-delete and restore actions logged via Spatie Activitylog
 
 ---
@@ -330,10 +331,10 @@ All 19 deletable models use `Illuminate\Database\Eloquent\SoftDeletes`. The UI:
 ### Annual Reports (Admin)
 | Form | Official Name (BM) | English | Status |
 |------|--------------------|---------|--------|
-| KEW.PA-4 | Senarai Daftar Harta Tetap | Fixed Asset Register List | ✅ Ready (React-only, no Blade) |
-| KEW.PA-5 | Senarai Daftar Inventori | Inventory Register List | ✅ Ready (React-only, no Blade) |
+| KEW.PA-4 | Senarai Daftar Harta Tetap | Fixed Asset Register List | ✅ Ready |
+| KEW.PA-5 | Senarai Daftar Inventori | Inventory Register List | ✅ Ready |
 | KEW.PA-7 | Senarai Harta Tetap dan Inventori (Mengikut Lokasi) | Asset List by Location | ✅ Ready |
-| KEW.PA-8 | Laporan Tahunan Harta Tetap dan Inventori | Annual Asset Report | ✅ Ready (React-only, no Blade) |
+| KEW.PA-8 | Laporan Tahunan Harta Tetap dan Inventori | Annual Asset Report | ✅ Ready |
 
 | Form count | Blade? | JSX? |
 |------------|--------|------|
@@ -386,7 +387,7 @@ All 19 deletable models use `Illuminate\Database\Eloquent\SoftDeletes`. The UI:
 
 - **UTM Branding** — maroon (#5C001F) and gold (#F8A617) colour palette
 - **Responsive Layout** — optimised for desktop and tablet
-- **7-Section Sidebar** — asset lifecycle organised by phase
+- **8-Section Sidebar** — asset lifecycle organised by phase
 - **Role Badges** — colour-coded role indicators in sidebar footer
 - **Toast Notifications** — instant action feedback
 - **Delete Confirmation** — modal dialogs before destructive actions
@@ -397,11 +398,13 @@ All 19 deletable models use `Illuminate\Database\Eloquent\SoftDeletes`. The UI:
 
 | Role | Email | Password |
 |------|-------|----------|
-| **Super Admin** | `admin@cairo.utm` | `password` |
-| **Admin** | `admin2@cairo.utm` | `password` |
+| **Super Admin** | `user@gmail.com` | `password` |
+| **Admin** | `admin@cairo.utm` | `password` |
 | **Manager** | `manager@cairo.utm` | `password` |
 | **Auditor** | `auditor@cairo.utm` | `password` |
-| **Staff** | `user@gmail.com` | `password` |
+| **Staff** | `ibrahim@cairo.utm` | `password` |
+
+> Deployment admin (`admin@cairo.test`) is also created by `AdminUserSeeder` for environments where the demo accounts are not seeded.
 
 **superadmin** can access everything — user management, admin dashboard, annual reports, verify pipeline, all asset modules.
 
@@ -522,26 +525,31 @@ cairo-inventory/
 │   ├── Middleware/
 │   │   ├── PermissionMiddleware.php        # 5-role RBAC enforcement
 │   │   └── RoleMiddleware.php
-│   ├── Models/                             # 20 Eloquent models
+│   ├── Models/                             # 21 Eloquent models
 │   │   ├── Asset.php, AssetDisposal.php, AssetInspection.php, ...
 │   │   ├── AssetLossReport.php, AssetMaintenance.php, AssetPlacement.php
 │   │   ├── AssetTransfer.php, AssetUpgrade.php, CommitteeAppointment.php
 │   │   ├── DamageReport.php, DisposalSale.php, DisposalSaleItem.php
-│   │   ├── FinalLossReport.php, MasterItem.php, Receiving.php
+│   │   ├── FinalLossReport.php, Location.php, MasterItem.php, Receiving.php
 │   │   ├── SaleBid.php, Scan.php, Supplier.php, User.php
 │   │   └── VehicleDisposalAssessment.php
 │   └── Services/
+│       ├── AssetTagGenerator.php           # Unified AST-/REC- numbering (Cache::lock)
 │       ├── MasterItemImportService.php     # Shared import logic (replaced 3 duplicates)
 │       └── OcrService.php                  # Python bridge without re-exec
 ├── bin/
-│   └── cairo-ocr                           # 2,069-line OCR/import CLI (Python)
+│   └── cairo-ocr                           # 2,080-line OCR/import CLI (Python)
 ├── config/
+│   ├── cairo.php                           # asset_threshold, receive_no_prefix, registration_enabled
 │   └── roles.php                           # 5-role permissions matrix
 ├── database/
-│   ├── migrations/                         # 56 migration files
+│   ├── migrations/                         # 59 migration files
 │   └── seeders/
 │       ├── DatabaseSeeder.php
-│       ├── AdminUserSeeder.php             # Pre-seeds all 5 example accounts
+│       ├── AdminUserSeeder.php             # Creates deployment admin (admin@cairo.test)
+│       ├── LocationSeeder.php
+│       ├── MasterItemSeeder.php            # 156 canonical master items
+│       ├── SupplierSeeder.php
 │       └── KewpaDataSeeder.php
 ├── resources/
 │   ├── js/Pages/                           # 65 React page components
@@ -563,10 +571,10 @@ cairo-inventory/
 │   ├── js/Layouts/
 │   │   ├── AuthenticatedLayout.jsx         # Sidebar + header + role badges
 │   │   └── GuestLayout.jsx
-│   ├── js/Components/                      # 15 reusable components
+│   ├── js/Components/                      # 16 reusable components
 │   └── views/pdfs/                         # 35 KEW.PA PDF Blade templates
 ├── routes/
-│   └── web.php                             # ~175 routes (auth + pipeline + lifecycle)
+│   └── web.php                             # ~200 routes (auth + pipeline + lifecycle)
 ├── requirements.txt                        # Python OCR dependencies
 └── public/build/                           # Compiled frontend assets
 ```
@@ -585,20 +593,22 @@ cairo-inventory/
 | KEW.PA Directory | ✅ Fully Built |
 | Seed Data (demo + canonical) | ✅ Complete |
 | **Ground Truth Alignment (4 tiers)** | **✅ Complete** |
-| **OCR Engine (2,069 lines)** | **✅ Built & Hardened** |
-| **Import Pipeline (PDF/CSV/Excel/Paste)** | **✅ 170 master items imported** |
-| **2-Step Receive→Verify Pipeline** | **✅ Ready (not exercised on fresh DB)** |
+| **OCR Engine (2,080 lines)** | **✅ Built & Hardened** |
+| **Import Pipeline (PDF/CSV/Excel/Paste)** | **✅ 156 master items imported** |
+| **2-Step Receive→Verify Pipeline** | **✅ Exercised 2026-07-27 — 15 assets, 2 PA-1 records** |
 | **Per-S/N Asset Splitting** | **✅ Complete** |
 | **RBAC (5 roles + email verification)** | **✅ Complete** |
-| **Soft Delete + Recycle Bin (19 models)** | **✅ Complete** |
+| **Soft Delete + Recycle Bin (19 models, 13 modules)** | **✅ Complete** |
 | **Scanner Module (status-aware)** | **✅ Built & integrated into verification page** |
 | **Partial Receive Quantity** | **✅ Complete** |
 | **budget_vot + voucher_no capture** | **✅ Added to Verify modal** |
 | **PO Reference Field** | **✅ Added to Receive modal** |
 | **MasterItemImportService** | **✅ Extracted (replaced 3 duplicates)** |
-| **Supplier Dedup Route** | **✅ Ready (`/dev/dedup-suppliers`)** |
+| **AssetTagGenerator** | **✅ Unified AST-/REC- numbering with Cache::lock** |
+| **Supplier Dedup** | **✅ Executed — 5 → 2 canonical suppliers via `cairo:dedup-suppliers`** |
+| **Registration Gating** | **✅ `REGISTRATION_ENABLED` (default off), routes unregistered when disabled** |
 | **OCR Hardening (brand, S/N, qty, format)** | **✅ Complete** |
-| Activity Logging | ✅ `spatie/activitylog` — ~970 entries |
+| Activity Logging | ✅ `spatie/activitylog` — ~988 entries |
 
 ### Ground Truth Alignment — Completed ✅
 
@@ -613,50 +623,34 @@ cairo-inventory/
 
 ## Database Overview
 
-**17 business tables + 9 Laravel system tables** (56 migrations):
+**17 business tables + 9 Laravel system tables** (59 migrations):
 
 ### Canonical Tables (Procurement Pipeline)
 
 | Table | Records | Notes |
 |-------|---------|-------|
-| `master_items` | **170** | Primary equipment register — deduplicated, unique on item_no |
-| `suppliers` | **5** (needs dedup: 3 canonical) | Dotcom, SNS Network, auto-created from import |
+| `master_items` | **156** | Primary equipment register — deduplicated, unique on item_no |
+| `suppliers` | **2** (canonical — dedup executed) | Dotcom, SNS Network |
 | `users` | **7** | 1 superadmin, 2 admin, 1 manager, 1 auditor, 2 staff |
-| `assets` | **0** | Created on verification — one per S/N |
-| `receivings` | **0** | PA-1 records — created at Receive time |
+| `assets` | **15** | Created on verification — one per S/N (pipeline exercised 2026-07-27) |
+| `receivings` | **2** | PA-1 records — created at Verify time |
 | `scans` | **0** | Scanner module built, awaiting production use |
-| `activity_log` | **~970** | Spatie Activitylog audit trail |
-| `media` | **2** | PT-DOT-COM.pdf (291KB) + DOTCOM-DO.pdf (9.5MB) |
+| `activity_log` | **~988** | Spatie Activitylog audit trail |
+| `media` | **1** | PT-DOT-COM.pdf |
+| `locations` | **0** | Location lookup table (LocationSeeder available) |
 
 ### Master Items by Status
 
 | Status | Count | With Asset |
 |--------|-------|------------|
-| `belum_diterima` | 170 | 0 |
+| `belum_diterima` | 154 | 0 |
 | `diterima` | 0 | 0 |
-| `verified` | 0 | 0 |
-| **Total** | **170** | **0** |
+| `verified` | 2 | 15 |
+| **Total** | **156** | **15** |
 
 ### Demo Data (Phase 1 Seed)
 
-| Table | Records | Notes |
-|-------|---------|-------|
-| `assets` | **10** | 38 columns, demo records only (no real data yet) |
-| `receivings` | **12** | Legacy seed from fictional companies — no FK to Phase 2 |
-| `asset_placements` | 11 | Demo data |
-| `asset_disposals` | 10 | Demo data |
-| `asset_transfers` | 10 | Demo data |
-| `asset_inspections` | 10 | Demo data |
-| `asset_maintenances` | 10 | Demo data |
-| `asset_loss_reports` | 10 | Demo data |
-| `damage_reports` | 11 | Demo data |
-| `vehicle_disposal_assessments` | 10 | Demo data |
-| `disposal_sales` | 10 | Demo data |
-| `asset_upgrades` | 10 | Demo data |
-| `committee_appointments` | 12 | Pre-seeded placeholder |
-| `disposal_sale_items` | 21 | Demo lots with reserve prices |
-| `sale_bids` | 30 | Demo bids |
-| `final_loss_reports` | 10 | 8-section investigation schema (PA-30) |
+> **Note:** The live DB was reset (2026-07-31) — all demo tables are now empty. `php artisan db:seed` / `DatabaseSeeder` re-seeds them. `DatabaseSeeder` also creates the 5 role accounts (superadmin/admin/manager/auditor/staff) plus master items (156) via `MasterItemSeeder`.
 
 ---
 
@@ -676,18 +670,41 @@ cairo-inventory/
 | **Verify Gating** | Verify button hidden from non-admin users — shows "Menunggu pengesahan pentadbir" |
 | **Tests** | 117 tests, 538 assertions (pipeline, scanner, lifecycle, PA forms, RBAC, e2e) |
 
+## Recent Milestones (2026-07-31)
+
+| Area | What Changed |
+|------|-------------|
+| **Pipeline Restructure** | PA-1 creation moved from `receive()` to `verify()` — receiver metadata stored as JSON in `master_items.receive_meta`; PA-1 + Asset created atomically at Verify |
+| **Threshold Config** | RM 2,000 extracted to `config('cairo.asset_threshold')` — single source of truth |
+| **AssetTagGenerator** | New service — unified `AST-YYYYMMDD-NNNNNN` / `REC-YYYYMMDD-NNNN` numbering with `Cache::lock`; legacy `CAIRO/…` + `RC-` formats retired |
+| **Trash Bin — 13 modules** | `restore()` methods + trashed data + Tong toggle UI added to 11 more controllers/pages (Transfers, Damage, Placements, Inspections, Maintenances, Disposals, Loss, Vehicle Disposal, Disposal Sales, Suppliers, Committees) |
+| **RBAC Fix** | `user` role granted `verify` permission |
+| **Registration Gating** | `REGISTRATION_ENABLED` (default **false**) — routes unregistered, Register link auto-hides |
+| **Security (Phase 0)** | Ungated `/_dev/dedup-*` GET routes removed → artisan commands with `--dry-run`/`--force`; `kewpa9a()` null-deref fixed; session flashes → Inertia toasts (FlashToaster, de-emoji'd icons) |
+| **Data Integrity (Phase 1)** | 32 bad OCR regex escapes fixed; `rejectReceiving()` no longer fabricates zero-value REJ- assets (records `rejection_reason`/`rejected_at`); import wrapped in `DB::transaction` + dedup guard (`imported`/`skipped` counts); scanner off-by-one fixed; qty × unit_price cross-check |
+| **Supplier Dedup EXECUTED** | 5 → **2** suppliers (Dotcom id 1, SNS id 3); 156 master_items re-pointed via `php artisan cairo:dedup-suppliers --force` |
+| **Welcome Page** | 26 stale entries → 34 KEW.PA forms with correct Malay names |
+| **Sidebar Cleanup** | Dead `/items` + `/scanner` redirect routes removed; duplicate committee-appointments entry removed |
+| **Tests** | 116 passed / 2 failed / 482 assertions — 2 stale failures pending (EndToEnd PA-1-at-receive; RbacTest staff-cannot-verify) |
+
 ---
 
 ## Future Considerations
 
 | Item | Notes |
 |------|-------|
-| **Exercise Pipeline** | Run Receive→Verify on fresh 170 master items to create production assets |
+| **Fix 2 stale tests** | EndToEndPipelineTest (asserts PA-1 at Receive — old pipeline) + RbacTest staff-cannot-verify (pre-RBAC-fix) → suite green (118 pass) |
+| **Verify-button permission sync** | Frontend `Verification/Index.jsx` gates on hardcoded `['admin','superadmin']` while backend grants `user` role `verify` — pass `can_verify` prop |
+| **OCR confidence enforcement** | Confidence computed but nothing downstream acts on it — warn/block below threshold ~50 at import |
+| **`acceptReceiving()` validation** | `AssetController.php:51-105` validates only `photo`; mirror `update()` rules + `$request->safe()` |
+| **Jul-27 asset fate** | 14 assets created from a qty=1 master item under old split logic — verify against source DO, collapse or keep |
+| **Dead-code cleanup** | ItemsController + Items/Index.jsx, orphaned Scanner pages, Adminmiddleware.php, unused seeders |
 | **Barcode Label Printing** | Print scannable labels from verification page (currently only from Asset show) |
 | **Dashboard Custodian FK** | Replace free-text `custodian_name` matching with user FK |
+| **DB-level pagination** | Verification registry + Assets index load all rows into memory — paginate when data grows |
+| **`orWhereYear` grouping** | `ReportController` kewpa12/kewpa20 ungrouped `whereYear(...)->orWhereYear(...)` — latent footgun |
+| **OCR follow-ups** | F1: `total_amount` capture on scanned DOs; F2: supplier capture noise; F3: 10-min multi-page scans |
 | **Docker Deployment** | Containerise Laravel + OCR + PostgreSQL for reproducible environments |
-| **PA-4/5/8 Blade templates** | Add Blade PDF templates for these React-only forms |
-| **PA-15/29 letter-format PDF** | Add PDF output for committee appointment letters |
 | **i18n / Bilingual Support** | Current UI is mixed BM/EN; add full language toggle |
 | **SAGA Integration** | Sync asset data with Malaysia's national SAGA system |
 | **E2E Testing** | Automated end-to-end tests for all CRUD workflows |
@@ -700,18 +717,19 @@ cairo-inventory/
 | Metric | Count |
 |--------|-------|
 | React Pages | 65 |
-| Reusable Components | 15 |
-| Eloquent Models | 20 |
+| Reusable Components | 16 |
+| Eloquent Models | 21 |
 | Business Controllers | 28 |
 | Auth Controllers | 9 |
 | Total Controllers | **37** |
-| Database Migrations | 56 |
+| Database Migrations | 59 |
 | PDF Blade Templates | 35 |
 | Business Tables | 17 |
-| Route Definitions | **~175** |
-| OCR Engine (Python) | 2,069 lines |
-| Activity Log Entries | ~970 |
-| Master Items Imported | 170 |
+| Route Definitions | **~200** |
+| OCR Engine (Python) | 2,080 lines |
+| Activity Log Entries | ~988 |
+| Master Items Imported | 156 |
+| Assets Created (pipeline) | 15 |
 | Seed Records | 10+ per module |
 
 ---
