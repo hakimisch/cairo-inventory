@@ -125,9 +125,12 @@ class ImportPdfData extends Command
         $this->line('Importing into master equipment list...');
 
         $service = app(\App\Services\MasterItemImportService::class);
-        $imported = $service->importAsMasterItems($items, $supplier);
+        $result = $service->importAsMasterItems($items, $supplier);
 
-        $this->info("Imported {$imported} items into master equipment list.");
+        $this->info("Imported {$result['imported']} items into master equipment list.");
+        if ($result['skipped'] > 0) {
+            $this->warn("{$result['skipped']} duplicate items skipped.");
+        }
         $this->line('Visit /verification to verify and create assets.');
     }
 }

@@ -36,6 +36,7 @@ class MasterItem extends Model
         'verified_at',
         'verified_by',
         'asset_type',       // fixed_asset | inventory
+        'receive_meta',     // JSON: receiver metadata stored at receive time, used at verify
     ];
 
     protected $casts = [
@@ -44,6 +45,7 @@ class MasterItem extends Model
         'total_price'   => 'decimal:2',
         'received_date' => 'date:Y-m-d',
         'verified_at'   => 'datetime',
+        'receive_meta'  => 'array',
     ];
 
     // ─── Relations ─────────────────────────────────────────────────────────────

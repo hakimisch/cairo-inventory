@@ -109,6 +109,15 @@ class ImportController extends Controller
             'items.*.quantity_ordered' => 'nullable|integer|min:1',
             'items.*.unit'             => 'nullable|string',
             'items.*.unit_price'       => 'nullable|numeric|min:0',
+            // ── Extended fields ─────────────────────────────────────────
+            'items.*.specification'    => 'nullable|string',
+            'items.*.country_of_origin' => 'nullable|string',
+            'items.*.total_price'      => 'nullable|numeric|min:0',
+            'items.*.sodo_bayaran'     => 'nullable|string',
+            'items.*.supplier_name'    => 'nullable|string',
+            'items.*.do_no'            => 'nullable|string',
+            'items.*.invoice_no'       => 'nullable|string',
+            'items.*.received_date'    => 'nullable|string',
             'supplier_id'   => 'nullable|exists:suppliers,id',
             'supplier_name' => 'nullable|string|max:255',
         ]);
@@ -127,15 +136,20 @@ class ImportController extends Controller
             );
         }
 
-        $count = $this->importAsMasterItems($items, $supplier);
+        $result = $this->importAsMasterItems($items, $supplier);
+
+        $message = "{$result['imported']} items imported into master equipment list.";
+        if ($result['skipped'] > 0) {
+            $message .= " {$result['skipped']} duplicates skipped.";
+        }
 
         return redirect()->route('import.index')
-            ->with('success', "{$count} items imported into master equipment list.");
+            ->with('success', $message);
     }
 
     // ─── Import into master_items ─────────────────────────────────────────
 
-    private function importAsMasterItems(array $items, ?Supplier $supplier): int
+    private function importAsMasterItems(array $items, ?Supplier $supplier): array
     {
         return app(\App\Services\MasterItemImportService::class)->importAsMasterItems($items, $supplier);
     }
@@ -189,15 +203,25 @@ class ImportController extends Controller
         $data = $rows;
 
         $fieldMap = [
-            'description' => ['description', 'nama item', 'item description', 'nama', 'name', 'perkara', 'butiran', 'product'],
-            'item_code'   => ['item_code', 'no item', 'item code', 'code', 'part_no', 'part number', 'bil', 'number'],
-            'brand'       => ['brand', 'jenama', 'manufacturer', 'make', 'merk'],
-            'model'       => ['model', 'type', 'tipe', 'part'],
-            'serial'      => ['serial', 'serial_number', 'serial number', 'no siri', 'sn', 's/n', 'no.siri'],
-            'category'    => ['category', 'kategori', 'jenis', 'section'],
-            'qty'         => ['quantity', 'qty', 'kuantiti', 'kuantiti', 'quantity_ordered', 'ordered'],
-            'unit'        => ['unit_of_measure', 'uom', 'unit'],
-            'price'       => ['price', 'harga seunit', 'unit_price', 'harga', 'cost', 'amount'],
+            'description'     => ['description', 'nama item', 'item description', 'nama', 'name', 'perkara', 'butiran', 'product'],
+            'item_code'       => ['item_code', 'no item', 'no.', 'item code', 'code', 'part_no', 'part number', 'bil', 'number'],
+            'brand'           => ['brand', 'jenama', 'manufacturer', 'make', 'merk'],
+            'model'           => ['model', 'type', 'tipe', 'part'],
+            'serial'          => ['serial', 'serial_number', 'serial number', 'no siri', 'sn', 's/n', 'no.siri'],
+            'category'        => ['category', 'kategori', 'jenis', 'section'],
+            'qty'             => ['quantity', 'qty', 'kuantiti', 'kuantiti', 'quantity_ordered', 'ordered'],
+            'unit'            => ['unit_of_measure', 'uom', 'unit'],
+            'price'           => ['price', 'harga seunit', 'unit_price', 'harga', 'cost', 'amount'],
+            // ── Master list extended fields ─────────────────────────────────
+            'specification'   => ['specification', 'spesifikasi', 'spek', 'spec', 'technical specification'],
+            'country_of_origin' => ['negara asal alat', 'country_of_origin', 'negara asal', 'country of origin', 'origin'],
+            'total_price'     => ['jumlah harga', 'total_price', 'total price', 'jumlah', 'total'],
+            'sodo_bayaran'    => ['sodo bayaran', 'sodo_bayaran', 'sodo', 'so/do'],
+            'supplier_name'   => ['pembekal', 'supplier_name', 'supplier', 'vendor', 'pembekal'],
+            'do_no'           => ['no do', 'do_no', 'do no', 'delivery order no', 'do number'],
+            'invoice_no'      => ['invoice_no', 'invoice no', 'no invois', 'invoice number', 'inv', 'invois'],
+            'received_date'   => ['date received', 'received_date', 'tarikh terima', 'tarikh diterima', 'received date', 'date_received', 'tarikh'],
+            'status'          => ['status', 'item status'],
         ];
 
         $items = [];
@@ -230,6 +254,16 @@ class ImportController extends Controller
                     'quantity_ordered' => (int) ($item['qty'] ?? 1),
                     'unit'             => $item['unit'] ?? 'unit',
                     'unit_price'       => $this->parsePrice($item['price'] ?? null),
+                    // ── Extended fields ──────────────────────────────────
+                    'specification'    => $item['specification'] ?? null,
+                    'country_of_origin' => $item['country_of_origin'] ?? null,
+                    'total_price'      => $this->parsePrice($item['total_price'] ?? null),
+                    'sodo_bayaran'     => $item['sodo_bayaran'] ?? null,
+                    'supplier_name'    => $item['supplier_name'] ?? null,
+                    'do_no'            => $item['do_no'] ?? null,
+                    'invoice_no'       => $item['invoice_no'] ?? null,
+                    'received_date'    => $item['received_date'] ?? null,
+                    'status_import'    => $item['status'] ?? null,
                 ];
             }
         }

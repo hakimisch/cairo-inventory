@@ -42,7 +42,7 @@ class AssetController extends Controller
         ]);
 
         // Enforce classification by price (RM2000 threshold — KEW.PA-2/PA-3 boundary)
-        $validated['asset_type'] = $validated['purchase_price'] >= 2000 ? 'fixed_asset' : 'inventory';
+        $validated['asset_type'] = $validated['purchase_price'] >= config('cairo.asset_threshold', 2000) ? 'fixed_asset' : 'inventory';
 
         Asset::create($validated);
         return redirect()->back();
@@ -62,7 +62,7 @@ class AssetController extends Controller
 
         // ─── Single asset creation ──────────────────────────────────────────
         $newAsset = Asset::create([
-            'asset_tag'            => $this->generateAssetTag(),
+            'asset_tag'            => app(\App\Services\AssetTagGenerator::class)->assetTag(),
             'name'                 => $receiving->item_description,
             'category'             => $request->category ?? 'General',
             'asset_type'           => $enforcedAssetType,
@@ -105,31 +105,17 @@ class AssetController extends Controller
 
     public function rejectReceiving(Request $request, Receiving $receiving)
     {
-        $receiving->update(['status' => 'rejected']);
-
-        Asset::create([
-            'asset_tag'        => 'REJ-' . $receiving->receive_no,
-            'name'             => $receiving->item_description,
-            'category'         => 'Rejected',
-            'asset_type'       => 'inventory',
-            'purchase_price'   => 0.00,
-            'location'         => 'Receiving Bay',
-            'status'           => 'disposed',
-            'supplier_name'    => $receiving->supplier_name,
-            'supplier_address' => $receiving->supplier_address,
-            'po_reference'     => $receiving->purchase_order_no,
+        // Rejection records the reason on the Receiving row — no asset is
+        // created (previously a zero-value 'disposed' REJ- asset polluted
+        // the registry and KEW.PA reports).
+        $receiving->update([
+            'status'           => 'rejected',
             'rejection_reason' => $request->reason ?? 'Spesifikasi tidak menepati pesanan / Kerosakan fizikal',
+            'rejected_at'      => now(),
         ]);
 
         return redirect()->route('receivings.index')
-            ->with('success', 'Barangan telah ditolak. Sila muat turun KEW.PA-2.');
-    }
-
-    private function generateAssetTag(): string
-    {
-        $year  = date('Y');
-        $count = Asset::whereYear('created_at', $year)->count() + 1;
-        return "CAIRO/{$year}/H/" . str_pad($count, 2, '0', STR_PAD_LEFT);
+            ->with('success', 'Barangan telah ditolak. Rekod penerimaan ditandakan sebagai Ditolak.');
     }
 
     public function receivingIndex()
@@ -161,8 +147,7 @@ class AssetController extends Controller
             'unit_price'        => 'required|numeric|min:0',
         ]);
 
-        $todayCount = Receiving::whereDate('created_at', now())->count() + 1;
-        $validated['receive_no']  = 'RC-' . now()->format('Ymd') . '-' . str_pad($todayCount, 3, '0', STR_PAD_LEFT);
+        $validated['receive_no']  = app(\App\Services\AssetTagGenerator::class)->receiveNo();
         $validated['status']      = 'pending';
         $validated['total_price'] = $validated['unit_price'] * $validated['quantity_received'];
 
@@ -407,6 +392,16 @@ class AssetController extends Controller
         return redirect()->back()->with('success', "Aset {$tag} telah dipulihkan.");
     }
 
+    /**
+     * Restore a soft-deleted asset placement.
+     */
+    public function restorePlacement(Asset $asset, $placement)
+    {
+        $placement = AssetPlacement::withTrashed()->findOrFail($placement);
+        $placement->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
+    }
+
     public function downloadKewpa3(Asset $asset)
     {
         return \Spatie\LaravelPdf\Facades\Pdf::view('pdfs.kewpa3', ['asset' => $asset])
@@ -490,6 +485,7 @@ class AssetController extends Controller
         return inertia('Assets/Kewpa9aIndex', [
             'records' => $placements,
             'filters' => $request->only(['search']),
+            'trashed' => AssetPlacement::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -500,7 +496,7 @@ class AssetController extends Controller
     {
         $asset->load('placements');
         // Use the latest placement if none specified
-        if (!$placement->exists) {
+        if (!$placement || !$placement->exists) {
             $placement = $asset->placements()->latest()->first();
         }
         return Inertia::render('Assets/Kewpa9a', [

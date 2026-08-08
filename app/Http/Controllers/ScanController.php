@@ -196,12 +196,12 @@ class ScanController extends Controller
             'warranty_expiry'=> 'nullable|date',
         ]);
 
-        $threshold = 2000;
         $user = auth()->user();
+        $createdTag = null;
 
-        DB::transaction(function () use ($masterItem, $request, $threshold, $user) {
+        DB::transaction(function () use ($masterItem, $request, $user, &$createdTag) {
             // 1. Update master item
-            $assetType = $masterItem->unit_price >= $threshold ? 'fixed_asset' : 'inventory';
+            $assetType = $masterItem->unit_price >= config('cairo.asset_threshold', 2000) ? 'fixed_asset' : 'inventory';
             $masterItem->update([
                 'status'        => 'verified',
                 'verified_at'   => now(),
@@ -220,20 +220,14 @@ class ScanController extends Controller
             $custodianName = $request->custodian_name;
 
             // 3. Create assets with atomic tag generation
-            $tagLock = Cache::lock('asset-tag', 10);
-            $tagLock->block(5);
-            try {
-                $today = date('Ymd');
-                $maxSeq = DB::table('assets')
-                    ->where('asset_tag', 'LIKE', "AST-{$today}-%")
-                    ->max(DB::raw("CAST(SUBSTRING(asset_tag FROM 'AST-[0-9]{8}-([0-9]+)') AS INTEGER)"));
+            $generator = app(\App\Services\AssetTagGenerator::class);
 
-                $seqNo = ($maxSeq ?? 0) + 1;
-
-                if (count($serials) > 1) {
-                    foreach ($serials as $sn) {
-                        $assetTag = "AST-{$today}-" . str_pad($seqNo, 6, '0', STR_PAD_LEFT);
-                        $seqNo++;
+            if (count($serials) > 1 && $masterItem->quantity > 1) {
+                // Per-S/N split: one asset per serial number (only when quantity > 1).
+                // When qty=1, S/Ns represent internal component serials, not separate units.
+                foreach ($serials as $sn) {
+                    $assetTag = $generator->assetTag();
+                    $createdTag = $assetTag;
 
                         Asset::create([
                             'master_item_id'   => $masterItem->id,
@@ -257,7 +251,8 @@ class ScanController extends Controller
                         ]);
                     }
                 } else {
-                    $assetTag = "AST-{$today}-" . str_pad($seqNo, 6, '0', STR_PAD_LEFT);
+                    $assetTag = $generator->assetTag();
+                    $createdTag = $assetTag;
 
                     Asset::create([
                         'master_item_id'   => $masterItem->id,
@@ -280,15 +275,12 @@ class ScanController extends Controller
                         'scan_verified_at' => now(),
                     ]);
                 }
-            } finally {
-                $tagLock->release();
-            }
         });
 
         return response()->json([
             'success'   => true,
             'message'   => "{$masterItem->name} — verified and asset created.",
-            'asset_tag' => 'AST-' . date('Ymd') . '-' . str_pad(Asset::whereDate('created_at', today())->count(), 6, '0', STR_PAD_LEFT),
+            'asset_tag' => $createdTag,
             'item_no'   => $masterItem->item_no,
             'name'      => $masterItem->name,
         ]);
@@ -312,22 +304,16 @@ class ScanController extends Controller
             'do_no'          => 'nullable|string|max:255',
         ]);
 
-        DB::transaction(function () use ($request, $masterItem) {
+        $receiveNo = null;
+
+        DB::transaction(function () use ($request, $masterItem, &$receiveNo) {
             $masterItem->update([
                 'status'        => 'diterima',
                 'received_date' => $request->received_date ?? now(),
                 'do_no'         => $request->do_no ?? $masterItem->do_no,
             ]);
 
-            $recvLock = Cache::lock('receiving-number', 10);
-            $recvLock->block(5);
-            try {
-                $receiveNo = 'REC-' . date('Ymd') . '-' . str_pad(
-                    Receiving::whereDate('created_at', today())->count() + 1, 4, '0', STR_PAD_LEFT
-                );
-            } finally {
-                $recvLock->release();
-            }
+            $receiveNo = app(\App\Services\AssetTagGenerator::class)->receiveNo();
 
             Receiving::create([
                 'master_item_id'    => $masterItem->id,
@@ -352,9 +338,7 @@ class ScanController extends Controller
             'item_no'    => $masterItem->item_no,
             'name'       => $masterItem->name,
             'status'     => 'diterima',
-            'receive_no' => 'REC-' . date('Ymd') . '-' . str_pad(
-                Receiving::whereDate('created_at', today())->count(), 4, '0', STR_PAD_LEFT
-            ),
+            'receive_no' => $receiveNo,
         ]);
     }
 

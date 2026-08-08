@@ -614,8 +614,8 @@ class DocumentParser:
     def _extract_supplier(self) -> Optional[str]:
         """Extract supplier name."""
         patterns = [
-            r'(DOTCOM\s+TELECOMMUNICATIONS[^\\n]*)',
-            r'(NAMA\s+DAN\s+ALAMAT\s+PEMBEKAL[^\\n]*\\n\\s*([^\\n]+))',
+            r'(DOTCOM\s+TELECOMMUNICATIONS[^\n]*)',
+            r'(NAMA\s+DAN\s+ALAMAT\s+PEMBEKAL[^\n]*\n\s*([^\n]+))',
         ]
         for pat in patterns:
             m = re.search(pat, self.text, re.IGNORECASE)
@@ -640,10 +640,10 @@ class DocumentParser:
     def _extract_total(self) -> Optional[float]:
         """Extract total amount."""
         patterns = [
-            r'JUMLAH\s+BESAR[^\\n]*?(\\d{1,3}(?:,\\d{3})*\\.\\d{2})',
-            r'TOTAL[^\\n]*?(\\d{1,3}(?:,\\d{3})*\\.\\d{2})',
-            r'GRAND\s+TOTAL[^\\n]*?(\\d{1,3}(?:,\\d{3})*\\.\\d{2})',
-            r'RM\s*(\\d{1,3}(?:,\\d{3})*\\.\\d{2})',
+            r'JUMLAH\s+BESAR[^\n]*?(\d{1,3}(?:,\d{3})*\.\d{2})',
+            r'TOTAL[^\n]*?(\d{1,3}(?:,\d{3})*\.\d{2})',
+            r'GRAND\s+TOTAL[^\n]*?(\d{1,3}(?:,\d{3})*\.\d{2})',
+            r'RM\s*(\d{1,3}(?:,\d{3})*\.\d{2})',
         ]
         for pat in patterns:
             m = re.search(pat, self.text, re.IGNORECASE)
@@ -814,6 +814,17 @@ class DocumentParser:
             )
             if is_phantom:
                 continue
+
+            # ── Qty integrity cross-check ──────────────────────────────────────
+            # A stray standalone number inside the peek window can corrupt qty
+            # (e.g. a price column or date line). If qty x unit_price does not
+            # approximate total_price, recompute qty from the totals.
+            if qty > 1 and unit_price and total_price and total_price > 0:
+                implied = qty * unit_price
+                if abs(implied - total_price) / total_price > 0.05:
+                    ratio = round(total_price / unit_price)
+                    if 1 <= ratio <= 999:
+                        qty = ratio
 
             item = ExtractedItem(
                 item_code=str(item_num),
@@ -1901,7 +1912,7 @@ class DocumentParser:
                 continue
 
             # Try to detect item pattern: number + text + quantity
-            m = re.match(r'^\\s*(\\d+(?:\\.\\d+)*)\\s+([A-Za-z].+?)\\s+(\\d+)\\s+(unit|units)?$',
+            m = re.match(r'^\s*(\d+(?:\.\d+)*)\s+([A-Za-z].+?)\s+(\d+)\s+(unit|units)?$',
                          line_s, re.IGNORECASE)
             if m:
                 item = ExtractedItem(

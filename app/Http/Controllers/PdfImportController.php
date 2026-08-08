@@ -100,16 +100,21 @@ class PdfImportController extends Controller
             );
         }
 
-        $count = $this->importAsMasterItems($items, $supplier);
+        $result = $this->importAsMasterItems($items, $supplier);
+
+        $message = "{$result['imported']} items imported into master equipment list.";
+        if ($result['skipped'] > 0) {
+            $message .= " {$result['skipped']} duplicates skipped.";
+        }
 
         return redirect()->route('pdf-import.index')
-            ->with('success', "{$count} items imported into master equipment list.");
+            ->with('success', $message);
     }
 
     /**
      * Import items into master_items register.
      */
-    private function importAsMasterItems(array $items, ?Supplier $supplier): int
+    private function importAsMasterItems(array $items, ?Supplier $supplier): array
     {
         return app(\App\Services\MasterItemImportService::class)->importAsMasterItems($items, $supplier);
     }

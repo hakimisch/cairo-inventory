@@ -33,6 +33,8 @@ class Receiving extends Model
         'technical_officer_position',
         'damage_description', // NEW
         'notes',              // NEW
+        'rejection_reason',   // set when a receiving is rejected (no asset created)
+        'rejected_at',
     ];
 
     protected $casts = [

@@ -83,6 +83,9 @@ class VerificationController extends Controller
                     'location'      => $m->asset?->location,
                     'model'         => $m->model,
                     'specification' => $m->specification,
+                    'country_of_origin' => $m->country_of_origin,
+                    'sodo_bayaran'  => $m->sodo_bayaran,
+                    'do_no'         => $m->do_no,
                 ];
             });
 
@@ -191,7 +194,8 @@ class VerificationController extends Controller
 
     /**
      * Mark a master item as received (belum_diterima → diterima).
-     * Does NOT create assets — that happens at verify time.
+     * Stores receiver metadata for use at verify time.
+     * PA-1 (Receiving) is created at verify, not here.
      */
     public function receive(Request $request, MasterItem $masterItem)
     {
@@ -213,49 +217,26 @@ class VerificationController extends Controller
             return back()->withErrors(['item' => 'This item has already been received.']);
         }
 
-        DB::transaction(function () use ($request, $masterItem) {
-            $masterItem->update([
-                'status'        => 'diterima',
-                'received_date' => $request->received_date ?? now(),
-                'do_no'         => $request->do_no ?? $masterItem->do_no,
-                'invoice_no'    => $request->invoice_no,
-            ]);
+        // Store receiver metadata as JSON for use at verify time.
+        // PA-1 Receiving is created atomically with the Asset at verify.
+        $masterItem->update([
+            'status'        => 'diterima',
+            'received_date' => $request->received_date ?? now(),
+            'do_no'         => $request->do_no ?? $masterItem->do_no,
+            'invoice_no'    => $request->invoice_no,
+            'receive_meta'  => [
+                'purchase_order_no'          => $request->purchase_order_no,
+                'quantity_received'          => $request->quantity_received ?? $masterItem->quantity,
+                'receiver_name'              => $request->receiver_name,
+                'receiver_position'          => $request->receiver_position,
+                'technical_officer_name'     => $request->technical_officer_name,
+                'technical_officer_position' => $request->technical_officer_position,
+                'damage_description'         => $request->damage_description,
+                'notes'                      => $request->notes,
+            ],
+        ]);
 
-            // Create PA-1 Receiving record immediately at receive time
-            $recvLock = Cache::lock('receiving-number', 10);
-            $recvLock->block(5);
-            try {
-                $receiveNo = 'REC-' . date('Ymd') . '-' . str_pad(
-                    Receiving::whereDate('created_at', today())->count() + 1, 4, '0', STR_PAD_LEFT
-                );
-            } finally {
-                $recvLock->release();
-            }
-
-            Receiving::create([
-                'master_item_id'            => $masterItem->id,
-                'receive_no'                => $receiveNo,
-                'supplier_name'             => $masterItem->supplier?->name ?? 'N/A',
-                'supplier_address'          => $masterItem->supplier?->address,
-                'delivery_order_no'         => $request->do_no ?? $masterItem->do_no ?? 'N/A',
-                'purchase_order_no'         => $request->purchase_order_no ?? 'N/A',
-                'invoice_no'                => $request->invoice_no,
-                'item_description'          => $masterItem->name,
-                'quantity_ordered'          => $masterItem->quantity,
-                'quantity_received'         => $request->quantity_received ?? $masterItem->quantity,
-                'unit_price'                => $masterItem->unit_price,
-                'total_price'               => $masterItem->total_price,
-                'status'                    => 'accepted',
-                'receiver_name'             => $request->receiver_name,
-                'receiver_position'         => $request->receiver_position,
-                'technical_officer_name'    => $request->technical_officer_name,
-                'technical_officer_position'=> $request->technical_officer_position,
-                'damage_description'        => $request->damage_description,
-                'notes'                     => $request->notes,
-            ]);
-        });
-
-        return redirect()->back()->with('success', "{$masterItem->name} — received and PA-1 created.");
+        return redirect()->back()->with('success', "{$masterItem->name} — diterima. Sedia untuk pengesahan (verify).");
     }
 
     /**
@@ -284,7 +265,8 @@ class VerificationController extends Controller
 
         DB::transaction(function () use ($request, $masterItem) {
             $user = auth()->user();
-            $threshold = 2000; // RM 2,000 — PA-2 vs PA-3 boundary
+            $threshold = config('cairo.asset_threshold', 2000); // RM 2,000 — PA-2 vs PA-3 boundary
+            $meta = $masterItem->receive_meta ?? [];
 
             // 1. Update master item
             $masterItem->update([
@@ -295,7 +277,32 @@ class VerificationController extends Controller
                 'serial_numbers'=> $request->serial_numbers ?? $masterItem->serial_numbers,
             ]);
 
-            // 2. Parse serial numbers — use the request value or fall back to stored
+            // 2. Create PA-1 Receiving (KEW.PA-1) — atomically with the Asset
+            $receiveNo = app(\App\Services\AssetTagGenerator::class)->receiveNo();
+
+            Receiving::create([
+                'master_item_id'            => $masterItem->id,
+                'receive_no'                => $receiveNo,
+                'supplier_name'             => $masterItem->supplier?->name ?? 'N/A',
+                'supplier_address'          => $masterItem->supplier?->address,
+                'delivery_order_no'         => $masterItem->do_no ?? 'N/A',
+                'purchase_order_no'         => $meta['purchase_order_no'] ?? 'N/A',
+                'invoice_no'                => $masterItem->invoice_no,
+                'item_description'          => $masterItem->name,
+                'quantity_ordered'          => $masterItem->quantity,
+                'quantity_received'         => $meta['quantity_received'] ?? $masterItem->quantity,
+                'unit_price'                => $masterItem->unit_price,
+                'total_price'               => $masterItem->total_price,
+                'status'                    => 'accepted',
+                'receiver_name'             => $meta['receiver_name'] ?? null,
+                'receiver_position'         => $meta['receiver_position'] ?? null,
+                'technical_officer_name'    => $meta['technical_officer_name'] ?? null,
+                'technical_officer_position'=> $meta['technical_officer_position'] ?? null,
+                'damage_description'        => $meta['damage_description'] ?? null,
+                'notes'                     => $meta['notes'] ?? null,
+            ]);
+
+            // 3. Parse serial numbers — use the request value or fall back to stored
             $serials = collect(explode(',', $request->serial_numbers ?? $masterItem->serial_numbers ?? ''))
                 ->map(fn($s) => trim($s))
                 ->filter(fn($s) => $s !== '')
@@ -307,21 +314,15 @@ class VerificationController extends Controller
             $custodianName = $request->custodian_name;
 
             // Atomically reserve asset tags to prevent race conditions
-            $tagLock = Cache::lock('asset-tag', 10);
-            $tagLock->block(5);
-            try {
-                $today = date('Ymd');
-                $maxSeq = DB::table('assets')
-                    ->where('asset_tag', 'LIKE', "AST-{$today}-%")
-                    ->max(DB::raw("CAST(SUBSTR(asset_tag, 14) AS INTEGER)"));
+            $generator = app(\App\Services\AssetTagGenerator::class);
 
-                $seqNo = ($maxSeq ?? 0) + 1;
-
-                if (count($serials) > 1) {
-                    // Per-S/N split: one asset per serial number
-                    foreach ($serials as $sn) {
-                        $assetTag = "AST-{$today}-" . str_pad($seqNo, 6, '0', STR_PAD_LEFT);
-                        $seqNo++;
+            if (count($serials) > 1 && $masterItem->quantity > 1) {
+                // Per-S/N split: one asset per serial number
+                // Only applies when quantity > 1 (multiple units of the same item).
+                // When qty=1, S/Ns represent internal component serials
+                // (e.g. one PC's motherboard + SSD + GPU S/Ns), not separate units.
+                foreach ($serials as $sn) {
+                    $assetTag = $generator->assetTag();
 
                         Asset::create([
                             'master_item_id'   => $masterItem->id,
@@ -346,8 +347,13 @@ class VerificationController extends Controller
                         ]);
                     }
                 } else {
-                    // Single asset (with or without a serial number)
-                    $assetTag = "AST-{$today}-" . str_pad($seqNo, 6, '0', STR_PAD_LEFT);
+                    // Single asset (with or without serial numbers)
+                    // When qty=1, store ALL component S/Ns concatenated
+                    $serialStr = count($serials) > 1
+                        ? implode(', ', $serials)
+                        : ($serials[0] ?? $request->serial_numbers ?? $masterItem->serial_numbers);
+
+                    $assetTag = $generator->assetTag();
 
                     Asset::create([
                         'master_item_id'   => $masterItem->id,
@@ -355,7 +361,7 @@ class VerificationController extends Controller
                         'name'             => $masterItem->name,
                         'category'         => $masterItem->category,
                         'brand'            => $masterItem->brand,
-                        'serial_number'    => $serials[0] ?? $request->serial_numbers ?? $masterItem->serial_numbers,
+                        'serial_number'    => $serialStr,
                         'asset_type'       => $assetType,
                         'purchase_price'   => $masterItem->unit_price,
                         'unit_price'       => $masterItem->unit_price,
@@ -371,9 +377,6 @@ class VerificationController extends Controller
                         'verified_by_scan' => false,
                     ]);
                 }
-            } finally {
-                $tagLock->release();
-            }
         });
 
         return redirect()->back()->with('success', "{$masterItem->name} — verified successfully.");

@@ -7,6 +7,7 @@ use App\Models\MasterItem;
 use App\Models\Receiving;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Artisan;
 use Tests\TestCase;
 
 class MasterItemLifecycleTest extends TestCase
@@ -37,8 +38,6 @@ class MasterItemLifecycleTest extends TestCase
 
     public function test_dedup_merges_duplicate_item_numbers(): void
     {
-        $staff = $this->createStaff();
-
         // Create two master items with the SAME item_no
         $itemNo = 'DUP-TEST-001';
 
@@ -97,13 +96,10 @@ class MasterItemLifecycleTest extends TestCase
         // Verify initial state: 2 items with same item_no
         $this->assertEquals(2, MasterItem::where('item_no', $itemNo)->count());
 
-        // Run dedup
-        $response = $this->actingAs($staff)->get('/_dev/dedup-master-items');
-
-        $response->assertStatus(200);
-        $data = $response->json();
-        $this->assertEquals(1, $data['deleted']);
-        $this->assertEquals(0, $data['dupes_left']);
+        // Run dedup via artisan command (the /_dev HTTP routes were removed —
+        // dedup is now an admin-run CLI utility)
+        $exitCode = Artisan::call('cairo:dedup-master-items', ['--force' => true]);
+        $this->assertEquals(0, $exitCode);
 
         // Only one item remains
         $this->assertEquals(1, MasterItem::where('item_no', $itemNo)->count());
@@ -115,22 +111,18 @@ class MasterItemLifecycleTest extends TestCase
         $this->assertEquals($remaining->id, $receiving->fresh()->master_item_id);
     }
 
-    /** Dedup with no duplicates returns 0 deleted */
+    /** Dedup with no duplicates returns success and leaves data untouched */
     public function test_dedup_with_no_duplicates_returns_zero(): void
     {
-        $staff = $this->createStaff();
-
         // Create unique item_nos — no duplicates
         MasterItem::create(['item_no' => 'UNIQUE-001', 'name' => 'A', 'category' => 'T', 'quantity' => 1, 'unit_price' => 1, 'total_price' => 1, 'status' => 'belum_diterima']);
         MasterItem::create(['item_no' => 'UNIQUE-002', 'name' => 'B', 'category' => 'T', 'quantity' => 1, 'unit_price' => 1, 'total_price' => 1, 'status' => 'diterima']);
         MasterItem::create(['item_no' => 'UNIQUE-003', 'name' => 'C', 'category' => 'T', 'quantity' => 1, 'unit_price' => 1, 'total_price' => 1, 'status' => 'verified']);
 
-        $response = $this->actingAs($staff)->get('/_dev/dedup-master-items');
+        $exitCode = Artisan::call('cairo:dedup-master-items', ['--force' => true]);
 
-        $response->assertStatus(200);
-        $data = $response->json();
-        $this->assertEquals(0, $data['deleted']);
-        $this->assertEquals(0, $data['dupes_left']);
+        $this->assertEquals(0, $exitCode);
+        $this->assertEquals(3, MasterItem::count());
     }
 
     // ═════════════════════════════════════════════════════════════════════
