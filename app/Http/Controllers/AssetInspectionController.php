@@ -29,6 +29,7 @@ class AssetInspectionController extends Controller
             'records' => $inspections,
             'filters' => $request->only(['search', 'status']),
             'assets'  => Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
+            'trashed' => AssetInspection::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -75,6 +76,16 @@ class AssetInspectionController extends Controller
         $inspection->delete();
 
         return redirect()->back()->with('success', 'Rekod pemeriksaan berjaya dipadam.');
+    }
+
+    /**
+     * Restore a soft-deleted inspection record.
+     */
+    public function restore(Asset $asset, $id)
+    {
+        $inspection = AssetInspection::withTrashed()->findOrFail($id);
+        $inspection->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 
     // ─── PA-11: Inventory Inspection Report ─────────────────────────────

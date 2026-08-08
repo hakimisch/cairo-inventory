@@ -24,6 +24,6 @@ return [
     'user' => [
         'priority' => 20,
         'label'    => 'Pengguna',
-        'can'      => [],
+        'can'      => ['verify'],
     ],
 ];

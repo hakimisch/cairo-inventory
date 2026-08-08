@@ -33,6 +33,7 @@ class VehicleDisposalAssessmentController extends Controller
             'records' => $records,
             'filters' => $request->only(['search', 'status']),
             'assets'  => Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
+            'trashed' => VehicleDisposalAssessment::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -97,6 +98,16 @@ class VehicleDisposalAssessmentController extends Controller
         }
 
         return redirect()->back()->with('success', 'Vehicle disposal assessment removed.');
+    }
+
+    /**
+     * Restore a soft-deleted vehicle disposal assessment.
+     */
+    public function restore(Asset $asset)
+    {
+        $assessment = VehicleDisposalAssessment::withTrashed()->where('asset_id', $asset->id)->firstOrFail();
+        $assessment->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 
     /**

@@ -51,4 +51,14 @@ class AssetUpgradeController extends Controller
 
         return redirect()->back()->with('success', 'Rekod naiktaraf berjaya dipadam.');
     }
+
+    /**
+     * Restore a soft-deleted upgrade record.
+     */
+    public function restore(Asset $asset, $id)
+    {
+        $upgrade = AssetUpgrade::withTrashed()->findOrFail($id);
+        $upgrade->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
+    }
 }

@@ -37,6 +37,7 @@ class DisposalSaleController extends Controller
             'sales' => $sales,
             'filters' => $request->only(['sale_type', 'search', 'status']),
             'typeCounts' => $typeCounts,
+            'trashed' => DisposalSale::onlyTrashed()->latest()->get(),
             'disposals' => \App\Models\AssetDisposal::with('asset')
                 ->select('id', 'asset_id', 'disposal_method', 'disposal_date')
                 ->orderBy('id', 'desc')
@@ -137,6 +138,16 @@ class DisposalSaleController extends Controller
     {
         $sale->delete();
         return redirect()->route('disposal-sales.index')->with('success', 'Disposal sale deleted.');
+    }
+
+    /**
+     * Restore a soft-deleted disposal sale.
+     */
+    public function restore($id)
+    {
+        $sale = DisposalSale::withTrashed()->findOrFail($id);
+        $sale->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 
     // ─── KEW.PA Form Views ────────────────────────────────────────────────────

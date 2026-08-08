@@ -31,6 +31,7 @@ class AssetDisposalController extends Controller
             'records' => $disposals,
             'filters' => $request->only(['search', 'status']),
             'assets'  => \App\Models\Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
+            'trashed' => AssetDisposal::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -90,6 +91,16 @@ class AssetDisposalController extends Controller
         $disposal->delete();
 
         return redirect()->back()->with('success', 'Disposal record deleted successfully.');
+    }
+
+    /**
+     * Restore a soft-deleted disposal record.
+     */
+    public function restore(Asset $asset, $id)
+    {
+        $disposal = AssetDisposal::withTrashed()->findOrFail($id);
+        $disposal->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 
     /**

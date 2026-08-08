@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 
 const UTM = {
     maroon : '#5C001F', gold: '#F8A617', goldDark:'#C9840A', sand: '#FFF5AB',
@@ -188,11 +188,19 @@ function EditLossReportForm({ record, onDone }) {
     );
 }
 
-export default function Kewpa28Index({ records, filters, assets }) {
+export default function Kewpa28Index({ records, filters, assets, trashed }) {
+    const user = usePage().props.auth.user;
     const [search, setSearch] = useState(filters?.search || '');
     const [statusFilter, setStatusFilter] = useState(filters?.status || '');
     const [showAdd, setShowAdd] = useState(false);
     const [editingId, setEditingId] = useState(null);
+    const [showTrash, setShowTrash] = useState(false);
+
+    const fmtDT = (iso) => {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return d.toLocaleString('ms-MY', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
 
     const handleSearch = (e) => { e.preventDefault(); router.get(route('loss-reports.index'), { search, status: statusFilter }, { preserveState: true, replace: true }); };
     const handleReset = () => { setSearch(''); setStatusFilter(''); router.get(route('loss-reports.index'), {}, { preserveState: true, replace: true }); };
@@ -281,12 +289,62 @@ export default function Kewpa28Index({ records, filters, assets }) {
                     >
                         ▤ PA-32 Tindakan
                     </Link>
-                    <button onClick={() => setShowAdd(!showAdd)} style={{ padding: '7px 20px', borderRadius: 6, border: 'none', background: showAdd ? UTM.gray100 : '#C2410C', color: showAdd ? UTM.gray700 : UTM.white, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
-                        {showAdd ? 'Batal' : '+ Kehilangan Baru'}
+                    <button onClick={() => setShowAdd(!showAdd)} style={{ padding: '7px 20px', borderRadius: 6, border: 'none', background: showAdd ? UTM.gray100 : '#991B1B', color: showAdd ? UTM.gray700 : UTM.white, fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                        {showAdd ? 'Batal' : '+ Laporan Baru'}
                     </button>
+                    {['admin', 'superadmin'].includes(user.role) && (
+                        <button onClick={() => setShowTrash(!showTrash)}
+                            style={{ padding: '6px 14px', borderRadius: 6, border: `1.5px solid ${showTrash ? '#EF4444' : UTM.gray100}`, background: showTrash ? '#FEF2F2' : UTM.white, fontSize: 12, fontWeight: 700, color: showTrash ? '#EF4444' : UTM.gray600, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                            Tong ({trashed?.length ?? 0})
+                        </button>
+                    )}
                 </div>
 
                 {showAdd && <AddLossReportForm assets={assets} onDone={() => setShowAdd(false)} />}
+
+                {/* ── Trash Table ── */}
+                {showTrash && (
+                    <div style={{ background: UTM.white, borderRadius: 10, border: `1.5px solid #FECACA`, overflow: 'auto', marginBottom: 20 }}>
+                        <div style={{ padding: '10px 16px', background: '#FEF2F2', borderBottom: '1.5px solid #FECACA', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: 12, fontWeight: 700, color: '#991B1B' }}>Tong Sampah — {trashed?.length ?? 0} rekod</span>
+                            <button onClick={() => setShowTrash(false)} style={{ fontSize: 11, color: '#991B1B', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Tutup</button>
+                        </div>
+                        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                            <thead>
+                                <tr style={{ background: '#FEF2F2' }}>
+                                    <th style={thStyle}>Aset</th>
+                                    <th style={thStyle}>Tarikh Kehilangan</th>
+                                    <th style={thStyle}>Status</th>
+                                    <th style={thStyle}>Dipadam Pada</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {(trashed ?? []).length === 0 ? (
+                                    <tr><td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center', color: '#8A8480', fontSize: 13 }}>Tong sampah kosong.</td></tr>
+                                ) : (trashed ?? []).map(record => (
+                                    <tr key={record.id} style={{ borderBottom: `1px solid #EDE9E4` }}>
+                                        <td style={{ padding: '10px 12px', fontWeight: 700 }}>{record.asset?.name || '—'}</td>
+                                        <td style={{ padding: '10px 12px' }}>{record.loss_date || '—'}</td>
+                                        <td style={{ padding: '10px 12px' }}>{record.status || '—'}</td>
+                                        <td style={{ padding: '10px 12px', fontSize: 11, color: '#8A8480' }}>
+                                            {fmtDT(record.deleted_at)}
+                                        </td>
+                                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                            <button onClick={() => {
+                                                if (window.confirm(`Pulihkan rekod ini?`)) {
+                                                    router.post(route('assets.loss-reports.restore', record.id), {}, { preserveScroll: true });
+                                                }
+                                            }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer' }}>
+                                                Pulihkan
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
 
                 {/* Table */}
                 <div style={{ background: UTM.white, borderRadius: 12, border: `1px solid ${UTM.gray100}`, overflow: 'hidden' }}>

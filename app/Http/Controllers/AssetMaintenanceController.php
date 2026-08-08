@@ -30,6 +30,7 @@ class AssetMaintenanceController extends Controller
             'records' => $maintenances,
             'filters' => $request->only(['search', 'status']),
             'assets'  => \App\Models\Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
+            'trashed' => AssetMaintenance::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -83,6 +84,16 @@ class AssetMaintenanceController extends Controller
         $maintenance->delete();
 
         return redirect()->back()->with('success', 'Maintenance record deleted successfully.');
+    }
+
+    /**
+     * Restore a soft-deleted maintenance record.
+     */
+    public function restore(Asset $asset, $id)
+    {
+        $maintenance = AssetMaintenance::withTrashed()->findOrFail($id);
+        $maintenance->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 
     /**

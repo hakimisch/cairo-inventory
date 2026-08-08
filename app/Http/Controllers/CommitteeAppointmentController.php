@@ -30,6 +30,7 @@ class CommitteeAppointmentController extends Controller
             'appointments' => $appointments,
             'filters'      => $request->only(['search']),
             'users'        => $users,
+            'trashed'      => CommitteeAppointment::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -79,5 +80,15 @@ class CommitteeAppointmentController extends Controller
         $committeeAppointment->delete();
 
         return redirect()->back()->with('success', 'Committee appointment removed successfully.');
+    }
+
+    /**
+     * Restore a soft-deleted committee appointment.
+     */
+    public function restore($id)
+    {
+        $appointment = CommitteeAppointment::withTrashed()->findOrFail($id);
+        $appointment->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 }

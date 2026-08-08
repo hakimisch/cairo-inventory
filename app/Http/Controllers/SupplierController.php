@@ -40,6 +40,7 @@ class SupplierController extends Controller
         return inertia('Suppliers/Index', [
             'suppliers' => $suppliers,
             'filters'   => $request->only(['search']),
+            'trashed'   => Supplier::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -94,5 +95,15 @@ class SupplierController extends Controller
 
         return redirect()->route('suppliers.index')
             ->with('success', 'Supplier deleted successfully.');
+    }
+
+    /**
+     * Restore a soft-deleted supplier.
+     */
+    public function restore($id)
+    {
+        $supplier = Supplier::withTrashed()->findOrFail($id);
+        $supplier->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 }

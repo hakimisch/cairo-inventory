@@ -31,6 +31,7 @@ class AssetLossReportController extends Controller
             'records' => $lossReports,
             'filters' => $request->only(['search', 'status']),
             'assets'  => \App\Models\Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
+            'trashed' => AssetLossReport::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -102,6 +103,16 @@ class AssetLossReportController extends Controller
         $lossReport->delete();
 
         return redirect()->back()->with('success', 'Loss report deleted successfully.');
+    }
+
+    /**
+     * Restore a soft-deleted loss report.
+     */
+    public function restore(Asset $asset, $id)
+    {
+        $lossReport = AssetLossReport::withTrashed()->findOrFail($id);
+        $lossReport->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 
     /**

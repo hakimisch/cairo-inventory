@@ -329,6 +329,15 @@ function VerifyModal({ item, onClose }) {
                     {hasExplicitSerials ? (
                         <div style={{ marginBottom: 16 }}>
                             <label style={labelStyle}>Serial Numbers &mdash; one asset will be created for each selected S/N</label>
+                            {item.quantity === 1 && initialSerials.length > 1 && (
+                                <div style={{
+                                    padding: '8px 12px', background: '#FFFBEB', border: '1px solid #FDE68A',
+                                    borderRadius: 6, fontSize: 12, color: '#92400E', marginBottom: 8,
+                                }}>
+                                    ⚠ Item qty=1 with {initialSerials.length} S/Ns &mdash; these appear to be internal component serials.
+                                    Only 1 asset will be created with all selected S/Ns stored together.
+                                </div>
+                            )}
                             <div style={{ border: `1.5px solid ${UTM.gray100}`, borderRadius: 8, overflow: 'hidden' }}>
                                 <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                                     <thead>
@@ -814,10 +823,15 @@ function PipelineView({ items, stats, categories, filters, user }) {
                                 <th style={thStyle}>Item No.</th>
                                 <th style={thStyle}>Category</th>
                                 <th style={thStyle}>Name</th>
+                                <th style={{ ...thStyle, minWidth: 90 }}>Specification</th>
                                 <th style={thStyle}>Brand</th>
                                 <th style={thStyle}>Serial No.</th>
+                                <th style={thStyle}>Country</th>
                                 <th style={{ ...thStyle, textAlign: 'center' }}>Qty</th>
                                 <th style={{ ...thStyle, textAlign: 'right' }}>Unit Price</th>
+                                <th style={{ ...thStyle, textAlign: 'right' }}>Total</th>
+                                <th style={thStyle}>Sodo</th>
+                                <th style={thStyle}>DO No.</th>
                                 <th style={thStyle}>Status</th>
                                 <th style={thStyle}>Actions</th>
                             </tr>
@@ -833,18 +847,25 @@ function PipelineView({ items, stats, categories, filters, user }) {
                                     outline: isHighlighted ? `2px solid ${UTM.gold}` : 'none',
                                 }}>
                                     <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 12 }}>{item.item_no}</td>
-                                    <td style={{ ...tdStyle, fontSize: 12, color: UTM.gray600, maxWidth: 130 }}>{item.category}</td>
-                                    <td style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.name}>
+                                    <td style={{ ...tdStyle, fontSize: 12, color: UTM.gray600, maxWidth: 100 }}>{item.category}</td>
+                                    <td style={{ ...tdStyle, maxWidth: 180, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.name}>
                                         {item.name}
                                     </td>
+                                    <td style={{ ...tdStyle, maxWidth: 140 }}><SpecTooltip spec={item.specification} /></td>
                                     <td style={tdStyle}>{item.brand ?? '—'}</td>
-                                    <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 12, maxWidth: 150, wordBreak: 'break-all' }}>
+                                    <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 12, maxWidth: 130, wordBreak: 'break-all' }}>
                                         {item.serial_numbers ?? '—'}
                                     </td>
+                                    <td style={{ ...tdStyle, fontSize: 12, color: UTM.gray600 }}>{item.country_of_origin ?? '—'}</td>
                                     <td style={{ ...tdStyle, textAlign: 'center' }}>{item.quantity}</td>
                                     <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
                                         {item.unit_price ? `RM ${item.unit_price.toLocaleString('ms-MY', { minimumFractionDigits: 2 })}` : '—'}
                                     </td>
+                                    <td style={{ ...tdStyle, textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                        {item.total_price ? `RM ${item.total_price.toLocaleString('ms-MY', { minimumFractionDigits: 2 })}` : '—'}
+                                    </td>
+                                    <td style={{ ...tdStyle, fontSize: 12, fontFamily: 'monospace' }}>{item.sodo_bayaran ?? '—'}</td>
+                                    <td style={{ ...tdStyle, fontSize: 12, fontFamily: 'monospace' }}>{item.do_no ?? '—'}</td>
                                     <td style={tdStyle}><StatusBadge status={item.status} /></td>
                                     <td style={tdStyle}>
                                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -897,7 +918,7 @@ function PipelineView({ items, stats, categories, filters, user }) {
 
                                 {expandedId === item.id && (
                                     <tr style={{ background: '#FAFAFA', borderBottom: `2px solid ${UTM.gray100}` }}>
-                                        <td colSpan={9} style={{ padding: 0 }}>
+                                        <td colSpan={14} style={{ padding: 0 }}>
                                             <div style={{ padding: '20px 24px', display: 'flex', flexWrap: 'wrap', gap: 24, borderLeft: `4px solid ${UTM.gold}` }}>
                                                 <div style={{ minWidth: 200 }}>
                                                     <h4 style={{ fontSize: 11, fontWeight: 800, color: UTM.maroon, textTransform: 'uppercase', borderBottom: `2px solid ${UTM.gray100}`, paddingBottom: 6, marginBottom: 10 }}>

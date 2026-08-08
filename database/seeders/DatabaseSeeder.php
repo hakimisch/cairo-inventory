@@ -302,16 +302,19 @@ class DatabaseSeeder extends Seeder
             'status'                    => 'pending',
         ]);
 
-        // ─── 6. Seed 10+ records for every KEWPA module ──────────────────────
+        // ─── 6. Seed reference data (locations, etc.) ──────────────────────
+        $this->call(LocationSeeder::class);
+
+        // ─── 7. Seed 10+ records for every KEWPA module ──────────────────────
         $this->call(KewpaDataSeeder::class);
 
-        // ─── 7. Seed Phase 2 suppliers ──────────────────────────────────────
+        // ─── 8. Seed Phase 2 suppliers ──────────────────────────────────────
         $this->call(SupplierSeeder::class);
 
-        // ─── 8. Seed master equipment register (156 items from Excel) ────────
+        // ─── 9. Seed master equipment register (156 items from Excel) ────────
         $this->call(MasterItemSeeder::class);
 
-        // ─── 9. Deterministic admin account (for deployments) ────────────
+        // ─── 10. Deterministic admin account (for deployments) ────────────
         $this->call(AdminUserSeeder::class);
     }
 }

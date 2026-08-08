@@ -30,6 +30,7 @@ class AssetTransferController extends Controller
             'records' => $transfers,
             'filters' => $request->only(['search', 'status']),
             'assets'  => \App\Models\Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
+            'trashed' => AssetTransfer::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -85,5 +86,15 @@ class AssetTransferController extends Controller
         $transfer->delete();
 
         return redirect()->back()->with('success', 'Asset transfer deleted successfully.');
+    }
+
+    /**
+     * Restore a soft-deleted transfer record.
+     */
+    public function restore(Asset $asset, $id)
+    {
+        $transfer = AssetTransfer::withTrashed()->findOrFail($id);
+        $transfer->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 }

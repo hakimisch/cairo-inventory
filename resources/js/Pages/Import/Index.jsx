@@ -342,13 +342,18 @@ export default function Index({ suppliers, preview }) {
                                     <tr style={{ borderBottom: '2px solid #E5E7EB', background: '#F9FAFB' }}>
                                         <th style={thStyle}>#</th>
                                         <th style={thStyle}>Code</th>
-                                        <th style={{ ...thStyle, minWidth: 180 }}>Description</th>
+                                        <th style={{ ...thStyle, minWidth: 160 }}>Description</th>
+                                        <th style={{ ...thStyle, minWidth: 100 }}>Specification</th>
                                         <th style={thStyle}>Brand</th>
                                         <th style={thStyle}>Model</th>
                                         <th style={thStyle}>S/N</th>
                                         <th style={thStyle}>Category</th>
+                                        <th style={thStyle}>Country</th>
                                         <th style={thStyle}>Qty</th>
-                                        <th style={thStyle}>Price</th>
+                                        <th style={thStyle}>Unit Price</th>
+                                        <th style={thStyle}>Total</th>
+                                        <th style={thStyle}>Sodo</th>
+                                        <th style={thStyle}>DO No</th>
                                         <th style={thStyle}></th>
                                     </tr>
                                 </thead>
@@ -362,43 +367,69 @@ export default function Index({ suppliers, preview }) {
                                             <td style={tdStyle}>
                                                 <input value={item.item_code || ''}
                                                     onChange={e => handleItemChange(idx, 'item_code', e.target.value)}
-                                                    style={inputStyle} />
+                                                    style={{ ...inputStyle, width: 70 }} />
                                             </td>
                                             <td style={tdStyle}>
                                                 <input value={item.description || ''}
                                                     onChange={e => handleItemChange(idx, 'description', e.target.value)}
-                                                    style={{ ...inputStyle, minWidth: 160 }} />
+                                                    style={{ ...inputStyle, minWidth: 140 }} />
+                                            </td>
+                                            <td style={tdStyle}>
+                                                <input value={item.specification || ''}
+                                                    onChange={e => handleItemChange(idx, 'specification', e.target.value)}
+                                                    style={{ ...inputStyle, minWidth: 100 }} />
                                             </td>
                                             <td style={tdStyle}>
                                                 <input value={item.brand || ''}
                                                     onChange={e => handleItemChange(idx, 'brand', e.target.value)}
-                                                    style={{ ...inputStyle, width: 70 }} />
+                                                    style={{ ...inputStyle, width: 65 }} />
                                             </td>
                                             <td style={tdStyle}>
                                                 <input value={item.model || ''}
                                                     onChange={e => handleItemChange(idx, 'model', e.target.value)}
-                                                    style={{ ...inputStyle, width: 70 }} />
+                                                    style={{ ...inputStyle, width: 60 }} />
                                             </td>
                                             <td style={tdStyle}>
                                                 <input value={item.serial_number || ''}
                                                     onChange={e => handleItemChange(idx, 'serial_number', e.target.value)}
-                                                    style={{ ...inputStyle, width: 90, fontFamily: 'monospace', fontSize: 11 }} />
+                                                    style={{ ...inputStyle, width: 80, fontFamily: 'monospace', fontSize: 11 }} />
                                             </td>
                                             <td style={tdStyle}>
                                                 <input value={item.category || ''}
                                                     onChange={e => handleItemChange(idx, 'category', e.target.value)}
-                                                    style={{ ...inputStyle, width: 80 }} />
+                                                    style={{ ...inputStyle, width: 70 }} />
+                                            </td>
+                                            <td style={tdStyle}>
+                                                <input value={item.country_of_origin || ''}
+                                                    onChange={e => handleItemChange(idx, 'country_of_origin', e.target.value)}
+                                                    style={{ ...inputStyle, width: 60 }} />
                                             </td>
                                             <td style={tdStyle}>
                                                 <input type="number" min="1" value={item.quantity_ordered || 1}
                                                     onChange={e => handleItemChange(idx, 'quantity_ordered', parseInt(e.target.value) || 1)}
-                                                    style={{ ...inputStyle, width: 50 }} />
+                                                    style={{ ...inputStyle, width: 45 }} />
                                             </td>
                                             <td style={tdStyle}>
                                                 <input type="number" step="0.01" min="0"
                                                     value={item.unit_price ?? ''}
                                                     onChange={e => handleItemChange(idx, 'unit_price', e.target.value ? parseFloat(e.target.value) : null)}
-                                                    style={{ ...inputStyle, width: 70 }} />
+                                                    style={{ ...inputStyle, width: 65 }} />
+                                            </td>
+                                            <td style={tdStyle}>
+                                                <input type="number" step="0.01" min="0"
+                                                    value={item.total_price ?? ''}
+                                                    onChange={e => handleItemChange(idx, 'total_price', e.target.value ? parseFloat(e.target.value) : null)}
+                                                    style={{ ...inputStyle, width: 65 }} />
+                                            </td>
+                                            <td style={tdStyle}>
+                                                <input value={item.sodo_bayaran || ''}
+                                                    onChange={e => handleItemChange(idx, 'sodo_bayaran', e.target.value)}
+                                                    style={{ ...inputStyle, width: 55 }} />
+                                            </td>
+                                            <td style={tdStyle}>
+                                                <input value={item.do_no || ''}
+                                                    onChange={e => handleItemChange(idx, 'do_no', e.target.value)}
+                                                    style={{ ...inputStyle, width: 60 }} />
                                             </td>
                                             <td style={tdStyle}>
                                                 <button onClick={() => handleRemoveItem(idx)}
@@ -422,6 +453,8 @@ export default function Index({ suppliers, preview }) {
                                 setItems(prev => [...prev, {
                                     item_code: '', description: '', brand: '',
                                     model: '', serial_number: '', category: '',
+                                    specification: '', country_of_origin: '',
+                                    total_price: null, sodo_bayaran: '', do_no: '',
                                     quantity_ordered: 1, unit: 'unit', unit_price: null,
                                 }]);
                             }} style={{

@@ -30,6 +30,7 @@ class DamageReportController extends Controller
             'records' => $damageReports,
             'filters' => $request->only(['search', 'status']),
             'assets'  => Asset::select('id', 'name', 'asset_tag')->orderBy('name')->get(),
+            'trashed' => DamageReport::onlyTrashed()->latest()->get(),
         ]);
     }
 
@@ -82,6 +83,16 @@ class DamageReportController extends Controller
         $damageReport->delete();
 
         return redirect()->back()->with('success', 'Aduan kerosakan berjaya dipadam.');
+    }
+
+    /**
+     * Restore a soft-deleted damage report.
+     */
+    public function restore(Asset $asset, $id)
+    {
+        $damageReport = DamageReport::withTrashed()->findOrFail($id);
+        $damageReport->restore();
+        return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 
     public function downloadKewpa9(DamageReport $damageReport)
