@@ -223,7 +223,37 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::delete('/assets/{asset}/vehicle-disposal', [VehicleDisposalAssessmentController::class, 'destroy'])->middleware('permission:crud_assets')->name('assets.vehicle-disposal.destroy');
     Route::get('/assets/{asset}/vehicle-disposal/kewpa16', [VehicleDisposalAssessmentController::class, 'kewpa16'])->name('assets.vehicle-disposal.kewpa16');
     Route::get('/assets/{asset}/vehicle-disposal/kewpa16/download', [VehicleDisposalAssessmentController::class, 'downloadKewpa16'])->name('assets.vehicle-disposal.kewpa16.download');
-});
+
+    // ── Receivings (PA-1) ──────────────────────────────────────────────────
+    Route::get('/receivings', [AssetController::class, 'receivingIndex'])->name('receivings.index');
+    Route::get('/receivings/{receiving}/kewpa1', [AssetController::class, 'kewpa1'])->name('receivings.kewpa1');
+    Route::post('/receivings/{receiving}/accept', [AssetController::class, 'acceptReceiving'])->name('receivings.accept');
+    Route::post('/receivings/{receiving}/reject', [AssetController::class, 'rejectReceiving'])->name('receivings.reject');
+    Route::post('/receivings', [AssetController::class, 'storeReceiving'])->name('receivings.store');
+    Route::get('/receivings/{receiving}/kewpa1/download', [AssetController::class, 'downloadKewpa1'])->name('receivings.kewpa1.download');
+    Route::put('/receivings/{receiving}', [AssetController::class, 'updateReceiving'])->name('receivings.update');
+    Route::delete('/receivings/{receiving}', [AssetController::class, 'destroyReceiving'])->middleware('permission:crud_assets')->name('receivings.destroy');
+
+    // ── Asset downloads ────────────────────────────────────────────────────
+    Route::get('/assets/{asset}/kewpa2/download', [AssetController::class, 'downloadKewpa2'])->name('assets.kewpa2.download');
+    Route::get('/assets/{asset}/kewpa3/download', [AssetController::class, 'downloadKewpa3'])->name('assets.kewpa3.download');
+    Route::get('/assets/{asset}/label', [AssetController::class, 'downloadLabel'])->name('assets.label');
+
+    // ── Restore soft-deleted records — admin/superadmin only ───────────────
+    Route::post('/assets/{id}/restore', [AssetController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.restore');
+    Route::post('/receivings/{id}/restore', [AssetController::class, 'restoreReceiving'])->middleware('permission:crud_assets')->name('receivings.restore');
+
+    // ── Restore for nested resource records
+    Route::post('/assets/{asset}/transfers/{transfer}/restore', [AssetTransferController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.transfers.restore');
+    Route::post('/assets/{asset}/inspections/{inspection}/restore', [AssetInspectionController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.inspections.restore');
+    Route::post('/assets/{asset}/maintenances/{maintenance}/restore', [AssetMaintenanceController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.maintenances.restore');
+    Route::post('/assets/{asset}/disposals/{disposal}/restore', [AssetDisposalController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.disposals.restore');
+    Route::post('/assets/{asset}/loss-reports/{lossReport}/restore', [AssetLossReportController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.loss-reports.restore');
+    Route::post('/assets/{asset}/damage-reports/{damageReport}/restore', [DamageReportController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.damage-reports.restore');
+    Route::post('/assets/{asset}/upgrades/{upgrade}/restore', [AssetUpgradeController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.upgrades.restore');
+    Route::post('/assets/{asset}/vehicle-disposal/restore', [VehicleDisposalAssessmentController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.vehicle-disposal.restore');
+    Route::post('/assets/{asset}/placements/{placement}/restore', [AssetController::class, 'restorePlacement'])->middleware('permission:crud_assets')->name('assets.placements.restore');
+    });
 
 // ── Phase 5: PA-21→27A Tender/Sebutharga/Lelongan ──────────────────────────
 
@@ -235,6 +265,7 @@ Route::middleware(['auth', 'verified'])->prefix('disposal-sales')->name('disposa
     Route::get('/{sale}',       [DisposalSaleController::class, 'show'])->name('show');
     Route::put('/{sale}',       [DisposalSaleController::class, 'update'])->name('update');
     Route::delete('/{sale}',    [DisposalSaleController::class, 'destroy'])->middleware('permission:crud_assets')->name('destroy');
+    Route::post('/{sale}/restore', [DisposalSaleController::class, 'restore'])->middleware('permission:crud_assets')->name('restore');
 
     // Sale Items (nested)
     Route::get('/{sale}/items',             [DisposalSaleItemController::class, 'index'])->name('items.index');
@@ -275,6 +306,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/committee-appointments', [CommitteeAppointmentController::class, 'store'])->name('committee-appointments.store');
     Route::put('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'update'])->name('committee-appointments.update');
     Route::delete('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'destroy'])->middleware('permission:crud_assets')->name('committee-appointments.destroy');
+    Route::post('/committee-appointments/{committeeAppointment}/restore', [CommitteeAppointmentController::class, 'restore'])->middleware('permission:crud_assets')->name('committee-appointments.restore');
 });
 
 Route::middleware('auth')->group(function () {
@@ -282,35 +314,6 @@ Route::middleware('auth')->group(function () {
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
 });
-
-
-Route::middleware(['auth', 'verified'])->group(function () {
-
-    // Receivings (was unprotected — moved into auth group)
-    Route::get('/receivings', [AssetController::class, 'receivingIndex'])->name('receivings.index');
-    Route::get('/receivings/{receiving}/kewpa1', [AssetController::class, 'kewpa1'])->name('receivings.kewpa1');
-    Route::post('/receivings/{receiving}/accept', [AssetController::class, 'acceptReceiving'])->name('receivings.accept');
-    Route::post('/receivings/{receiving}/reject', [AssetController::class, 'rejectReceiving'])->name('receivings.reject');
-
-    Route::post('/receivings', [AssetController::class, 'storeReceiving'])->name('receivings.store');
-
-    Route::get('/receivings/{receiving}/kewpa1/download', [AssetController::class, 'downloadKewpa1'])->name('receivings.kewpa1.download');
-    Route::put('/receivings/{receiving}', [AssetController::class, 'updateReceiving'])->name('receivings.update');
-    Route::delete('/receivings/{receiving}', [AssetController::class, 'destroyReceiving'])->middleware('permission:crud_assets')->name('receivings.destroy');
-
-    // Asset downloads (was unprotected — moved into auth group)
-    Route::get('/assets/{asset}/kewpa2/download', [AssetController::class, 'downloadKewpa2'])->name('assets.kewpa2.download');
-    Route::get('/assets/{asset}/kewpa3/download', [AssetController::class, 'downloadKewpa3'])->name('assets.kewpa3.download');
-    Route::get('/assets/{asset}/label', [AssetController::class, 'downloadLabel'])->name('assets.label');
-
-    // Restore soft-deleted records — admin/superadmin only
-    Route::post('/assets/{id}/restore', [AssetController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.restore');
-    Route::post('/receivings/{id}/restore', [AssetController::class, 'restoreReceiving'])->middleware('permission:crud_assets')->name('receivings.restore');
-
-});
-
-// ── Items Overview — redirects to Verification Registry tab ────────────────
-Route::permanentRedirect('/items', '/verification?tab=registry');
 
 // ── Verification Pipeline ────────────────────────────────────────────
 Route::middleware(['auth', 'verified'])->prefix('verification')->name('verification.')->group(function () {
@@ -326,13 +329,10 @@ Route::middleware(['auth', 'verified'])->prefix('suppliers')->name('suppliers.')
     Route::post('/',         [SupplierController::class, 'store'])->name('store');
     Route::put('/{supplier}', [SupplierController::class, 'update'])->name('update');
     Route::delete('/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:crud_assets')->name('destroy');
+    Route::post('/{supplier}/restore', [SupplierController::class, 'restore'])->middleware('permission:crud_assets')->name('restore');
 });
 
-// ── Scanner Module — GET routes redirect, API routes stay ──────────────────
-Route::permanentRedirect('/scanner', '/verification?scan=1');
-Route::permanentRedirect('/scanner/history', '/verification?scan=1');
-
-// API endpoints (used by Verification ScanPanel + scanner recordings)
+// ── Scanner API endpoints (used by Verification ScanPanel) ──────────────────
 Route::middleware(['auth', 'verified'])->prefix('scanner')->name('scanner.')->group(function () {
     Route::post('/lookup', [ScanController::class, 'lookup'])->name('lookup');
     Route::post('/scan',   [ScanController::class, 'scan'])->name('scan');
@@ -352,70 +352,7 @@ Route::middleware(['auth', 'verified'])->prefix('import')->name('import.')->grou
     Route::post('/confirm',      [\App\Http\Controllers\ImportController::class, 'confirm'])->name('confirm');
 });
 
-// ── Utility: Deduplicate master_items ──────────────────────────────────────
-Route::get('/_dev/dedup-master-items', function () {
-    $dupes = \DB::table('master_items')
-        ->select('item_no', \DB::raw('COUNT(*) as cnt'))
-        ->groupBy('item_no')
-        ->havingRaw('COUNT(*) > 1')
-        ->get();
-
-    $deleted = 0;
-    foreach ($dupes as $dup) {
-        $rows = \DB::table('master_items')
-            ->where('item_no', $dup->item_no)
-            ->orderBy('status', 'desc')
-            ->orderBy('id', 'desc')
-            ->get();
-
-        $keep = $rows->shift();
-        foreach ($rows as $row) {
-            \DB::table('assets')->where('master_item_id', $row->id)->update(['master_item_id' => $keep->id]);
-            \DB::table('receivings')->where('master_item_id', $row->id)->update(['master_item_id' => $keep->id]);
-            \DB::table('master_items')->where('id', $row->id)->delete();
-            $deleted++;
-        }
-    }
-
-    return response()->json([
-        'deleted' => $deleted,
-        'dupes_left' => \DB::table('master_items')
-            ->select(\DB::raw('COUNT(*) - COUNT(DISTINCT item_no)'))
-            ->value(\DB::raw('COUNT(*) - COUNT(DISTINCT item_no)')),
-    ]);
-})->name('dev.dedup');
-
-// ── Utility: Deduplicate suppliers ─────────────────────────────────────────
-Route::get('/_dev/dedup-suppliers', function () {
-    $map = [
-        // Dotcom: keep ID 1, merge 6 (abbreviated) and 7 (dotcom telecom)
-        6 => 1,
-        7 => 1,
-        // SNS: keep ID 3, merge 8 (sns network)
-        8 => 3,
-    ];
-
-    $updated = 0;
-    $deleted = 0;
-    foreach ($map as $fromId => $toId) {
-        $from = \DB::table('suppliers')->where('id', $fromId)->first();
-        if (!$from) continue;
-
-        $affected = \DB::table('master_items')->where('supplier_id', $fromId)->update(['supplier_id' => $toId]);
-        $updated += $affected;
-
-        \DB::table('suppliers')->where('id', $fromId)->delete();
-        $deleted++;
-    }
-
-    $to = \DB::table('suppliers')->where('id', 1)->first();
-
-    return response()->json([
-        'merged' => $deleted,
-        'master_items_updated' => $updated,
-        'remaining' => \DB::table('suppliers')->count(),
-        'canonical_dotcom' => $to?->name,
-    ]);
-})->name('dev.dedup-suppliers');
+// ── Utility dedup moved to artisan commands (previously ungated GET routes):
+//    php artisan cairo:dedup-master-items   /   cairo:dedup-suppliers
 
 require __DIR__.'/auth.php';

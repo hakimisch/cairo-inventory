@@ -2,10 +2,10 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 
 const typeStyles = {
-    success: { background: '#166534', icon: '✅' },
-    error:   { background: '#991b1b', icon: '❌' },
-    warning: { background: '#92400e', icon: '⚠️' },
-    info:    { background: '#1e40af', icon: 'ℹ️' },
+    success: { background: '#166534', icon: '✓' },
+    error:   { background: '#991b1b', icon: '✕' },
+    warning: { background: '#92400e', icon: '!' },
+    info:    { background: '#1e40af', icon: 'i' },
 };
 
 const styles = {

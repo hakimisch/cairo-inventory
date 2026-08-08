@@ -11,12 +11,19 @@ use App\Http\Controllers\Auth\RegisteredUserController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use Illuminate\Support\Facades\Route;
 
+// Self-registration is gated behind REGISTRATION_ENABLED (default: off).
+// When disabled the routes are not registered and the UI hides the Register
+// link automatically (canRegister checks Route::has('register')).
+if (config('cairo.registration_enabled')) {
+    Route::middleware('guest')->group(function () {
+        Route::get('register', [RegisteredUserController::class, 'create'])
+            ->name('register');
+
+        Route::post('register', [RegisteredUserController::class, 'store']);
+    });
+}
+
 Route::middleware('guest')->group(function () {
-    Route::get('register', [RegisteredUserController::class, 'create'])
-        ->name('register');
-
-    Route::post('register', [RegisteredUserController::class, 'store']);
-
     Route::get('login', [AuthenticatedSessionController::class, 'create'])
         ->name('login');
 

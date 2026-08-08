@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import ApplicationLogo from '@/Components/ApplicationLogo';
 import { Link, usePage } from '@inertiajs/react';
-import { ToastProvider } from '@/Components/Toast';
+import { ToastProvider, useToast } from '@/Components/Toast';
 
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -171,6 +171,26 @@ function SubNavLink({ href, label, active }) {
     );
 }
 
+// ─── Flash → Toast bridge ───────────────────────────────────────────────────
+// Renders session flashes (redirect()->with('success'/'error', ...)) as toasts
+// so permission denials and CRUD messages are actually visible to the clerk.
+function FlashToaster() {
+    const { flash } = usePage().props;
+    const toast = useToast();
+    const error = flash?.error;
+    const success = flash?.success;
+
+    useEffect(() => {
+        if (error) {
+            toast({ type: 'error', title: 'Ralat', message: error, duration: 6000 });
+        } else if (success) {
+            toast({ type: 'success', title: 'Berjaya', message: success, duration: 4000 });
+        }
+    }, [error, success]);
+
+    return null;
+}
+
 export default function AuthenticatedLayout({ header, children }) {
     const user = usePage().props.auth.user;
 
@@ -286,11 +306,6 @@ export default function AuthenticatedLayout({ header, children }) {
                             icon="◈"
                             label="Verification Pipeline + Registry"
                             active={isActive('verification.*')}
-                        />
-                        <NavLink
-                            href={'/verification?scan=1'}
-                            icon="◉"
-                            label="Scanner S/N / Barcode"
                         />
 
                         {/* ── Pendaftaran (Registry & Forms) ── */}
@@ -484,12 +499,7 @@ export default function AuthenticatedLayout({ header, children }) {
                                 active={isActive('loss-reports.kewpa32', 'loss-reports.kewpa32.download')}
                             />
                         </NavGroup>
-                        <NavLink
-                            href={route('committee-appointments.index')}
-                            icon="◈"
-                            label="PA-29 Jawatankuasa Siasatan"
-                            active={isActive('committee-appointments.index', 'committee-appointments.*')}
-                        />
+
                     </NavSection>
 
                     {/* ═══════════════════════════════════════════════════════
@@ -671,6 +681,7 @@ export default function AuthenticatedLayout({ header, children }) {
 
                 <main style={{ flex: 1, overflowY: 'auto', background: UTM.gray50 }}>
                     <ToastProvider>
+                        <FlashToaster />
                         {children}
                     </ToastProvider>
                 </main>
