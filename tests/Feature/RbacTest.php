@@ -117,21 +117,22 @@ class RbacTest extends TestCase
     }
 
     // ═══════════════════════════════════════════════════════════════════
-    //  STAFF — CANNOT verify (admin gate)
+    //  STAFF — CAN verify (config/roles.php grants the `user` role `verify`)
     // ═══════════════════════════════════════════════════════════════════
 
-    public function test_staff_cannot_verify_items(): void
+    public function test_staff_can_verify_items(): void
     {
         $staff = $this->createStaff();
         $item  = $this->createReceivedItem();
 
         $response = $this->actingAs($staff)
-            ->post("/verification/{$item->id}/verify");
+            ->post("/verification/{$item->id}/verify", [
+                'location' => 'Test Lab',
+            ]);
 
-        // AdminMiddleware redirects non-admin to dashboard with error
-        $response->assertRedirect('/dashboard');
-        $response->assertSessionHas('error');
-        $this->assertEquals('diterima', $item->fresh()->status);
+        $response->assertSessionHas('success');
+        $this->assertEquals('verified', $item->fresh()->status);
+        $this->assertNotNull($item->fresh()->asset);
     }
 
     // ═══════════════════════════════════════════════════════════════════

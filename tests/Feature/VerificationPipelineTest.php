@@ -322,4 +322,196 @@ class VerificationPipelineTest extends TestCase
         // Actually, the outer DB::transaction will roll back on exception.
         $this->assertEquals('diterima', $item->fresh()->status);
     }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  T13–T17: Tong (soft delete / restore) + permission props
+    // ═══════════════════════════════════════════════════════════════════
+
+    /** T13: index() exposes can_verify / can_delete / trashed for UI gating */
+    public function test_index_exposes_permission_and_trash_props(): void
+    {
+        $staff = $this->createStaff();
+
+        $trashedItem = $this->createReceivedItem();
+        $trashedItem->delete();
+
+        $this->actingAs($staff)->get('/verification')->assertInertia(fn ($page) => $page
+            ->component('Verification/Index')
+            ->where('can_verify', true)         // `user` role has `verify`
+            ->where('can_delete', false)        // `user` role has no `crud_assets`
+            ->where('can_force_delete', false)  // `user` role has no `force_delete`
+            ->has('trashed', 1)
+        );
+    }
+
+    /** T14: admin can soft-delete an item that has no downstream records */
+    public function test_admin_can_delete_unreceived_item(): void
+    {
+        $admin = $this->createAdmin();
+        $item  = $this->createUnreceivedItem();
+
+        $this->actingAs($admin)
+            ->delete("/verification/{$item->id}")
+            ->assertSessionHas('success');
+
+        $this->assertSoftDeleted('master_items', ['id' => $item->id]);
+        $this->assertNull(MasterItem::find($item->id));
+        $this->assertNotNull(MasterItem::withTrashed()->find($item->id));
+    }
+
+    /** T15: deleting an item that already produced a PA-1/asset is refused */
+    public function test_cannot_delete_item_with_downstream_records(): void
+    {
+        $admin = $this->createAdmin();
+        $item  = $this->createReceivedItem(['unit_price' => 5000.00, 'total_price' => 5000.00]);
+
+        $this->actingAs($admin)
+            ->post("/verification/{$item->id}/verify", ['location' => 'Lab A'])
+            ->assertSessionHas('success');
+
+        $this->actingAs($admin)
+            ->delete("/verification/{$item->id}")
+            ->assertSessionHasErrors('item');
+
+        $this->assertNotSoftDeleted('master_items', ['id' => $item->id]);
+    }
+
+    /** T16: staff cannot delete — route is gated by permission:crud_assets */
+    public function test_staff_cannot_delete_item(): void
+    {
+        $staff = $this->createStaff();
+        $item  = $this->createUnreceivedItem();
+
+        $this->actingAs($staff)
+            ->delete("/verification/{$item->id}")
+            ->assertRedirect('/dashboard')
+            ->assertSessionHas('error');
+
+        $this->assertNotSoftDeleted('master_items', ['id' => $item->id]);
+    }
+
+    /** T17: restore brings a trashed master item back */
+    public function test_admin_can_restore_deleted_item(): void
+    {
+        $admin = $this->createAdmin();
+        $item  = $this->createUnreceivedItem();
+        $item->delete();
+
+        $this->actingAs($admin)
+            ->post("/verification/{$item->id}/restore")
+            ->assertSessionHas('success');
+
+        $this->assertNotSoftDeleted('master_items', ['id' => $item->id]);
+    }
+
+    /**
+     * T18: a rejected Verify must reach the *page*, not just the session.
+     *
+     * This is the P2 regression guard. The page used to render the banner from
+     * `filters.item_error`, a key `index()` never sends, so every pipeline
+     * rejection was a silent no-op in the UI even though the server was
+     * correctly putting it in the error bag.
+     */
+    public function test_rejected_verify_reaches_the_page_props(): void
+    {
+        $admin = $this->createAdmin();
+        $item  = $this->createReceivedItem(['unit_price' => 5000.00, 'total_price' => 5000.00]);
+
+        // First verify succeeds…
+        $this->actingAs($admin)
+            ->post("/verification/{$item->id}/verify", ['location' => 'Lab A'])
+            ->assertSessionHas('success');
+
+        // …re-verifying is rejected. Follow the redirect back to the page and
+        // assert the message is present in the Inertia `errors` prop that the
+        // React page reads.
+        $this->actingAs($admin)
+            ->from('/verification')
+            ->followingRedirects()
+            ->post("/verification/{$item->id}/verify", ['location' => 'Lab A'])
+            ->assertInertia(fn ($page) => $page
+                ->component('Verification/Index')
+                ->has('errors.item')
+            );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
+    //  T19–T21: permanent delete + audit trail
+    // ═══════════════════════════════════════════════════════════════════
+
+    /** T19: only a superadmin can permanently delete from the Tong */
+    public function test_only_superadmin_can_force_delete_a_trashed_item(): void
+    {
+        $admin = $this->createAdmin();
+        $item  = $this->createUnreceivedItem();
+        $item->delete();
+
+        // admin has `crud_assets` but NOT `force_delete`
+        $this->actingAs($admin)
+            ->delete("/verification/{$item->id}/force")
+            ->assertRedirect('/dashboard')
+            ->assertSessionHas('error');
+
+        $this->assertNotNull(MasterItem::withTrashed()->find($item->id));
+
+        $super = User::factory()->superadmin()->create();
+
+        $this->actingAs($super)
+            ->delete("/verification/{$item->id}/force")
+            ->assertSessionHas('success');
+
+        // row is gone for good, and the purge is on the record
+        $this->assertNull(MasterItem::withTrashed()->find($item->id));
+        $this->assertDatabaseHas('activity_log', [
+            'event'        => 'force_deleted',
+            'subject_type' => MasterItem::class,
+            'subject_id'   => $item->id,
+        ]);
+    }
+
+    /** T20: moving to / restoring from the Tong is audited with explicit events */
+    public function test_tong_operations_are_audited(): void
+    {
+        $admin = $this->createAdmin();
+        $item  = $this->createUnreceivedItem();
+
+        $this->actingAs($admin)->delete("/verification/{$item->id}")->assertSessionHas('success');
+        $this->assertDatabaseHas('activity_log', [
+            'event'        => 'deleted',
+            'subject_type' => MasterItem::class,
+            'subject_id'   => $item->id,
+        ]);
+
+        $this->actingAs($admin)->post("/verification/{$item->id}/restore")->assertSessionHas('success');
+        $this->assertDatabaseHas('activity_log', [
+            'event'        => 'restored',
+            'subject_type' => MasterItem::class,
+            'subject_id'   => $item->id,
+        ]);
+    }
+
+    /** T21: the pipeline actions themselves (Receive / Verify) are audited */
+    public function test_pipeline_actions_are_audited(): void
+    {
+        $admin = $this->createAdmin();
+        $item  = $this->createUnreceivedItem(['unit_price' => 5000.00, 'total_price' => 5000.00]);
+
+        $this->actingAs($admin)
+            ->post("/verification/{$item->id}/receive", ['do_no' => 'DO-AUDIT-1'])
+            ->assertSessionHas('success');
+        $this->actingAs($admin)
+            ->post("/verification/{$item->id}/verify", ['location' => 'Lab A'])
+            ->assertSessionHas('success');
+
+        $this->assertDatabaseHas('activity_log', [
+            'event'        => 'received',
+            'subject_type' => MasterItem::class,
+            'subject_id'   => $item->id,
+        ]);
+        $this->assertDatabaseHas('activity_log', [
+            'event'        => 'verified',
+            'subject_type' => MasterItem::class,
+            'subject_id'   => $item->id,
+        ]);
+    }
 }

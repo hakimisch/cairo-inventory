@@ -72,7 +72,8 @@ class EndToEndPipelineTest extends TestCase
         $this->assertEquals(11, $ap->quantity);
         $this->assertEquals(1631.00, (float) $ap->unit_price);
 
-        // ── 4. Receive step: belum_diterima → diterima (PA-1 created) ──────
+        // ── 4. Receive step: belum_diterima → diterima (PA-1 NOT created yet) ─
+        // PA-1 moved to the verify step (see known issue #1 / backlog item 17).
         $receiveResponse = $this->actingAs($admin)->post("/verification/{$desktop->id}/receive", [
             'do_no'             => 'DO-2025-001',
             'receiver_name'     => 'Ahmad Bin Ali',
@@ -84,17 +85,13 @@ class EndToEndPipelineTest extends TestCase
         $desktop->refresh();
         $this->assertEquals('diterima', $desktop->status);
         $this->assertNotNull($desktop->received_date);
+        $this->assertEquals(
+            0,
+            Receiving::where('master_item_id', $desktop->id)->count(),
+            'PA-1 must not be created at receive — it is created atomically with the asset at verify.'
+        );
 
-        // PA-1 Receiving record created
-        $receiving = Receiving::where('master_item_id', $desktop->id)->first();
-        $this->assertNotNull($receiving);
-        $this->assertEquals('DO-2025-001', $receiving->delivery_order_no);
-        $this->assertEquals('Ahmad Bin Ali', $receiving->receiver_name);
-        $this->assertEquals(5926.00, (float) $receiving->unit_price);
-        $this->assertEquals(14 * 5926.00, (float) $receiving->total_price);
-        $this->assertEquals('Office Desktop', $receiving->item_description);
-
-        // ── 5. Verify step: diterima → verified (PA-2 or PA-3 asset created) ─
+        // ── 5. Verify step: diterima → verified (PA-1 + PA-2 or PA-3 created) ─
         // Desktop = RM 5,926 >= RM 2,000 → PA-2 (fixed_asset)
         $verifyResponse = $this->actingAs($admin)->post("/verification/{$desktop->id}/verify", [
             'location'       => 'CAIRO Lab H4',
@@ -106,6 +103,15 @@ class EndToEndPipelineTest extends TestCase
         $this->assertEquals('verified', $desktop->status);
         $this->assertNotNull($desktop->verified_at);
         $this->assertEquals($admin->id, $desktop->verified_by);
+
+        // PA-1 Receiving record created at verify, from the receive_meta captured in step 4
+        $receiving = Receiving::where('master_item_id', $desktop->id)->first();
+        $this->assertNotNull($receiving);
+        $this->assertEquals('DO-2025-001', $receiving->delivery_order_no);
+        $this->assertEquals('Ahmad Bin Ali', $receiving->receiver_name);
+        $this->assertEquals(5926.00, (float) $receiving->unit_price);
+        $this->assertEquals(14 * 5926.00, (float) $receiving->total_price);
+        $this->assertEquals('Office Desktop', $receiving->item_description);
 
         // Asset created (PA-2 — fixed_asset, price >= 2000)
         $asset = Asset::where('master_item_id', $desktop->id)->first();
