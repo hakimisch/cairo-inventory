@@ -35,5 +35,6 @@ __pycache__/
 /plans/*
 !/plans/2026-07-31_current-system-state.md
 !/plans/2026-07-31_future-work-backlog.md
+!/plans/2026-10-08_verification-items-findings.md
 table_name.php
 item_documents/

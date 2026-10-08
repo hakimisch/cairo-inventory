@@ -31,22 +31,21 @@ npm run build
 - **Fix:** one line — `$price >= config('cairo.asset_threshold', 2000)`.
 - **Verify:** set config 5000, accept RM3000 receiving → classified `inventory`.
 
-### 16. Sync Verify-button gating to permission
+### 16. Sync Verify-button gating to permission ✅ DONE 2026-10-08
 - **What:** `config/roles.php` grants `user` role `verify` (RBAC Fix #3, morning session), but `Verification/Index.jsx:891` hides the Verify button for non-`['admin','superadmin']` — staff can verify via direct POST but see "Menunggu pengesahan pentadbir" with no button. UI/backend mismatch.
-- **Fix:** pass `can_verify` from `VerificationController::index()` (e.g. `auth()->user()->can('verify')` or check `config("roles.{role}.can")`) and gate the button on that prop.
-- **Verify:** log in as `user` role → Verify button visible on `diterima` items.
+- **Done:** `VerificationController::index()` now passes `can_verify` / `can_delete` (via new `User::hasPermission()`, which reads the same `config/roles.php` that `PermissionMiddleware` uses); the button is gated on `can_verify`.
+- ~~**Files:** `Verification/Index.jsx:891`~~
+- **Verify:** log in as `user` role → Verify button visible on `diterima` items. ✅ covered by `VerificationPipelineTest::test_index_exposes_permission_and_trash_props`
 
 ---
 
 ## Phase 3 — Tests & documentation (≈half day)
 
-### 17. Fix the 2 stale tests (make suite green)
-- **`EndToEndPipelineTest.php:88-95`** — asserts `Receiving` exists right after `receive()` (old pipeline: PA-1 at Receive). PA-1 is now created at **Verify** (`VerificationController::verify()`). Move the Receiving assertions (L88-95) to **after** the verify step (after L108), and fix the step-4 comment "PA-1 created".
-- **`RbacTest.php:123-135` `test_staff_cannot_verify_items`** — asserts staff is blocked (pre-RBAC-fix). `user` role now HAS `verify`. Either:
-  - (a) rename/rewrite to `test_staff_can_verify_items` — assert status → `verified`, asset created, redirect back; or
-  - (b) if the RBAC fix was unintended, remove `verify` from `config/roles.php` `user` entry first.
-  - Also remove the stale comment "AdminMiddleware redirects non-admin" (middleware is dead).
-- **Verify:** `artisan test` → **118 passed / 0 failed**.
+### 17. Fix the 2 stale tests (make suite green) ✅ FIXED 2026-10-08
+- **`EndToEndPipelineTest.php:88-95`** — DONE: the Receiving assertions moved to after the verify step, and a new assertion now pins the contract that receive creates **no** PA-1. Step-4 comment corrected.
+- **`RbacTest.php:123-135` `test_staff_cannot_verify_items`** — DONE (option a): renamed to `test_staff_can_verify_items`, asserts success → `verified` + asset created. Stale "AdminMiddleware redirects non-admin" comment removed.
+- **Bonus:** 5 new tests in `VerificationPipelineTest` (T13–T17) for the Tong (delete/restore/guard) and the permission props.
+- **Verify:** `artisan test` → re-run to refresh the counts (was 118 tests / 482 assertions, 116 pass / 2 fail).
 
 ### 18. README overhaul (doc debt from the audit)
 - **Counts:** 170 → **156** master items; 56 → **58** migrations; 20 → **21** models (+Location); 15 → **16** components; "7-Section Sidebar" → **8** NavSections; assets "38 columns" → 41; tests "117/538" → **118 tests / ~485 assertions** (2 currently failing).
@@ -60,8 +59,9 @@ npm run build
 - **Options:** (a) collapse 14 → 1 asset (concatenate S/Ns, sum quantity), (b) keep as-is if the 14 S/Ns are legitimately 14 separate units (verify against the source DO).
 - **Verify:** registry + PA-2/PA-3 reflect the business rule consistently.
 
-### 20. Dead-code cleanup
-- **Remove:** `ItemsController.php` (imported in `routes/web.php:31`, zero routes) + `resources/js/Pages/Items/Index.jsx`; orphaned `resources/js/Pages/Scanner/Index.jsx` + `History.jsx` (scanner UI lives in Verification; only `/scanner/lookup|scan` API routes exist); `app/Http/Middleware/Adminmiddleware.php` (no alias registered — `bootstrap/app.php` registers only `role` + `permission`); unreferenced `DummyKewpaSeeder.php` + `DashboardTestSeeder.php`.
+### 20. Dead-code cleanup — ⚠️ PARTIAL 2026-10-08
+- **Removed 2026-10-08:** `ItemsController.php` (imported in `routes/web.php:31`, zero routes) + `resources/js/Pages/Items/Index.jsx`; `ScanController::verifyFromScan()` / `receiveFromScan()` (unrouted, and they disagreed with the pipeline on PA-1 timing).
+- **Still to remove:** orphaned `resources/js/Pages/Scanner/Index.jsx` + `History.jsx` (they call non-existent `scanner.index` / `scanner.history` routes), `app/Http/Middleware/Adminmiddleware.php` (no alias registered — `bootstrap/app.php` registers only `role` + `permission`), unreferenced `DummyKewpaSeeder.php` + `DashboardTestSeeder.php`.
 - **Verify:** `git grep` each name → zero references; `artisan route:list` clean.
 
 ---

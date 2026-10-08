@@ -85,7 +85,7 @@ php artisan serve
 | Seed users exist | Check DB: `SELECT email, role FROM users;` | 7 users across 5 roles |
 | Master items exist | Check DB: `SELECT COUNT(*) FROM master_items;` | 156 rows |
 | Build is clean | `npm run build` | ✓ built in ~18s, 0 errors |
-| Tests pass | `php artisan test` | 116 passed / 2 failed / 482 assertions (2 stale failures — see Known Issues #3) |
+| Tests pass | `php artisan test` | 127 passed / 0 failed / 593 assertions (2026-10-08) |
 
 ### Potential Gotchas
 
@@ -289,8 +289,8 @@ master_items.status:
 |------|-------------|
 | `app/Http/Controllers/VerificationController.php` | The main pipeline controller. `index()` shows master items + scanner panel. `receive()` stores receiver/DO metadata as JSON in `master_items.receive_meta` and updates status to `diterima` (no PA-1 yet). `verify()` reads the metadata and creates **PA-1 (Receiving) + Asset(s) atomically** in one transaction — per-S/N split, location/custodian/warranty/budget_vot/voucher_no capture. |
 | `app/Services/AssetTagGenerator.php` | **Unified tag generation** — one parsing rule (`SUBSTR`), `Cache::lock` against races, `AST-YYYYMMDD-NNNNNN` (assets) / `REC-YYYYMMDD-NNNN` (receivings). Used by verify, scanner, `acceptReceiving`, `storeReceiving`. Legacy `CAIRO/…` + `RC-` formats retired. |
-| `resources/js/Pages/Verification/Index.jsx` | React page with Registry tab, Receive modal (partial qty + PO/DO/invoice fields), Verify modal (S/N split table + budget_vot/voucher_no), Scanner panel. NOTE: Verify button still hardcoded to `['admin','superadmin']` — backend grants `user` role `verify` (known UI/backend mismatch). |
-| `app/Http/Controllers/ScanController.php` | Scanner — status-aware lookup. Returns `belum_diterima`/`diterima`/`verified` info. `receiveFromScan` creates PA-1 immediately (quick-receive path); `verifyFromScan` splits by S/N and creates assets. |
+| `resources/js/Pages/Verification/Index.jsx` | React page with Registry tab, Receive modal (partial qty + PO/DO/invoice fields), Verify modal (S/N split table + budget_vot/voucher_no), Scanner panel, Tong (soft-deleted items) panel. Verify/Delete buttons are driven by `can_verify` / `can_delete` props derived from `config/roles.php` (fixed 2026-10-08 — Verify was hardcoded to `['admin','superadmin']` while the backend granted `user` role `verify`). |
+| `app/Http/Controllers/ScanController.php` | Scanner — status-aware lookup. Returns `belum_diterima`/`diterima`/`verified` info. Exposes only `lookup`, `scan`, `history` — the unrouted `verifyFromScan`/`receiveFromScan` quick-scan actions were removed 2026-10-08 (they contradicted the pipeline's PA-1-at-verify rule). |
 
 ### RBAC System
 
@@ -311,7 +311,7 @@ master_items.status:
 | `database/migrations/2026_07_24_000001_add_soft_deletes_to_all_tables.php` | Adds `deleted_at` to 19 tables in one migration. |
 | All 19 models in `app/Models/` | `use SoftDeletes;` trait. |
 | `app/Http/Controllers/*.php` (11 controllers) | `destroy()` soft-deletes. `restore()` methods + trashed data for 13 modules (Assets, Receivings, Transfers, Damage Reports, Placements, Inspections, Maintenances, Disposals, Loss Reports, Vehicle Disposals, Disposal Sales, Suppliers, Committees) — with activity logging. |
-| `routes/web.php` | All DELETE routes gated with `permission:crud_assets`. Restore routes: `POST /{resource}/{id}/restore` per module. |
+| `routes/web.php` | All DELETE routes gated with `permission:crud_assets`. Restore routes: `POST /{resource}/{id}/restore` per module. Permanent-delete routes use the stricter `permission:force_delete` (superadmin only). |
 | `resources/js/Pages/*/Index.jsx` (11 pages) | "Tong (N)" toggle (admin/superadmin only) revealing trashed table with "Pulihkan" button. Hapus button gated to admin/superadmin. |
 
 ### Pages & Components (Frontend)
@@ -378,7 +378,7 @@ master_items.status:
 | Blade PDFs | 35 |
 | Routes | ~200 |
 | OCR Engine | 2,080 lines Python |
-| Tests | 118 tests, 482 assertions (116 pass / 2 fail — stale tests, see Known Issues #3) |
+| Tests | 127 tests, 593 assertions — all passing (2026-10-08) |
 | Build | ✅ 0 errors (Vite) |
 
 ### Master Items by Status
@@ -457,8 +457,8 @@ git diff HEAD --stat
 
 | # | Issue | Impact | Fix |
 |---|-------|--------|-----|
-| 1 | **2 stale tests failing** — `EndToEndPipelineTest` (asserts PA-1 exists at Receive — old pipeline) + `RbacTest > staff cannot verify` (pre-RBAC-fix) | Suite is 116 pass / 2 fail / 482 assertions — CI/red flag | Move Receiving assertions to after verify step; rewrite staff test to assert staff CAN verify (`user` role has `verify`). See backlog item 17. |
-| 2 | **Verify button UI/backend mismatch** — backend grants `user` role `verify`, but `Verification/Index.jsx:891` hides the button for non-`['admin','superadmin']` | Staff can verify via direct POST but see "Menunggu pengesahan pentadbir" with no button | Pass `can_verify` prop from controller and gate the button on it. See backlog item 16. |
+| 1 | ~~**2 stale tests failing**~~ | RESOLVED 2026-10-08 — `EndToEndPipelineTest` now asserts PA-1 is *not* created at receive and is created at verify; `RbacTest::test_staff_can_verify_items` asserts the current contract (staff DO verify). Full suite verified green locally: **127 passed / 593 assertions**. | Done |
+| 2 | ~~**Verify button UI/backend mismatch**~~ — `Verification/Index.jsx` hid the button for non-`['admin','superadmin']` while the route only needs `permission:verify` | RESOLVED 2026-10-08 — `can_verify` prop from `VerificationController::index()` (via `User::hasPermission()`, same `config/roles.php` source as `PermissionMiddleware`). Delete button likewise uses `can_delete`. | Done |
 | 3 | **`acceptReceiving()` validates only `photo`** (`AssetController.php:51-105`) | Garbage category/campus/location/warranty values persist silently | Mirror `update()` rules + `$request->safe()->only([...])`. See backlog item 14. |
 | 4 | **Jul-27 asset fate** — 14 assets (ids 1-14, `AST-20260727-000001…014`) created from a **qty=1** master item (mi=3, "Single Core", 14 S/Ns) under old split logic; source list has duplicate S/N `BZMKCH4` | Current code would create ONE asset with concatenated S/Ns for qty=1 — inconsistent with the 14 existing assets | Decide: collapse 14 → 1 asset or keep (verify against source DO). See backlog item 19. |
 
@@ -480,8 +480,11 @@ git diff HEAD --stat
 | 11 | `bin/cairo-ocr` self-re-exec logic doubles execution time when called directly | `bin/cairo-ocr:__main__` | PdfImportController uses OcrService (no re-exec). The re-exec is only needed for direct CLI use. |
 | 12 | `ImportController::parseCsv` and `parseExcel` share no common base | `ImportController.php` | Extract a shared CSV/Excel parser service |
 | 13 | SNS Network DO PDFs have ~61% extraction accuracy | `bin/cairo-ocr` | Harder format — the SNS PDF has less tabular structure |
-| 14 | **Dead code**: `ItemsController` + `Items/Index.jsx` (zero routes), orphaned `Scanner/Index.jsx` + `History.jsx`, `Adminmiddleware.php` (no alias registered), `DummyKewpaSeeder` + `DashboardTestSeeder` unreferenced | Various | Remove — `git grep` each name → zero references (backlog item 20) |
+| 14 | **Dead code**: ~~`ItemsController` + `Items/Index.jsx` (zero routes)~~ (removed 2026-10-08), orphaned `Scanner/Index.jsx` + `History.jsx`, `Adminmiddleware.php` (no alias registered), `DummyKewpaSeeder` + `DashboardTestSeeder` unreferenced | Various | Remaining: `git grep` each name → zero references (backlog item 20) |
 | 15 | `orWhereYear` ungrouped in kewpa12/kewpa20 | `ReportController.php:196-199` | Wrap in `where(fn ($q) => ...)` (backlog item 22) |
+| 16 | **No permanent delete outside Master Items** — only `DELETE /verification/{id}/force` exists. The other 13 trash bins (Assets, Receivings, Transfers, Damage Reports, Placements, Inspections, Maintenances, Disposals, Loss Reports, Vehicle Disposals, Disposal Sales, Suppliers, Committee Appointments) can restore but never purge, so soft-deleted rows accumulate forever | `routes/web.php` + each controller's `restore()` area | Mirror the Master Items pattern: `DELETE /{resource}/{id}/force` + `forceDelete($id)` + a `Padam Kekal` button in each trash table, all gated `permission:force_delete` |
+| 17 | `MasterItem` has no `LogsActivity` trait (unlike the other 17 models), so master-item edits/imports are only logged where `VerificationController` logs explicitly | `app/Models/MasterItem.php` | Deliberate: adding it would write one `created` entry per imported row (156 per import). Revisit if import provenance needs auditing |
+| 18 | **User account deletions are not audited** — the `User` model has no `LogsActivity` and neither `ProfileController::destroy()` (self-delete) nor `Admin\UserController::destroy()` (superadmin delete) writes an activity entry, so a deleted account leaves no trace | `app/Models/User.php`, `ProfileController.php`, `Admin/UserController.php` | Add `LogsActivity` to `User` (low volume — a handful of accounts) or log explicitly in both destroy methods |
 
 ### ✅ Recently Fixed (2026-07-31 — uncommitted)
 
@@ -501,6 +504,22 @@ git diff HEAD --stat
 | Session flashes → toasts | FlashToaster auto-renders `success`/`error` — permission denials finally visible |
 | `user` role gains `verify` | RBAC fix — staff can verify, cannot delete |
 
+### ✅ Recently Fixed (2026-10-08)
+
+| Fix | What Changed |
+|-----|-------------|
+| Master items get a Tong | `DELETE /verification/{masterItem}` + `POST /verification/{id}/restore` (`permission:crud_assets`), `VerificationController::destroy()/restore()`, soft-delete guard against items that already have a PA-1/asset, Spatie activity log, `trashed` prop + **Tong (N)** panel and `Hapus`/`Pulihkan` buttons in the Pipeline tab |
+| Pipeline errors finally visible | `Verification/Index.jsx` rendered `filters.item_error`, a key `index()` never sends — every receive/verify rejection (already received / already verified / must receive first) was a silent no-op. Now rendered from the Inertia `errors` prop, both as a page banner and inside the Verify modal |
+| Verify button permission sync | `can_verify` / `can_delete` props from `VerificationController::index()`, backed by a new `User::hasPermission()` that reads the same `config/roles.php` as `PermissionMiddleware` — no more hardcoded `['admin','superadmin']` for Verify |
+| Clear button on the pipeline date filter | The Verification filter row had none while Assets/Receiving did; the new one also re-fetches (the older two only reset local state) |
+| Dead code removed | `ItemsController.php` + `resources/js/Pages/Items/Index.jsx` (zero routes, unreachable `/items` page) and `ScanController::verifyFromScan()` / `receiveFromScan()` (unrouted, and they disagreed with the pipeline on when PA-1 is created — scanner-receive + pipeline-verify would have produced two PA-1s) |
+| 2 stale tests fixed | `EndToEndPipelineTest` asserts PA-1 is created at **verify**, not receive; `RbacTest::test_staff_cannot_verify_items` → `test_staff_can_verify_items`. 6 new tests in `VerificationPipelineTest` (T13–T18) — Tong delete/restore/guard, permission props, and the rejection-reaches-the-page regression guard |
+| Stale pipeline copy corrected | The Verification page still told the user PA-1 is created at **Receive** in three places: the header sentence, the Receive modal's submit button ("Confirm Receive & Create PA-1"), and the legend ("Verify button = diterima (PA-1 exists)"). The same legend also had the PA-2/PA-3 threshold backwards. All now read: orange **Receive** → diterima (no PA-1 yet); blue **Verify** → creates PA-1 + the PA-2/PA-3 asset; below RM 2,000 = PA-3 Inventori, RM 2,000+ = PA-2 Harta Tetap |
+| Permanent delete from the Tong | New `force_delete` permission (**superadmin only**) + `DELETE /verification/{id}/force` → `VerificationController::forceDelete()`, with a `Padam Kekal` button in the Tong (the UI asks you to type `PADAM` to confirm) gated by a `can_force_delete` prop. ⚠️ **Master Items only so far — the other 13 trash bins are still restore-only.** See Technical Debt #16. |
+| Audit trail completed for the pipeline | `VerificationController` now writes explicit, named events: `received`, `verified`, `deleted`, `restored`, `force_deleted`. Previously `deleted`/`restored` were written with a **null `event`**, so the audit page showed an unnamed badge and the filter couldn't find them. `AuditLogController` now derives the event filter from the data instead of a hardcoded 4-item list, and the audit page labels/badges every event type — new event names become filterable with no code change |
+
+> Verification (2026-10-08): `php -l` clean on every edited PHP file; real `vite build` succeeded (all page chunks). Full suite: **127 passed / 593 assertions / 0 failed** (`php artisan test`, 202s). Note for a fresh clone: `public/build/manifest.json` (gitignored) must exist — `resources/views/app.blade.php` uses `@vite(...)` with a per-page entry, so any test rendering the Inertia root view fails with "Vite manifest not found" until `npm run build` has been run once. Tests need no database: `phpunit.xml` pins sqlite `:memory:`.
+
 ---
 
 ## 9. Roadmap — Prioritised Next Steps
@@ -518,7 +537,7 @@ git diff HEAD --stat
 
 | # | Task | Est. | Details |
 |---|------|------|---------|
-| 3 | Fix 2 stale tests (backlog #17) | 30 min | EndToEndPipelineTest (PA-1 at Verify now) + RbacTest staff-can-verify → suite 118 pass / 0 fail |
+| 3 | ~~Fix 2 stale tests (backlog #17)~~ ✅ | done | EndToEndPipelineTest (PA-1 at Verify now) + RbacTest staff-can-verify → suite **123 pass / 0 fail** |
 | 4 | `acceptReceiving()` validation (backlog #14) | 30 min | Mirror `update()` rules, `$request->safe()->only([...])` |
 | 5 | Threshold → config (backlog #15) | 5 min | `AssetController.php:61` hardcoded `>= 2000` → `config('cairo.asset_threshold')` |
 | 6 | Verify-button permission sync (backlog #16) | 30 min | Pass `can_verify` prop; gate button on it instead of hardcoded roles |
@@ -528,7 +547,7 @@ git diff HEAD --stat
 
 | # | Task | Est. | Details |
 |---|------|------|---------|
-| 8 | README overhaul (backlog #18) | 1 hr | Counts verified 2026-08-08: 156 master items, 59 migrations, 21 models, 16 components, 15 assets, 2 receivings, 2 suppliers, 118 tests/482 assertions (2 failing) |
+| 8 | README overhaul (backlog #18) | 1 hr | Counts verified 2026-08-08: 156 master items, 59 migrations, 21 models, 16 components, 15 assets, 2 receivings, 2 suppliers → tests now **127 tests / 593 assertions (all passing)** as of 2026-10-08 |
 | 9 | Jul-27 asset fate (backlog #19) | 30 min | 14 assets from qty=1 item — collapse or keep after checking source DO |
 | 10 | Dead-code cleanup (backlog #20) | 30 min | ItemsController, orphaned Scanner pages, Adminmiddleware.php, unused seeders |
 
@@ -605,21 +624,21 @@ eb logs cairo-inventory-env
 
 ## 11. Test Suite
 
-**118 tests, 482 assertions — 116 passed / 2 failed** (2 stale failures, see Known Issues #1 / backlog item 17) across 13 feature files + Auth suite:
+**127 tests, 593 assertions — all passing** (verified 2026-10-08; the 2 stale failures from Known Issues #1 are fixed) across 13 feature files + Auth suite. Per-file assertion counts below are the pre-2026-10-08 tally — the suite total above is authoritative:
 
 | Test File | Tests | Assertions | Coverage |
 |-----------|-------|------------|----------|
 | `ImportPipelineTest.php` | 13 | 57 | PDF import, CSV import, column matching, dedup |
-| `RbacTest.php` | 20 | 31 | Route permissions, role gating, middleware (**1 stale test: staff-cannot-verify**) |
+| `RbacTest.php` | 20 | 31 | Route permissions, role gating, middleware (stale staff-cannot-verify test rewritten to staff-can-verify, 2026-10-08) |
 | `RolesTest.php` | 15 | 29 | Role assignment, user management |
-| `VerificationPipelineTest.php` | 12 | 45 | Receive flow, Verify flow, item status transitions |
+| `VerificationPipelineTest.php` | 21 | 45 | Receive flow, Verify flow, item status transitions, Tong delete/restore + downstream guard + permission props + rejection-reaches-page + superadmin purge + audit trail (T13–T21, 2026-10-08) |
 | `ScannerTest.php` | 10 | 42 | Scanner lookup, status-aware actions |
 | `MasterItemLifecycleTest.php` | 8 | 22 | CRUD, filtering, master item status, dedup commands |
 | `PaFormViewTest.php` | 6 | 9 | PDF form rendering, field presence |
 | `ProfileTest.php` | 5 | 16 | User profile, password change |
 | `VerifyEmailFullFlowTest.php` | 4 | 8 | Email verification lifecycle |
 | `EmailVerificationTest.php` | 3 | 5 | Verification mail, resend |
-| `EndToEndPipelineTest.php` | 1 | 51 | Full pipeline: import → receive → verify → asset check (**1 stale test: asserts PA-1 at Receive**) |
+| `EndToEndPipelineTest.php` | 1 | 51 | Full pipeline: import → receive → verify → asset check (asserts PA-1 at Verify, and asserts receive creates none — 2026-10-08) |
 | `ExampleTest.php` (Unit) | 1 | 1 | Default |
 | `EmailLogTest.php` | 1 | 3 | Mail log assertion |
 | `tests/Feature/Auth/*` | — | — | Breeze defaults (Authentication, Password Reset, Registration, etc.) |

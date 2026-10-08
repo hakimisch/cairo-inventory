@@ -99,7 +99,7 @@ Upload at /import or /pdf-import
         → Verify (permission:verify) → PA-1 + Assets created atomically
             → per-S/N split; warranty + budget_vot + voucher_no captured
     → /scanner panel on verification page
-        → Scan S/N → auto Receive (PA-1) or auto Verify based on status
+        → Scan S/N → highlights the matching row; Receive / Verify run from the row actions
     → Print KEW.PA-2 / PA-3 forms with individual S/Ns
 ```
 
@@ -229,8 +229,8 @@ Scanner panel on the Verification page (`/verification?scan=1`):
 
 | Scan Result | Item Status | Action |
 |-------------|-------------|--------|
-| MATCH | `belum_diterima` | **Receive** — inline form, creates PA-1 |
-| MATCH | `diterima` | **Verify** — inline form, creates Asset |
+| MATCH | `belum_diterima` | **Receive** (orange) — inline form; PA-1 is NOT created here |
+| MATCH | `diterima` | **Verify** (blue) — inline form; creates PA-1 + the PA-2/PA-3 asset |
 | DUPLICATE | `verified` / has asset | Info only — shows asset tag |
 | MISMATCH | Not found | Info only |
 
@@ -242,7 +242,7 @@ Scanner panel on the Verification page (`/verification?scan=1`):
 
 | Role | Permissions |
 |------|-------------|
-| **superadmin** | `manage_users`, `verify`, `crud_assets`, `view_reports`, `view_admin` |
+| **superadmin** | `manage_users`, `verify`, `crud_assets`, `force_delete`, `view_reports`, `view_admin` |
 | **admin** | `verify`, `crud_assets`, `view_reports`, `view_admin` |
 | **manager** | `view_reports` |
 | **auditor** | `view_reports` |
@@ -253,7 +253,7 @@ Scanner panel on the Verification page (`/verification?scan=1`):
 - **PermissionMiddleware + RoleMiddleware** — route-level gating via `->middleware('permission:*')`
 - **Email verification** — `MustVerifyEmail` enforced on all routes
 - **Role badges** — Distinct coloured badges for all 5 roles in sidebar footer
-- **Verify gating** — backend gated by `permission:verify` (superadmin/admin/user). Frontend button still gated to admin/superadmin — known UI/backend mismatch, see Known Issues #8
+- **Verify gating** — backend gated by `permission:verify` (superadmin/admin/user). Frontend button now gated by the same rule via the `can_verify` prop (fixed 2026-10-08 — previously hardcoded to admin/superadmin, see Known Issues #8)
 - **Delete gating** — Hapus button hidden from non-admin/superadmin
 - **User management** — `/admin/users` with role assignment (superadmin only)
 
@@ -263,8 +263,10 @@ Scanner panel on the Verification page (`/verification?scan=1`):
 
 All 19 deletable models use `Illuminate\Database\Eloquent\SoftDeletes`. The UI:
 
-- **13 modules have trash tabs** — every CRUD index page has a "Tong (N)" toggle (admin/superadmin only) showing soft-deleted records with "Pulihkan" (Restore) buttons: Assets, Receivings, Transfers, Damage Reports, Placements, Inspections, Maintenances, Disposals, Loss Reports, Vehicle Disposals, Disposal Sales, Suppliers, Committee Appointments
-- **Delete buttons** gated to `['admin', 'superadmin']` only
+- **14 modules have trash tabs** — every CRUD index page has a "Tong (N)" toggle (admin/superadmin only) showing soft-deleted records with "Pulihkan" (Restore) buttons: Assets, Receivings, Transfers, Damage Reports, Placements, Inspections, Maintenances, Disposals, Loss Reports, Vehicle Disposals, Disposal Sales, Suppliers, Committee Appointments, and **Master Items** (Verification Pipeline, added 2026-10-08)
+- **Delete buttons** gated by `permission:crud_assets` (admin/superadmin); the Verification pipeline's `Hapus` uses the `can_delete` prop derived from the same config
+- **Permanent delete from the trash** — `DELETE /verification/{id}/force` (Master Items only, so far), gated by a separate `force_delete` permission held **only by superadmin**. The UI's `Padam Kekal` button requires typing `PADAM` to confirm, and the purge is written to the audit log as a `force_deleted` event with a snapshot of the record
+- **Master item guard** — an item that already has a PA-1 receiving or PA-2/PA-3 asset record cannot be deleted; the API rejects it with an inline error so the register is never orphaned
 - **Restore endpoints**: `POST /{resource}/{id}/restore` per module (e.g. `/assets/{id}/restore`, `/receivings/{id}/restore`)
 - **Activity logging**: All soft-delete and restore actions logged via Spatie Activitylog
 
@@ -685,7 +687,7 @@ cairo-inventory/
 | **Supplier Dedup EXECUTED** | 5 → **2** suppliers (Dotcom id 1, SNS id 3); 156 master_items re-pointed via `php artisan cairo:dedup-suppliers --force` |
 | **Welcome Page** | 26 stale entries → 34 KEW.PA forms with correct Malay names |
 | **Sidebar Cleanup** | Dead `/items` + `/scanner` redirect routes removed; duplicate committee-appointments entry removed |
-| **Tests** | 116 passed / 2 failed / 482 assertions — 2 stale failures pending (EndToEnd PA-1-at-receive; RbacTest staff-cannot-verify) |
+| **Tests** | **127 passed / 0 failed / 593 assertions** (2026-10-08 — the 2 stale failures are fixed) |
 
 ---
 
@@ -693,7 +695,7 @@ cairo-inventory/
 
 | Item | Notes |
 |------|-------|
-| **Fix 2 stale tests** | EndToEndPipelineTest (asserts PA-1 at Receive — old pipeline) + RbacTest staff-cannot-verify (pre-RBAC-fix) → suite green (118 pass) |
+| **Fix 2 stale tests** ✅ | Done 2026-10-08 — EndToEndPipelineTest now asserts PA-1 at Verify, RbacTest asserts staff CAN verify → suite 123 pass / 0 fail |
 | **Verify-button permission sync** | Frontend `Verification/Index.jsx` gates on hardcoded `['admin','superadmin']` while backend grants `user` role `verify` — pass `can_verify` prop |
 | **OCR confidence enforcement** | Confidence computed but nothing downstream acts on it — warn/block below threshold ~50 at import |
 | **`acceptReceiving()` validation** | `AssetController.php:51-105` validates only `photo`; mirror `update()` rules + `$request->safe()` |
