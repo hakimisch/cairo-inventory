@@ -257,6 +257,7 @@ function ScanPanel({ onScanResult, onClose }) {
 
 // ─── Verify Modal (unchanged from current) ────────────────────────────────────
 function VerifyModal({ item, onClose }) {
+    const { errors: pageErrors } = usePage().props;
     const initialSerials = (item.serial_numbers ?? '')
         .split(',')
         .map(s => s.trim())
@@ -324,6 +325,13 @@ function VerifyModal({ item, onClose }) {
                 <p style={{ fontSize: 12, color: UTM.gray500, margin: '0 0 16px' }}>
                     Type: {assetTypeLabel} &middot; Qty: {item.quantity} &middot; Price: RM {item.unit_price?.toLocaleString('ms-MY', { minimumFractionDigits: 2 })}
                 </p>
+
+                {/* Backend rejection, shown inside the modal so the overlay can't hide it */}
+                {pageErrors?.item && (
+                    <div style={{ padding: '8px 12px', background: '#FFEBEE', border: '1px solid #FECACA', borderRadius: 6, fontSize: 12, color: '#C62828', marginBottom: 12 }}>
+                        {pageErrors.item}
+                    </div>
+                )}
 
                 <form onSubmit={handleVerify}>
                     {hasExplicitSerials ? (
@@ -468,6 +476,7 @@ function VerifyModal({ item, onClose }) {
 
 // ─── Receive Modal (unchanged) ────────────────────────────────────────────────
 function ReceiveModal({ item, onClose }) {
+    const { errors: pageErrors } = usePage().props;
     const [receiverName, setReceiverName] = useState('');
     const [receiverPosition, setReceiverPosition] = useState('');
     const [techOfficerName, setTechOfficerName] = useState('');
@@ -516,6 +525,13 @@ function ReceiveModal({ item, onClose }) {
                 <p style={{ fontSize: 13, color: UTM.gray500, margin: '0 0 16px' }}>
                     {item.item_no} — {item.name} &middot; Qty: {item.quantity} &middot; RM {item.unit_price?.toLocaleString('ms-MY', { minimumFractionDigits: 2 })}
                 </p>
+
+                {/* Backend rejection, shown inside the modal so the overlay can't hide it */}
+                {pageErrors?.item && (
+                    <div style={{ padding: '8px 12px', background: '#FFEBEE', border: '1px solid #FECACA', borderRadius: 6, fontSize: 12, color: '#C62828', marginBottom: 12 }}>
+                        {pageErrors.item}
+                    </div>
+                )}
 
                 <form onSubmit={handleReceive}>
                     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 16 }}>
@@ -590,7 +606,7 @@ function ReceiveModal({ item, onClose }) {
                                 background: '#E65100', color: UTM.white, fontWeight: 700, fontSize: 13,
                                 cursor: 'pointer', opacity: processing ? 0.6 : 1,
                             }}>
-                            {processing ? 'Receiving...' : 'Confirm Receive & Create PA-1'}
+                            {processing ? 'Receiving...' : 'Confirm Receive'}
                         </button>
                     </div>
                 </form>
@@ -626,7 +642,12 @@ function TabBar({ tabs, activeTab, onTabChange }) {
 }
 
 // ─── Pipeline View ─────────────────────────────────────────────────────────────
-function PipelineView({ items, stats, categories, filters, user }) {
+function PipelineView({ items, stats, categories, filters, can_verify, can_delete, can_force_delete, trashed }) {
+    // Validation errors from the last receive/verify attempt. Inertia shares them
+    // automatically as the `errors` prop (Inertia\Middleware::share).
+    // The banner below used to read `filters.item_error`, which the controller
+    // never sends — pipeline rejections were silently swallowed.
+    const { errors: pageErrors } = usePage().props;
     const [search, setSearch] = useState(filters.search ?? '');
     const [catFilter, setCatFilter] = useState(filters.category ?? '');
     const [statusFilter, setStatusFilter] = useState(filters.status ?? '');
@@ -636,8 +657,24 @@ function PipelineView({ items, stats, categories, filters, user }) {
     const [receiveItem, setReceiveItem] = useState(null);
     const [expandedId, setExpandedId] = useState(null);
     const [showScan, setShowScan] = useState(!!filters.scan);
+    const [showTrash, setShowTrash] = useState(false);
     const [scanHighlight, setScanHighlight] = useState(filters.highlight || null);
     const activeHighlight = scanHighlight;
+
+    const handleDeleteMasterItem = (item) => {
+        if (!window.confirm(`Padam "${item.name}" (${item.item_no})?\nItem akan dipindahkan ke Tong dan boleh dipulihkan.`)) return;
+        router.delete(`/verification/${item.id}`, { preserveScroll: true });
+    };
+
+    const handleForceDeleteMasterItem = (record) => {
+        const typed = window.prompt(
+            `PADAM KEKAL "${record.name}" (${record.item_no})?\n\n`
+            + 'Tindakan ini TIDAK BOLEH DIBATALKAN — rekod akan hilang sepenuhnya dari sistem.\n\n'
+            + 'Taip PADAM untuk mengesahkan:'
+        );
+        if (typed !== 'PADAM') return;
+        router.delete(`/verification/${record.id}/force`, { preserveScroll: true });
+    };
 
     const handleFilter = (key, val) => {
         const newVal = val === (key === 'status' ? statusFilter : catFilter) ? '' : val;
@@ -680,15 +717,15 @@ function PipelineView({ items, stats, categories, filters, user }) {
                     Verification Pipeline
                 </h1>
                 <p style={{ fontSize: 13, color: UTM.gray500, marginTop: 4 }}>
-                    Process incoming items: Receive (belum_diterima &rarr; PA-1 created), then Verify (diterima &rarr; Asset created).
+                    Process incoming items: <strong style={{ color: '#E65100' }}>Receive</strong> (belum_diterima &rarr; diterima), then <strong style={{ color: '#1565C0' }}>Verify</strong> (diterima &rarr; PA-1 + Aset created).
                     Use the scanner to find items by S/N or barcode.
                 </p>
             </div>
 
-            {/* Flash message */}
-            {filters.item_error && (
+            {/* Pipeline rejection — already received / already verified / must receive first */}
+            {pageErrors?.item && (
                 <div style={{ padding: '10px 16px', background: '#FFEBEE', borderRadius: 8, marginBottom: 16, fontSize: 13, color: '#C62828' }}>
-                    {filters.item_error}
+                    {pageErrors.item}
                 </div>
             )}
 
@@ -718,6 +755,75 @@ function PipelineView({ items, stats, categories, filters, user }) {
                 <span style={{ color: UTM.gray300 }}>&rarr;</span>
                 <StepBadge label="Aset (PA-2/3)" color="#7B1FA2" />
             </div>
+
+            {/* Tong (soft-deleted master items) — admin/superadmin only */}
+            {can_delete && (
+                <>
+                    <button onClick={() => setShowTrash(!showTrash)}
+                        style={{
+                            padding: '6px 14px', borderRadius: 6, marginBottom: 16,
+                            border: `1.5px solid ${showTrash ? '#EF4444' : UTM.gray100}`,
+                            background: showTrash ? '#FEF2F2' : UTM.white,
+                            fontSize: 12, fontWeight: 700,
+                            color: showTrash ? '#EF4444' : UTM.gray500, cursor: 'pointer',
+                        }}>
+                        Tong ({trashed?.length ?? 0})
+                    </button>
+                    {showTrash && (
+                        <div style={{ background: UTM.white, borderRadius: 10, border: '1.5px solid #FECACA', overflow: 'auto', marginBottom: 20 }}>
+                            <div style={{ padding: '10px 16px', background: '#FEF2F2', borderBottom: '1.5px solid #FECACA', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <span style={{ fontSize: 12, fontWeight: 700, color: '#991B1B' }}>Tong Sampah — {trashed?.length ?? 0} item</span>
+                                <button onClick={() => setShowTrash(false)} style={{ fontSize: 11, color: '#991B1B', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 600 }}>Tutup</button>
+                            </div>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                                <thead>
+                                    <tr style={{ background: '#FEF2F2' }}>
+                                        <th style={thStyle}>Item No.</th>
+                                        <th style={thStyle}>Nama</th>
+                                        <th style={thStyle}>Kategori</th>
+                                        <th style={thStyle}>Dipadam Pada</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {(trashed ?? []).length === 0 ? (
+                                        <tr><td colSpan={5} style={{ padding: '40px 20px', textAlign: 'center', color: UTM.gray500, fontSize: 13 }}>Tong sampah kosong.</td></tr>
+                                    ) : (trashed ?? []).map(record => (
+                                        <tr key={record.id} style={{ borderBottom: `1px solid ${UTM.gray100}` }}>
+                                            <td style={{ ...tdStyle, fontFamily: 'monospace', fontSize: 12 }}>{record.item_no}</td>
+                                            <td style={{ ...tdStyle, fontWeight: 700 }}>{record.name}</td>
+                                            <td style={tdStyle}>{record.category}</td>
+                                            <td style={{ ...tdStyle, fontSize: 11, color: UTM.gray500 }}>{fmtDT(record.deleted_at)}</td>
+                                            <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                                    <button onClick={() => {
+                                                        if (window.confirm('Pulihkan item ini?')) {
+                                                            router.post(`/verification/${record.id}/restore`, {}, { preserveScroll: true });
+                                                        }
+                                                    }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer' }}>
+                                                        Pulihkan
+                                                    </button>
+                                                    {can_force_delete && (
+                                                        <button onClick={() => handleForceDeleteMasterItem(record)}
+                                                            title="Hapuskan secara kekal — tidak boleh dibatalkan (superadmin)"
+                                                            style={{
+                                                                padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700,
+                                                                background: '#7F1D1D', color: UTM.white,
+                                                                border: '1px solid #7F1D1D', cursor: 'pointer',
+                                                            }}>
+                                                            Padam Kekal
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </>
+            )}
 
             {/* Scanner toggle */}
             <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
@@ -804,6 +910,20 @@ function PipelineView({ items, stats, categories, filters, user }) {
                         }}
                         style={{ padding: '6px 10px', borderRadius: 6, fontSize: 12, border: `1.5px solid ${UTM.gray100}`, background: UTM.white, color: UTM.gray700, fontWeight: 600, cursor: 'pointer' }}
                     />
+                    {(dateFrom || dateTo) && (
+                        <button onClick={() => {
+                            setDateFrom(''); setDateTo('');
+                            router.get('/verification', { ...filters, search, category: catFilter, status: statusFilter, date_from: '', date_to: '', tab: 'pipeline', page: 1 },
+                                { preserveState: true, replace: true });
+                        }}
+                            style={{
+                                padding: '4px 10px', borderRadius: 6, fontSize: 11,
+                                border: `1px solid ${UTM.gray100}`, background: UTM.white,
+                                color: UTM.gray500, fontWeight: 600, cursor: 'pointer',
+                            }}>
+                            Clear
+                        </button>
+                    )}
                 </div>
             </div>
 
@@ -888,7 +1008,7 @@ function PipelineView({ items, stats, categories, filters, user }) {
                                                     <span style={{ color: UTM.gray300, fontSize: 12 }}>Verified</span>
                                                 )
                                             ) : item.status === 'diterima' ? (
-                                                ['admin', 'superadmin'].includes(user.role) ? (
+                                                can_verify ? (
                                                 <button onClick={() => setVerifyItem(item)}
                                                     style={{
                                                         padding: '6px 12px', borderRadius: 6, border: 'none',
@@ -910,6 +1030,17 @@ function PipelineView({ items, stats, categories, filters, user }) {
                                                         fontWeight: 600, fontSize: 12, cursor: 'pointer',
                                                     }}>
                                                     Receive
+                                                </button>
+                                            )}
+                                            {can_delete && !item.has_asset && !item.has_receiving && (
+                                                <button onClick={() => handleDeleteMasterItem(item)}
+                                                    title="Padam — pindah ke Tong (boleh dipulihkan)"
+                                                    style={{
+                                                        padding: '6px 12px', borderRadius: 6, border: 'none',
+                                                        background: '#FEF2F2', color: '#DC2626',
+                                                        fontWeight: 600, fontSize: 12, cursor: 'pointer',
+                                                    }}>
+                                                    Hapus
                                                 </button>
                                             )}
                                         </div>
@@ -1003,9 +1134,9 @@ function PipelineView({ items, stats, categories, filters, user }) {
             )}
 
             <div style={{ marginTop: 16, display: 'flex', gap: 16, flexWrap: 'wrap', fontSize: 12, color: UTM.gray500 }}>
-                <span>▤ Items with <strong>Receive</strong> button = belum_diterima (not yet received)</span>
-                <span>▤ Items with <strong>Verify</strong> button = diterima (PA-1 exists, needs asset creation)</span>
-                <span>▤ Threshold: <strong>RM 2,000</strong> — below = PA-2 (Inventory), above = PA-3 (Fixed Asset)</span>
+                <span>▤ <strong style={{ color: '#E65100' }}>Receive</strong> (orange) = belum_diterima — marks the item diterima; no PA-1 yet</span>
+                <span>▤ <strong style={{ color: '#1565C0' }}>Verify</strong> (blue) = diterima — creates PA-1 + the PA-2/PA-3 asset</span>
+                <span>▤ Threshold: <strong>RM 2,000</strong> — below = PA-3 (Inventori), RM 2,000 and above = PA-2 (Harta Tetap)</span>
             </div>
 
             {verifyItem && <VerifyModal item={verifyItem} onClose={() => setVerifyItem(null)} />}
@@ -1226,9 +1357,7 @@ function RegistryView({ registryItems, registryCounts, filters }) {
 }
 
 // ─── Main Component ────────────────────────────────────────────────────────────
-export default function VerificationIndex({ items, stats, categories, filters, registry_items, registry_counts }) {
-    const user = usePage().props.auth.user;
-    const { errors: pageErrors } = usePage().props;
+export default function VerificationIndex({ items, stats, categories, filters, registry_items, registry_counts, trashed, can_verify, can_delete, can_force_delete }) {
     const [activeTab, setActiveTab] = useState(filters.tab === 'registry' ? 'registry' : 'pipeline');
 
     const tabs = [
@@ -1255,7 +1384,10 @@ export default function VerificationIndex({ items, stats, categories, filters, r
                         stats={stats}
                         categories={categories}
                         filters={filters}
-                        user={user}
+                        can_verify={can_verify}
+                        can_delete={can_delete}
+                        can_force_delete={can_force_delete}
+                        trashed={trashed}
                     />
                 ) : (
                     <RegistryView
