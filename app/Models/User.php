@@ -47,4 +47,14 @@ class User extends Authenticatable implements MustVerifyEmail
         ];
     }
 
+    /**
+     * Does this user's role grant the given ability?
+     *
+     * Single source of truth = config/roles.php, the same file
+     * PermissionMiddleware reads, so UI gating can never drift from the route gate.
+     */
+    public function hasPermission(string $ability): bool
+    {
+        return in_array($ability, config("roles.{$this->role}.can", []), true);
+    }
 }

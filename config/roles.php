@@ -4,7 +4,7 @@ return [
     'superadmin' => [
         'priority' => 100,
         'label'    => 'Super Admin',
-        'can'      => ['manage_users', 'verify', 'crud_assets', 'view_reports', 'view_admin'],
+        'can'      => ['manage_users', 'verify', 'crud_assets', 'force_delete', 'view_reports', 'view_admin'],
     ],
     'admin' => [
         'priority' => 80,

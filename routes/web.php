@@ -28,7 +28,6 @@ use App\Http\Controllers\KewpaDirectoryController;
 use App\Http\Controllers\VerificationController;
 use App\Http\Controllers\ScanController;
 use App\Http\Controllers\SupplierController;
-use App\Http\Controllers\ItemsController;
 
 Route::get('/', function () {
     return Inertia::render('Welcome', [
@@ -321,6 +320,13 @@ Route::middleware(['auth', 'verified'])->prefix('verification')->name('verificat
     Route::post('/{masterItem}/receive', [VerificationController::class, 'receive'])->name('receive');
     Route::post('/{masterItem}/verify', [VerificationController::class, 'verify'])->middleware('permission:verify')->name('do-verify');
     Route::get('/stats',               [VerificationController::class, 'stats'])->name('stats');
+
+    // ── Trash bin (soft delete) — admin/superadmin only, mirrors the other 13 modules ──
+    Route::delete('/{masterItem}', [VerificationController::class, 'destroy'])->middleware('permission:crud_assets')->name('destroy');
+    Route::post('/{id}/restore',   [VerificationController::class, 'restore'])->middleware('permission:crud_assets')->name('restore');
+
+    // ── Permanent delete from the Tong — irreversible, superadmin only ──
+    Route::delete('/{id}/force', [VerificationController::class, 'forceDelete'])->middleware('permission:force_delete')->name('force-delete');
 });
 
 // ── Phase 2: Supplier Management ────────────────────────────────────────────

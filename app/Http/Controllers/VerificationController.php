@@ -26,7 +26,7 @@ class VerificationController extends Controller
         $dateTo    = $request->date_to;
         $perPage   = 30;
 
-        $query = MasterItem::with('supplier', 'asset');
+        $query = MasterItem::with('supplier', 'asset', 'receiving');
 
         if ($search) {
             $query->where(function ($q) use ($search) {
@@ -77,6 +77,7 @@ class VerificationController extends Controller
                     'received_date' => $m->received_date?->format('Y-m-d H:i'),
                     'verified_at'   => $m->verified_at?->toISOString(),
                     'has_asset'     => $m->relationLoaded('asset') && $m->asset !== null,
+                    'has_receiving' => $m->relationLoaded('receiving') && $m->receiving !== null,
                     'asset_id'      => $m->asset?->id,
                     'asset_tag'     => $m->asset?->asset_tag,
                     'custodian_name'=> $m->asset?->custodian_name,
@@ -182,13 +183,33 @@ class VerificationController extends Controller
             'assets'         => $registryAssets->count(),
         ];
 
+        // Master items currently in the Tong (soft-deleted) — rendered only for
+        // admin/superadmin; the restore route is gated by permission:crud_assets.
+        $trashed = MasterItem::onlyTrashed()
+            ->latest('deleted_at')
+            ->get()
+            ->map(fn ($m) => [
+                'id'         => $m->id,
+                'item_no'    => $m->item_no,
+                'name'       => $m->name,
+                'category'   => $m->category,
+                'status'     => $m->status,
+                'deleted_at' => $m->deleted_at?->toISOString(),
+            ]);
+
         return Inertia::render('Verification/Index', [
             'items'           => $items,
             'stats'           => $stats,
             'categories'      => $categories,
-            'filters'         => $request->only(['search', 'category', 'status', 'date_from', 'date_to', 'scan', 'highlight']),
+            'filters'         => $request->only(['search', 'category', 'status', 'date_from', 'date_to', 'scan', 'highlight', 'tab']),
             'registry_items'  => $registryAll,
             'registry_counts' => $registryCounts,
+            // Server-side permission truth for UI gating — must come from the same
+            // config as the route gate so the button can never drift from the backend.
+            'can_verify'      => $request->user()?->hasPermission('verify') ?? false,
+            'can_delete'      => $request->user()?->hasPermission('crud_assets') ?? false,
+            'can_force_delete'=> $request->user()?->hasPermission('force_delete') ?? false,
+            'trashed'         => $trashed,
         ]);
     }
 
@@ -214,7 +235,11 @@ class VerificationController extends Controller
         ]);
 
         if ($masterItem->status !== 'belum_diterima') {
-            return back()->withErrors(['item' => 'This item has already been received.']);
+            $msg = $masterItem->status === 'verified'
+                ? "\"{$masterItem->name}\" sudah disahkan (verified) — tidak boleh terima semula."
+                : "\"{$masterItem->name}\" sudah diterima sebelum ini.";
+
+            return back()->withErrors(['item' => $msg]);
         }
 
         // Store receiver metadata as JSON for use at verify time.
@@ -235,6 +260,16 @@ class VerificationController extends Controller
                 'notes'                      => $request->notes,
             ],
         ]);
+
+        activity()
+            ->performedOn($masterItem)
+            ->event('received')
+            ->withProperties([
+                'item_no' => $masterItem->item_no,
+                'do_no'   => $masterItem->do_no,
+                'status'  => 'diterima',
+            ])
+            ->log("Master item \"{$masterItem->name}\" diterima (Receive).");
 
         return redirect()->back()->with('success', "{$masterItem->name} — diterima. Sedia untuk pengesahan (verify).");
     }
@@ -257,10 +292,10 @@ class VerificationController extends Controller
 
         // Don't re-verify already-verified items, and don't bypass receive step
         if ($masterItem->status === 'verified') {
-            return back()->withErrors(['item' => 'This item is already verified.']);
+            return back()->withErrors(['item' => "\"{$masterItem->name}\" sudah disahkan (verified)."]);
         }
         if ($masterItem->status !== 'diterima') {
-            return back()->withErrors(['item' => 'This item must be received before verification.']);
+            return back()->withErrors(['item' => "\"{$masterItem->name}\" belum diterima — sila Receive dahulu sebelum Verify."]);
         }
 
         DB::transaction(function () use ($request, $masterItem) {
@@ -379,7 +414,106 @@ class VerificationController extends Controller
                 }
         });
 
+        $assetCount = Asset::where('master_item_id', $masterItem->id)->count();
+
+        activity()
+            ->performedOn($masterItem)
+            ->event('verified')
+            ->withProperties([
+                'item_no'    => $masterItem->item_no,
+                'asset_type' => $masterItem->asset_type,
+                'assets'     => $assetCount,
+            ])
+            ->log("Master item \"{$masterItem->name}\" disahkan (Verify) — PA-1 + {$assetCount} aset dicipta.");
+
         return redirect()->back()->with('success', "{$masterItem->name} — verified successfully.");
+    }
+
+    /**
+     * Soft-delete a master item (move to the Tong).
+     *
+     * Refuses when the item already has downstream records (PA-1 receiving or
+     * PA-2/PA-3 asset) — those must be deleted first so the register is never
+     * left with an orphaned asset pointing at a hidden master item.
+     */
+    public function destroy(MasterItem $masterItem)
+    {
+        $name   = $masterItem->name;
+        $itemNo = $masterItem->item_no;
+
+        if ($masterItem->receiving()->exists() || $masterItem->asset()->exists()) {
+            return back()->withErrors([
+                'item' => "\"{$name}\" ({$itemNo}) sudah mempunyai rekod PA-1/Aset. Padam rekod tersebut dahulu.",
+            ]);
+        }
+
+        $masterItem->delete(); // soft delete — recoverable from the Tong
+
+        activity()
+            ->performedOn($masterItem)
+            ->event('deleted')
+            ->withProperties([
+                'item_no'  => $itemNo,
+                'name'     => $name,
+                'category' => $masterItem->category,
+                'status'   => $masterItem->status,
+            ])
+            ->log("Master item \"{$name}\" ({$itemNo}) dipadam dan dipindahkan ke Tong.");
+
+        return redirect()->route('verification.index', ['tab' => 'pipeline'])
+            ->with('success', "\"{$name}\" ({$itemNo}) telah dipadam dan dipindahkan ke Tong.");
+    }
+
+    /**
+     * Restore a soft-deleted master item.
+     */
+    public function restore($id)
+    {
+        $masterItem = MasterItem::withTrashed()->findOrFail($id);
+        $masterItem->restore();
+
+        activity()
+            ->performedOn($masterItem)
+            ->event('restored')
+            ->log("Master item \"{$masterItem->name}\" dipulihkan dari Tong.");
+
+        return redirect()->back()->with('success', "\"{$masterItem->name}\" telah dipulihkan.");
+    }
+
+    /**
+     * Permanently delete a trashed master item — irreversible.
+     *
+     * Gated by permission:force_delete (superadmin only). Items that already
+     * produced a PA-1/asset can never reach here, because destroy() refuses to
+     * bin those in the first place.
+     */
+    public function forceDelete($id)
+    {
+        $masterItem = MasterItem::withTrashed()->findOrFail($id);
+
+        $name   = $masterItem->name;
+        $itemNo = $masterItem->item_no;
+        $snapshot = [
+            'item_no'    => $itemNo,
+            'name'       => $name,
+            'category'   => $masterItem->category,
+            'status'     => $masterItem->status,
+            'quantity'   => $masterItem->quantity,
+            'unit_price' => (float) $masterItem->unit_price,
+        ];
+
+        $masterItem->forceDelete();
+
+        // Logged after the delete with a snapshot — the row is gone, but the
+        // model instance still carries its key, so the subject is recorded.
+        activity()
+            ->performedOn($masterItem)
+            ->event('force_deleted')
+            ->withProperties($snapshot)
+            ->log("Master item \"{$name}\" ({$itemNo}) dihapuskan secara KEKAL dari Tong.");
+
+        return redirect()->route('verification.index', ['tab' => 'pipeline'])
+            ->with('success', "\"{$name}\" ({$itemNo}) telah dihapuskan secara kekal.");
     }
 
     /**
