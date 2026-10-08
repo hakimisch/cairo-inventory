@@ -45,10 +45,19 @@ class AuditLogController extends Controller
                 ];
             });
 
+        // Derive the filter list from the data instead of hardcoding it, so any
+        // event type the app writes (force_deleted, received, verified, …) is
+        // filterable without touching this controller again.
+        $events = Activity::query()
+            ->whereNotNull('event')
+            ->distinct()
+            ->orderBy('event')
+            ->pluck('event');
+
         return inertia('AuditLog/Index', [
             'activities' => $activities,
             'filters'    => $request->only(['search', 'event']),
-            'events'     => ['created', 'updated', 'deleted', 'restored'],
+            'events'     => $events,
         ]);
     }
 }

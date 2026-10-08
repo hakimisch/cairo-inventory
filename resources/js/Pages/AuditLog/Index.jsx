@@ -15,14 +15,23 @@ const inputStyle = {
     boxSizing: 'border-box',
 };
 
+// Every event type the app can write. Single source of truth so the badge and
+// the filter dropdown can never disagree (the dropdown used to list only the
+// 4 model events, hiding everything else from the filter).
+const EVENT_STYLES = {
+    created:       { bg: '#D1FAE5', color: '#065F46', label: 'Cipta' },
+    updated:       { bg: '#DBEAFE', color: '#1E40AF', label: 'Kemas Kini' },
+    deleted:       { bg: '#FEE2E2', color: '#991B1B', label: 'Padam (Tong)' },
+    restored:      { bg: '#FEF3C7', color: '#92400E', label: 'Pulih' },
+    force_deleted: { bg: '#7F1D1D', color: '#FFFFFF', label: 'Padam Kekal' },
+    received:      { bg: '#FFEDD5', color: '#9A3412', label: 'Terima' },
+    verified:      { bg: '#E0E7FF', color: '#3730A3', label: 'Sahkan' },
+};
+
+const eventLabel = (e) => EVENT_STYLES[e]?.label ?? e;
+
 const EventBadge = ({ event }) => {
-    const map = {
-        created: { bg: '#D1FAE5', color: '#065F46', label: 'Cipta' },
-        updated: { bg: '#DBEAFE', color: '#1E40AF', label: 'Kemas Kini' },
-        deleted: { bg: '#FEE2E2', color: '#991B1B', label: 'Padam' },
-        restored: { bg: '#FEF3C7', color: '#92400E', label: 'Pulih' },
-    };
-    const s = map[event] || { bg: '#F3E8FF', color: '#6B21A8', label: event };
+    const s = EVENT_STYLES[event] || { bg: '#F3E8FF', color: '#6B21A8', label: event };
     return (
         <span style={{
             display: 'inline-block', padding: '2px 10px', borderRadius: 999,
@@ -117,7 +126,7 @@ export default function Index({ activities, filters, events }) {
                                 style={{ ...inputStyle, cursor: 'pointer', minWidth: 130 }}>
                                 <option value="">Semua</option>
                                 {events.map(e => (
-                                    <option key={e} value={e}>{e}</option>
+                                    <option key={e} value={e}>{eventLabel(e)}</option>
                                 ))}
                             </select>
                         </div>
