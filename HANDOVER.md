@@ -549,7 +549,7 @@ git diff HEAD --stat
 |---|------|------|---------|
 | 8 | README overhaul (backlog #18) | 1 hr | Counts verified 2026-08-08: 156 master items, 59 migrations, 21 models, 16 components, 15 assets, 2 receivings, 2 suppliers → tests now **127 tests / 593 assertions (all passing)** as of 2026-10-08 |
 | 9 | Jul-27 asset fate (backlog #19) | 30 min | 14 assets from qty=1 item — collapse or keep after checking source DO |
-| 10 | Dead-code cleanup (backlog #20) | 30 min | ItemsController, orphaned Scanner pages, Adminmiddleware.php, unused seeders |
+| 10 | Dead-code cleanup (backlog #20) ⚠️ Partial | 30 min | ✅ ItemsController + Items/Index.jsx + ScanController::verifyFromScan/receiveFromScan (2026-10-08). Remaining: orphaned Scanner pages, Adminmiddleware.php, unused seeders |
 
 ### P3 — Polish & Tech Debt (est. 1-2 days)
 

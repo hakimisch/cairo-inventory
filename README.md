@@ -253,7 +253,7 @@ Scanner panel on the Verification page (`/verification?scan=1`):
 - **PermissionMiddleware + RoleMiddleware** — route-level gating via `->middleware('permission:*')`
 - **Email verification** — `MustVerifyEmail` enforced on all routes
 - **Role badges** — Distinct coloured badges for all 5 roles in sidebar footer
-- **Verify gating** — backend gated by `permission:verify` (superadmin/admin/user). Frontend button now gated by the same rule via the `can_verify` prop (fixed 2026-10-08 — previously hardcoded to admin/superadmin, see Known Issues #8)
+- **Verify gating** — backend gated by `permission:verify` (superadmin/admin/user). Frontend button gated by the same rule via the `can_verify` prop (fixed 2026-10-08 — previously hardcoded to admin/superadmin)
 - **Delete gating** — Hapus button hidden from non-admin/superadmin
 - **User management** — `/admin/users` with role assignment (superadmin only)
 
@@ -379,7 +379,7 @@ All 19 deletable models use `Illuminate\Database\Eloquent\SoftDeletes`. The UI:
 - **Unified Import** (`/import`) — PDF, CSV, Excel, or pasted text
 - **OCR Extraction** — auto-detect PO/DO/Quotation, extract items with confidence scoring
 - **Editable Preview Grid** — review, edit, add, or delete rows before import
-- **Scanner Module** (`/verification?scan=1`) — status-aware S/N lookup with auto-action
+- **Scanner Module** (`/verification?scan=1`) — status-aware S/N lookup; the matching row is highlighted and Receive / Verify run from that row's actions
 - **Verification Dashboard** (`/verification`) — master items registry, Receive & Verify workflow
 - **Partial Receive** — receive fewer items than ordered, remaining tracked
 - **Per-S/N Asset Splitting** — items with multiple S/Ns create individual assets
@@ -512,7 +512,6 @@ cairo-inventory/
 │   │   │   ├── DisposalSaleController.php       # Asset sales (PA-21→27A)
 │   │   │   ├── DisposalSaleItemController.php
 │   │   │   ├── ImportController.php             # Web import (CSV/Excel/PDF/text)
-│   │   │   ├── ItemsController.php              # Unified items view
 │   │   │   ├── KewpaDirectoryController.php     # KEW.PA directory
 │   │   │   ├── PdfImportController.php          # OCR PDF import
 │   │   │   ├── ReportController.php             # Annual reports
@@ -600,7 +599,7 @@ cairo-inventory/
 | **2-Step Receive→Verify Pipeline** | **✅ Exercised 2026-07-27 — 15 assets, 2 PA-1 records** |
 | **Per-S/N Asset Splitting** | **✅ Complete** |
 | **RBAC (5 roles + email verification)** | **✅ Complete** |
-| **Soft Delete + Recycle Bin (19 models, 13 modules)** | **✅ Complete** |
+| **Soft Delete + Recycle Bin (19 models, 14 modules)** | **✅ Complete** — Master Items added 2026-10-08 (restore + superadmin-only permanent delete) |
 | **Scanner Module (status-aware)** | **✅ Built & integrated into verification page** |
 | **Partial Receive Quantity** | **✅ Complete** |
 | **budget_vot + voucher_no capture** | **✅ Added to Verify modal** |
@@ -679,7 +678,7 @@ cairo-inventory/
 | **Pipeline Restructure** | PA-1 creation moved from `receive()` to `verify()` — receiver metadata stored as JSON in `master_items.receive_meta`; PA-1 + Asset created atomically at Verify |
 | **Threshold Config** | RM 2,000 extracted to `config('cairo.asset_threshold')` — single source of truth |
 | **AssetTagGenerator** | New service — unified `AST-YYYYMMDD-NNNNNN` / `REC-YYYYMMDD-NNNN` numbering with `Cache::lock`; legacy `CAIRO/…` + `RC-` formats retired |
-| **Trash Bin — 13 modules** | `restore()` methods + trashed data + Tong toggle UI added to 11 more controllers/pages (Transfers, Damage, Placements, Inspections, Maintenances, Disposals, Loss, Vehicle Disposal, Disposal Sales, Suppliers, Committees) |
+| **Trash Bin — 14 modules** | `restore()` methods + trashed data + Tong toggle UI added to 11 more controllers/pages (Transfers, Damage, Placements, Inspections, Maintenances, Disposals, Loss, Vehicle Disposal, Disposal Sales, Suppliers, Committees); Master Items added 2026-10-08 with restore + superadmin-only permanent delete |
 | **RBAC Fix** | `user` role granted `verify` permission |
 | **Registration Gating** | `REGISTRATION_ENABLED` (default **false**) — routes unregistered, Register link auto-hides |
 | **Security (Phase 0)** | Ungated `/_dev/dedup-*` GET routes removed → artisan commands with `--dry-run`/`--force`; `kewpa9a()` null-deref fixed; session flashes → Inertia toasts (FlashToaster, de-emoji'd icons) |
@@ -695,12 +694,12 @@ cairo-inventory/
 
 | Item | Notes |
 |------|-------|
-| **Fix 2 stale tests** ✅ | Done 2026-10-08 — EndToEndPipelineTest now asserts PA-1 at Verify, RbacTest asserts staff CAN verify → suite 123 pass / 0 fail |
-| **Verify-button permission sync** | Frontend `Verification/Index.jsx` gates on hardcoded `['admin','superadmin']` while backend grants `user` role `verify` — pass `can_verify` prop |
+| **Fix 2 stale tests** ✅ | Done 2026-10-08 — EndToEndPipelineTest now asserts PA-1 at Verify, RbacTest asserts staff CAN verify → suite 127 pass / 0 fail |
+| **Verify-button permission sync** ✅ | Done 2026-10-08 — `can_verify` / `can_delete` / `can_force_delete` props from `VerificationController` via `User::hasPermission()`; no hardcoded role checks left in the pipeline |
 | **OCR confidence enforcement** | Confidence computed but nothing downstream acts on it — warn/block below threshold ~50 at import |
 | **`acceptReceiving()` validation** | `AssetController.php:51-105` validates only `photo`; mirror `update()` rules + `$request->safe()` |
 | **Jul-27 asset fate** | 14 assets created from a qty=1 master item under old split logic — verify against source DO, collapse or keep |
-| **Dead-code cleanup** | ItemsController + Items/Index.jsx, orphaned Scanner pages, Adminmiddleware.php, unused seeders |
+| **Dead-code cleanup** ⚠️ Partial | Done 2026-10-08: `ItemsController` + `Items/Index.jsx`, `ScanController::verifyFromScan()`/`receiveFromScan()`. Remaining: orphaned `Scanner/Index.jsx` + `History.jsx`, `Adminmiddleware.php`, unused seeders |
 | **Barcode Label Printing** | Print scannable labels from verification page (currently only from Asset show) |
 | **Dashboard Custodian FK** | Replace free-text `custodian_name` matching with user FK |
 | **DB-level pagination** | Verification registry + Assets index load all rows into memory — paginate when data grows |
