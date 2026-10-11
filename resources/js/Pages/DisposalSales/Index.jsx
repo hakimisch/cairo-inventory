@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 const UTM = {
     maroon : '#5C001F',
@@ -522,7 +523,7 @@ export default function Index({ sales, filters, typeCounts, disposals, trashed }
                                         <th style={thStyle}>Jenis</th>
                                         <th style={thStyle}>Tarikh</th>
                                         <th style={thStyle}>Dipadam Pada</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -536,7 +537,7 @@ export default function Index({ sales, filters, typeCounts, disposals, trashed }
                                             <td style={{ padding: '10px 12px', fontSize: 11, color: '#8A8480' }}>
                                                 {fmtDT(record.deleted_at)}
                                             </td>
-                                            <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                            <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
                                                 <button onClick={() => {
                                                     if (window.confirm(`Pulihkan rekod ini?`)) {
                                                         router.post(route('disposal-sales.restore', record.id), {}, { preserveScroll: true });
@@ -618,7 +619,7 @@ export default function Index({ sales, filters, typeCounts, disposals, trashed }
                                         <th style={thStyle}>Aset</th>
                                         <th style={thStyle}>Tarikh</th>
                                         <th style={thStyle}>Status</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead(UTM.gray50) }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -653,7 +654,7 @@ sales.data?.map((sale, index) => (
                                                         {sale.sale_date ?? '—'}
                                                     </td>
                                                     <td style={tdStyle} data-label="Status"><StatusBadge status={sale.status} /></td>
-                                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', textAlign: 'right' }} data-label="Tindakan">
+                                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', textAlign: 'right' , ...pinnedCell(expandedId === sale.id ? '#FFF5E8' : (index % 2 === 0 ? UTM.white : UTM.gray50)) }} data-label="Tindakan">
                                                         <div className="actions-wrap" style={{ display: 'flex', gap: 4, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                                                         <button
                                                             onClick={() => setExpandedId(expandedId === sale.id ? null : sale.id)}

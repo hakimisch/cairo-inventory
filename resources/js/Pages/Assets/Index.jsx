@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
  
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -342,7 +343,7 @@ export default function Index({ assets, trashed, totalValue, stats }) {
                                         <th style={thStyle}>Nama Aset</th>
                                         <th style={thStyle}>Kategori</th>
                                         <th style={thStyle}>Dipadam Pada</th>
-                                        <th style={thStyle, { textAlign: 'right' }}>Tindakan</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -360,7 +361,7 @@ export default function Index({ assets, trashed, totalValue, stats }) {
                                             <td style={{ padding: '10px 12px', fontSize: 11, color: UTM.gray500 }}>
                                                 {fmtDT(asset.deleted_at)}
                                             </td>
-                                            <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                            <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
                                                 <button
                                                     onClick={() => {
                                                         if (window.confirm(`Pulihkan aset "${asset.name}" (${asset.asset_tag})?`)) {
@@ -395,13 +396,13 @@ export default function Index({ assets, trashed, totalValue, stats }) {
                                         <th style={thStyle}>Waranti</th>
                                         <th style={thStyle}>Status</th>
                                         <th style={thStyle}>Added</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                        <th style={{ ...thStyle, ...pinnedHead(UTM.gray50), textAlign: 'right' }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
                                     {filtered.length === 0 && (
                                         <tr>
-                                            <td colSpan={10} style={{ padding: '48px', textAlign: 'center',
+                                            <td colSpan={11} style={{ padding: '48px', textAlign: 'center',
                                                                     color: UTM.gray300, fontSize: '14px' }}>
                                                 Tiada aset dijumpai.
                                             </td>
@@ -457,7 +458,12 @@ export default function Index({ assets, trashed, totalValue, stats }) {
                                                 <td style={{ padding: '10px 12px', fontSize: '11px', whiteSpace: 'nowrap', color: UTM.gray500 }}>
                                                     {fmtDT(asset.created_at)}
                                                 </td>
-                                                <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                <td style={{
+                                                    padding   : '10px 12px',
+                                                    textAlign : 'right',
+                                                    whiteSpace: 'nowrap',
+                                                    ...pinnedCell(expandedId === asset.id ? '#FFF5E8' : (idx % 2 === 0 ? UTM.white : UTM.gray50)),
+                                                }}>
                                                     {/* Expand Details Button */}
                                                     <button
                                                         onClick={() => setExpandedId(expandedId === asset.id ? null : asset.id)}

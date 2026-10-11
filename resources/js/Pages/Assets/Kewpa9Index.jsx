@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
     maroon : '#5C001F', gold: '#F8A617', goldDark:'#C9840A', sand: '#FFF5AB',
@@ -314,7 +315,7 @@ export default function Kewpa9Index({ records, filters, assets, trashed }) {
                                     <th style={thStyle}>Kerosakan</th>
                                     <th style={thStyle}>Tarikh</th>
                                     <th style={thStyle}>Dipadam Pada</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -328,7 +329,7 @@ export default function Kewpa9Index({ records, filters, assets, trashed }) {
                                         <td style={{ padding: '10px 12px', fontSize: 11, color: '#8A8480' }}>
                                             {fmtDT(record.deleted_at)}
                                         </td>
-                                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                        <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
                                             <button onClick={() => {
                                                 if (window.confirm(`Pulihkan rekod ini?`)) {
                                                     router.post(route('assets.damage-reports.restore', record.id), {}, { preserveScroll: true });
@@ -356,7 +357,7 @@ export default function Kewpa9Index({ records, filters, assets, trashed }) {
                                     <th style={thStyle}>Kerosakan</th>
                                     <th style={thStyle}>Status</th>
                                     <th style={thStyle}>Tarikh</th>
-                                    <th style={thStyle}></th>
+                                    <th style={{ ...thStyle, ...pinnedHead(UTM.gray50) }}></th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -406,7 +407,7 @@ export default function Kewpa9Index({ records, filters, assets, trashed }) {
                                             <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                                                 {record.damage_date ? new Date(record.damage_date).toLocaleDateString('ms-MY') : (record.created_at ? new Date(record.created_at).toLocaleDateString('ms-MY') : '—')}
                                             </td>
-                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' , ...pinnedCell(UTM.white) }}>
                                                 <Link href={route('assets.kewpa2', record.asset_id)}
                                                     style={{ display: 'inline-block', padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#EDE9E4', color: UTM.gray700, textDecoration: 'none', marginRight: 4 }}>
                                                     Borang

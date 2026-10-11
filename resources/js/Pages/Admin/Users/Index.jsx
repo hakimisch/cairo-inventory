@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, useForm } from '@inertiajs/react';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -250,7 +251,7 @@ export default function UserIndex({ users, roles }) {
                                         <th style={thStyle}>E-mel</th>
                                         <th style={thStyle}>Peranan & Kebenaran</th>
                                         <th style={thStyle}>Tarikh Daftar</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead(UTM.gray50) }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -343,7 +344,7 @@ export default function UserIndex({ users, roles }) {
                                                             <PermissionTags role={user.role} roles={roles} />
                                                         </td>
                                                         <td style={{ padding: '14px 20px', fontSize: '13px', color: UTM.gray700 }}>{new Date(user.created_at).toLocaleDateString('ms-MY')}</td>
-                                                        <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                        <td style={{ padding: '14px 20px', textAlign: 'right', whiteSpace: 'nowrap' , ...pinnedCell(idx % 2 === 0 ? UTM.white : UTM.gray50) }}>
                                                             {deleteConfirmId === user.id ? (
                                                                 <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
                                                                     <span style={{ fontSize: '12px', color: UTM.maroon, fontWeight: 600 }}>Padamkan?</span>

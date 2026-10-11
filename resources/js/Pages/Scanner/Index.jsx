@@ -246,7 +246,8 @@ export default function Index({ recentScans }) {
                     <div style={{ padding: '12px 20px', borderBottom: '1px solid #E5E7EB' }}>
                         <h2 style={{ fontSize: 14, fontWeight: 600, margin: 0, color: '#374151' }}>Recent Scans</h2>
                     </div>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+                    <div style={{ overflowX: 'auto', width: '100%' }}>
+                    <table style={{ width: '100%', minWidth: '600px', borderCollapse: 'collapse', fontSize: 12 }}>
                         <thead>
                             <tr style={{ background: '#F9FAFB' }}>
                                 <th style={thStyle}>Serial No.</th>
@@ -286,6 +287,7 @@ export default function Index({ recentScans }) {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 </div>
             </div>
         </AuthenticatedLayout>

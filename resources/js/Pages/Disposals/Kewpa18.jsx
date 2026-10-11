@@ -1,6 +1,7 @@
 import React from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link } from '@inertiajs/react';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 const UTM = {
     maroon : '#5C001F', gold: '#F8A617', goldDark:'#C9840A',
@@ -105,7 +106,7 @@ export default function Kewpa18({ disposals }) {
                                     <th style={thStyle}>Kaedah Pemusnahan</th>
                                     <th style={thStyle}>Rujukan Kelulusan</th>
                                     <th style={thStyle}>Tarikh</th>
-                                    <th style={thStyle}>Tindakan</th>
+                                    <th style={{ ...thStyle, ...pinnedHead(UTM.gray50) }}>Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -141,7 +142,7 @@ export default function Kewpa18({ disposals }) {
                                                 ? new Date(disposal.disposal_date).toLocaleDateString('ms-MY')
                                                 : '—'}
                                         </td>
-                                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                                        <td style={{ ...tdStyle, whiteSpace: 'nowrap' , ...pinnedCell(idx % 2 === 0 ? UTM.white : UTM.gray50) }}>
                                             <a
                                                 href={route('disposals.kewpa18.download', disposal.id)}
                                                 style={{

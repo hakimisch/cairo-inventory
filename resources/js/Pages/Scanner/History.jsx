@@ -56,7 +56,8 @@ export default function History({ scans, filters }) {
 
                 {/* ── Scans Table ─────────────────────────────────────────── */}
                 <div style={{ backgroundColor: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', overflow: 'hidden' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <div style={{ overflowX: 'auto', width: '100%' }}>
+                    <table style={{ width: '100%', minWidth: '700px', borderCollapse: 'collapse', fontSize: 13 }}>
                         <thead>
                             <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
                                 <th style={thStyle}>Serial No.</th>
@@ -121,6 +122,7 @@ export default function History({ scans, filters }) {
                             })}
                         </tbody>
                     </table>
+                    </div>
                 </div>
 
                 {/* ── Pagination ──────────────────────────────────────────── */}

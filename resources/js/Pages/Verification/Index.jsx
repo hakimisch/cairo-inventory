@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Head, router, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -782,7 +783,7 @@ function PipelineView({ items, stats, categories, filters, can_verify, can_delet
                                         <th style={thStyle}>Nama</th>
                                         <th style={thStyle}>Kategori</th>
                                         <th style={thStyle}>Dipadam Pada</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -794,7 +795,7 @@ function PipelineView({ items, stats, categories, filters, can_verify, can_delet
                                             <td style={{ ...tdStyle, fontWeight: 700 }}>{record.name}</td>
                                             <td style={tdStyle}>{record.category}</td>
                                             <td style={{ ...tdStyle, fontSize: 11, color: UTM.gray500 }}>{fmtDT(record.deleted_at)}</td>
-                                            <td style={{ ...tdStyle, textAlign: 'right' }}>
+                                            <td style={{ ...tdStyle, textAlign: 'right' , ...pinnedCell(UTM.white) }}>
                                                 <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                                                     <button onClick={() => {
                                                         if (window.confirm('Pulihkan item ini?')) {
@@ -953,7 +954,7 @@ function PipelineView({ items, stats, categories, filters, can_verify, can_delet
                                 <th style={thStyle}>Sodo</th>
                                 <th style={thStyle}>DO No.</th>
                                 <th style={thStyle}>Status</th>
-                                <th style={thStyle}>Actions</th>
+                                <th style={{ ...thStyle, ...pinnedHead(UTM.gray50) }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -987,7 +988,7 @@ function PipelineView({ items, stats, categories, filters, can_verify, can_delet
                                     <td style={{ ...tdStyle, fontSize: 12, fontFamily: 'monospace' }}>{item.sodo_bayaran ?? '—'}</td>
                                     <td style={{ ...tdStyle, fontSize: 12, fontFamily: 'monospace' }}>{item.do_no ?? '—'}</td>
                                     <td style={tdStyle}><StatusBadge status={item.status} /></td>
-                                    <td style={tdStyle}>
+                                    <td style={{ ...tdStyle, ...pinnedCell(isHighlighted ? '#FFFFF0' : UTM.white) }}>
                                         <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                                             <button onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                                                 style={{
@@ -1270,7 +1271,7 @@ function RegistryView({ registryItems, registryCounts, filters }) {
                                 <th style={thRegistry}>DO No.</th>
                                 <th style={thRegistry}>Supplier</th>
                                 <th style={thRegistry}>Status</th>
-                                <th style={thRegistry}></th>
+                                <th style={{ ...thRegistry, ...pinnedHead(UTM.gray50) }}></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1300,7 +1301,7 @@ function RegistryView({ registryItems, registryCounts, filters }) {
                                     <td style={{ ...tdRegistry, fontSize: 12, fontFamily: 'monospace' }}>{item.do_no ?? '—'}</td>
                                     <td style={{ ...tdRegistry, maxWidth: 140, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={item.supplier}>{item.supplier}</td>
                                     <td style={tdRegistry}><StatusBadge status={item.status} /></td>
-                                    <td style={tdRegistry}>
+                                    <td style={{ ...tdRegistry, ...pinnedCell(UTM.white) }}>
                                         <button onClick={() => setExpandedId(expandedId === item.id ? null : item.id)}
                                             style={{
                                                 padding: '4px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700,

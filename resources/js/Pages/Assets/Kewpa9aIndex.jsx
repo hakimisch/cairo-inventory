@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -163,7 +164,7 @@ export default function Kewpa9aIndex({ records, filters, trashed }) {
                                     <th style={thStyle}>Peminjam</th>
                                     <th style={thStyle}>Lokasi</th>
                                     <th style={thStyle}>Dipadam Pada</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -177,7 +178,7 @@ export default function Kewpa9aIndex({ records, filters, trashed }) {
                                         <td style={{ padding: '10px 12px', fontSize: 11, color: '#8A8480' }}>
                                             {fmtDT(record.deleted_at)}
                                         </td>
-                                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                        <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
                                             <button onClick={() => {
                                                 if (window.confirm(`Pulihkan rekod ini?`)) {
                                                     router.post(route('assets.placements.restore', record.id), {}, { preserveScroll: true });
@@ -210,7 +211,7 @@ export default function Kewpa9aIndex({ records, filters, trashed }) {
                                 <th style={thStyle}>Lokasi</th>
                                 <th style={thStyle}>No. Telefon</th>
                                 <th style={thStyle}>Tarikh Pinjam</th>
-                                <th style={thStyle}></th>
+                                <th style={{ ...thStyle, ...pinnedHead(UTM.gray50) }}></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -245,7 +246,7 @@ export default function Kewpa9aIndex({ records, filters, trashed }) {
                                     <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
                                         {record.created_at ? new Date(record.created_at).toLocaleDateString('ms-MY') : '—'}
                                     </td>
-                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap' , ...pinnedCell(UTM.white) }}>
                                         <Link href={route('assets.placements.kewpa9a', [record.asset_id, record.id])}
                                             style={{
                                                 display       : 'inline-block',

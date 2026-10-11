@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 const UTM = {
     maroon : '#5C001F', gold: '#F8A617', goldDark:'#C9840A', sand: '#FFF5AB',
@@ -196,7 +197,7 @@ export default function Kewpa10Index({ records, filters, assets, trashed }) {
                                     <th style={thStyle}>Tarikh Pemeriksaan</th>
                                     <th style={thStyle}>Status</th>
                                     <th style={thStyle}>Dipadam Pada</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -210,7 +211,7 @@ export default function Kewpa10Index({ records, filters, assets, trashed }) {
                                         <td style={{ padding: '10px 12px', fontSize: 11, color: '#8A8480' }}>
                                             {fmtDT(record.deleted_at)}
                                         </td>
-                                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                        <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
                                             <button onClick={() => {
                                                 if (window.confirm(`Pulihkan rekod ini?`)) {
                                                     router.post(route('assets.inspections.restore', record.id), {}, { preserveScroll: true });
@@ -237,7 +238,7 @@ export default function Kewpa10Index({ records, filters, assets, trashed }) {
                                 <th style={thStyle}>Status</th>
                                 <th style={thStyle}>Pemeriksa</th>
                                 <th style={thStyle}>Catatan</th>
-                                <th style={thStyle}></th>
+                                <th style={{ ...thStyle, ...pinnedHead(UTM.gray50) }}></th>
                             </tr></thead>
                             <tbody>
                                 {records.data.length === 0 ? (
@@ -261,7 +262,7 @@ export default function Kewpa10Index({ records, filters, assets, trashed }) {
                                             <td style={tdStyle}><StatusBadge status={record.status === 'Sedang Digunakan' || record.status === 'Baik' ? 'completed' : 'pending'} /></td>
                                             <td style={tdStyle}>{record.inspector_name || '—'}</td>
                                             <td style={{ ...tdStyle, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{record.notes || '—'}</td>
-                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' , ...pinnedCell(idx % 2 === 0 ? UTM.white : UTM.gray50) }}>
                                                 <button onClick={() => setEditingId(record.id)} style={{ padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#F5F3FF', color: '#5B21B6', border: 'none', cursor: 'pointer', marginRight: 4 }}>Edit</button>
                                                 <button onClick={() => handleDelete(record)} style={{ padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF2F2', color: '#DC2626', border: 'none', cursor: 'pointer' }}>Padam</button>
                                             </td>

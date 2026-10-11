@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 const UTM = {
     maroon : '#5C001F', gold: '#F8A617', goldDark:'#C9840A', sand: '#FFF5AB',
@@ -200,7 +201,7 @@ export default function Kewpa6Index({ records, filters, assets, trashed }) {
                                     <th style={thStyle}>Dari</th>
                                     <th style={thStyle}>Ke</th>
                                     <th style={thStyle}>Dipadam Pada</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -214,7 +215,7 @@ export default function Kewpa6Index({ records, filters, assets, trashed }) {
                                         <td style={{ padding: '10px 12px', fontSize: 11, color: '#8A8480' }}>
                                             {fmtDT(record.deleted_at)}
                                         </td>
-                                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                        <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
                                             <button onClick={() => {
                                                 if (window.confirm(`Pulihkan rekod ini?`)) {
                                                     router.post(route('assets.transfers.restore', record.id), {}, { preserveScroll: true });
@@ -242,7 +243,7 @@ export default function Kewpa6Index({ records, filters, assets, trashed }) {
                                 <th style={thStyle}>Ke</th>
                                 <th style={thStyle}>Status</th>
                                 <th style={thStyle}>Tarikh</th>
-                                <th style={thStyle}></th>
+                                <th style={{ ...thStyle, ...pinnedHead(UTM.gray50) }}></th>
                             </tr></thead>
                             <tbody>
                                 {records.data.length === 0 ? (
@@ -267,7 +268,7 @@ export default function Kewpa6Index({ records, filters, assets, trashed }) {
                                             <td style={tdStyle}>{record.to_location}</td>
                                             <td style={tdStyle}><StatusBadge status={record.status} /></td>
                                             <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>{new Date(record.transfer_date || record.created_at).toLocaleDateString('ms-MY')}</td>
-                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' }}>
+                                            <td style={{ ...tdStyle, whiteSpace: 'nowrap' , ...pinnedCell(idx % 2 === 0 ? UTM.white : UTM.gray50) }}>
                                                 <Link href={route('assets.kewpa6', record.asset_id)} style={{ padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#EDE9E4', color: UTM.gray700, textDecoration: 'none', marginRight: 4 }}>Borang</Link>
                                                 <button onClick={() => setEditingId(record.id)} style={{ padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF3C7', color: '#92400E', border: 'none', cursor: 'pointer', marginRight: 4 }}>Edit</button>
                                                 <button onClick={() => handleDelete(record)} style={{ padding: '4px 10px', borderRadius: 4, fontSize: 10, fontWeight: 600, background: '#FEF2F2', color: '#DC2626', border: 'none', cursor: 'pointer' }}>Padam</button>

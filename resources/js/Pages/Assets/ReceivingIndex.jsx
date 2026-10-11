@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 
 // ─── UTM brand palette ────────────────────────────────────────────────────────
@@ -458,7 +459,7 @@ export default function ReceivingIndex({ receivings, trashed, stats }) {
                                         <th style={thStyle}>Qty Diterima</th>
                                         <th style={thStyle}>Added</th>
                                         <th style={thStyle}>Status</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                        <th style={{ ...thStyle, ...pinnedHead(UTM.gray50), textAlign: 'right' }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -499,7 +500,12 @@ export default function ReceivingIndex({ receivings, trashed, stats }) {
                                                 <td style={{ padding: '10px 12px' }}>
                                                     <StatusBadge status={item.status} />
                                                 </td>
-                                                <td style={{ padding: '10px 12px', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                                                <td style={{
+                                                    padding   : '10px 12px',
+                                                    textAlign : 'right',
+                                                    whiteSpace: 'nowrap',
+                                                    ...pinnedCell(expandedId === item.id ? '#FFF5E8' : (idx % 2 === 0 ? UTM.white : UTM.gray50)),
+                                                }}>
                                                     {/* Expand Details Button */}
                                                     <button
                                                         onClick={() => { setExpandedId(expandedId === item.id ? null : item.id); if (editingId === item.id) setEditingId(null); }}
@@ -992,7 +998,7 @@ export default function ReceivingIndex({ receivings, trashed, stats }) {
                                     <th style={thStyle}>No. Penerimaan</th>
                                     <th style={thStyle}>Pembekal</th>
                                     <th style={thStyle}>Dipadam Pada</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -1003,7 +1009,7 @@ export default function ReceivingIndex({ receivings, trashed, stats }) {
                                         <td style={{ padding: '8px 12px', color: UTM.gray500, fontSize: 11 }}>
                                             {new Date(item.deleted_at).toLocaleString('ms-MY')}
                                         </td>
-                                        <td style={{ padding: '8px 12px', textAlign: 'right' }}>
+                                        <td style={{ padding: '8px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
                                             <button
                                                 onClick={() => {
                                                     if (window.confirm('Pulihkan penerimaan ' + item.receive_no + '?')) {

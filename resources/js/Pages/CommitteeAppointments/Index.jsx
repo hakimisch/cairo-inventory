@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 // ─── UTM brand palette ────────────────────────────────────────────────────────
 const UTM = {
@@ -410,7 +411,7 @@ export default function Index({ appointments, filters, users, trashed }) {
                                         <th style={thStyle}>Peranan</th>
                                         <th style={thStyle}>Tarikh Lantikan</th>
                                         <th style={thStyle}>Dipadam Pada</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -424,7 +425,7 @@ export default function Index({ appointments, filters, users, trashed }) {
                                             <td style={{ padding: '10px 12px', fontSize: 11, color: '#8A8480' }}>
                                                 {fmtDT(record.deleted_at)}
                                             </td>
-                                            <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                            <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
                                                 <button onClick={() => {
                                                     if (window.confirm(`Pulihkan rekod ini?`)) {
                                                         router.post(route('committee-appointments.restore', record.id), {}, { preserveScroll: true });
@@ -457,7 +458,7 @@ export default function Index({ appointments, filters, users, trashed }) {
                                         <th style={thStyle}>Jenis Rujukan</th>
                                         <th style={thStyle}>Tempoh</th>
                                         <th style={thStyle}>Status</th>
-                                        <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                        <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead(UTM.gray50) }}>Tindakan</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -496,7 +497,7 @@ export default function Index({ appointments, filters, users, trashed }) {
                                                     <td style={tdStyle}>
                                                         <StatusBadge validFrom={record.valid_from} validUntil={record.valid_until} />
                                                     </td>
-                                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', textAlign: 'right' }}>
+                                                    <td style={{ ...tdStyle, whiteSpace: 'nowrap', textAlign: 'right' , ...pinnedCell(expandedId === record.id ? '#FFF5E8' : (index % 2 === 0 ? UTM.white : UTM.gray50)) }}>
                                                         <button
                                                             onClick={() => { setExpandedId(expandedId === record.id ? null : record.id); if (editingId === record.id) setEditingId(null); }}
                                                             style={{

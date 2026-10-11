@@ -1,3 +1,26 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ | Always-visible scrollbars inside the app shell.
+ |
+ | Windows/Chrome render overlay scrollbars that only fade in while scrolling,
+ | so a data table that scrolls sideways looks like a table that is simply cut
+ | off — the far-right action buttons appeared unreachable. Styling the webkit
+ | scrollbar forces a persistent (classic) scrollbar with a visible track.
+ */
+main ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+main ::-webkit-scrollbar-track {
+    background: rgba(92, 0, 31, 0.04);
+}
+main ::-webkit-scrollbar-thumb {
+    background: #C9C2BC;
+    border-radius: 6px;
+}
+main ::-webkit-scrollbar-thumb:hover {
+    background: #A79E96;
+}

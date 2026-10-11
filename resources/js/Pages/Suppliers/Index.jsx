@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import AuthenticatedLayout from '@/Layouts/AuthenticatedLayout';
+import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 export default function Index({ suppliers, filters, trashed }) {
     const user = usePage().props.auth.user;
@@ -163,7 +164,7 @@ export default function Index({ suppliers, filters, trashed }) {
                                     <th style={thStyle}>Name</th>
                                     <th style={thStyle}>Registration No.</th>
                                     <th style={thStyle}>Dipadam Pada</th>
-                                    <th style={{ ...thStyle, textAlign: 'right' }}>Tindakan</th>
+                                    <th style={{ ...thStyle, textAlign: 'right' , ...pinnedHead('#FEF2F2') }}>Tindakan</th>
                                 </tr>
                             </thead>
                             <tbody>
@@ -176,7 +177,7 @@ export default function Index({ suppliers, filters, trashed }) {
                                         <td style={{ padding: '10px 12px', fontSize: 11, color: '#8A8480' }}>
                                             {fmtDT(record.deleted_at)}
                                         </td>
-                                        <td style={{ padding: '10px 12px', textAlign: 'right' }}>
+                                        <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell('#FFFFFF') }}>
                                             <button onClick={() => {
                                                 if (window.confirm(`Pulihkan rekod ini?`)) {
                                                     router.post(route('suppliers.restore', record.id), {}, { preserveScroll: true });
@@ -194,7 +195,8 @@ export default function Index({ suppliers, filters, trashed }) {
 
                 {/* ── Table ────────────────────────────────────────────────── */}
                 <div style={{ backgroundColor: '#fff', borderRadius: 12, border: '1px solid #E5E7EB', overflow: 'hidden' }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                    <div style={{ overflowX: 'auto', width: '100%' }}>
+                    <table style={{ width: '100%', minWidth: '900px', borderCollapse: 'collapse', fontSize: 13 }}>
                         <thead>
                             <tr style={{ backgroundColor: '#F9FAFB', borderBottom: '1px solid #E5E7EB' }}>
                                 <th style={thStyle}>Name</th>
@@ -202,7 +204,7 @@ export default function Index({ suppliers, filters, trashed }) {
                                 <th style={thStyle}>Contact</th>
                                 <th style={thStyle}>DOs</th>
                                 <th style={thStyle}>Status</th>
-                                <th style={thStyle}>Actions</th>
+                                <th style={{ ...thStyle, ...pinnedHead('#F9FAFB') }}>Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -229,7 +231,7 @@ export default function Index({ suppliers, filters, trashed }) {
                                             {s.is_active ? 'Active' : 'Inactive'}
                                         </span>
                                     </td>
-                                    <td style={tdStyle}>
+                                    <td style={{ ...tdStyle, ...pinnedCell('#FFFFFF') }}>
                                         <div style={{ display: 'flex', gap: 4 }}>
                                             <button onClick={() => openEdit(s)} style={actionBtnStyle}>Edit</button>
                                             {['admin', 'superadmin'].includes(user.role) && (
@@ -241,6 +243,7 @@ export default function Index({ suppliers, filters, trashed }) {
                             ))}
                         </tbody>
                     </table>
+                    </div>
                 </div>
 
                 {/* ── Pagination ──────────────────────────────────────────── */}
