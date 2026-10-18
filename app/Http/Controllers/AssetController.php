@@ -10,12 +10,15 @@ use Illuminate\Http\Request;
 
 class AssetController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         return Inertia::render('Assets/Index', [
             'assets'     => Asset::latest()->get(),
             'trashed'    => Asset::onlyTrashed()->latest()->get(),
             'totalValue' => Asset::sum('purchase_price'),
+            // Permission truth for UI gating — same source as the route gates.
+            'can_delete'       => $request->user()?->hasPermission('crud_assets') ?? false,
+            'can_force_delete' => $request->user()?->hasPermission('force_delete') ?? false,
             'stats'      => [
                 'total'       => Asset::withTrashed()->count(),
                 'active'      => Asset::where('status', 'active')->count(),
@@ -63,6 +66,7 @@ class AssetController extends Controller
         // ─── Single asset creation ──────────────────────────────────────────
         $newAsset = Asset::create([
             'asset_tag'            => app(\App\Services\AssetTagGenerator::class)->assetTag(),
+            'receiving_id'         => $receiving->id,
             'name'                 => $receiving->item_description,
             'category'             => $request->category ?? 'General',
             'asset_type'           => $enforcedAssetType,
@@ -118,11 +122,21 @@ class AssetController extends Controller
             ->with('success', 'Barangan telah ditolak. Rekod penerimaan ditandakan sebagai Ditolak.');
     }
 
-    public function receivingIndex()
+    public function receivingIndex(Request $request)
     {
+        // `has_asset` tells the page whether this PA-1 already produced an asset:
+        // a PA-1 with a live asset cannot be deleted (the asset would be left in
+        // the register without its acquisition evidence).
+        $decorate = fn ($rows) => $rows->map(fn (Receiving $r) => [
+            ...$r->toArray(),
+            'has_asset' => ($r->assets_count ?? 0) > 0,
+        ]);
+
         return Inertia::render('Assets/ReceivingIndex', [
-            'receivings' => Receiving::latest()->get(),
-            'trashed'    => Receiving::onlyTrashed()->latest()->get(),
+            'receivings' => $decorate(Receiving::withCount(['assets' => fn ($q) => $q->withTrashed()])->latest()->get()),
+            'trashed'    => $decorate(Receiving::onlyTrashed()->withCount(['assets' => fn ($q) => $q->withTrashed()])->latest()->get()),
+            'can_delete'       => $request->user()?->hasPermission('crud_assets') ?? false,
+            'can_force_delete' => $request->user()?->hasPermission('force_delete') ?? false,
             'stats'      => [
                 'total'    => Receiving::withTrashed()->count(),
                 'pending'  => Receiving::where('status', 'pending')->count(),
@@ -184,15 +198,78 @@ class AssetController extends Controller
         return redirect()->back()->with('success', 'Rekod penerimaan dikemaskini.');
     }
 
+    /**
+     * Move a PA-1 to the Tong.
+     *
+     * Any status is allowed — a pending or rejected PA-1 never produced an asset,
+     * and an accepted one becomes deletable once its asset has been removed.
+     * While a linked asset exists the delete is refused: the PA-1 is that asset's
+     * acquisition evidence.
+     */
     public function destroyReceiving(Receiving $receiving)
     {
-        if ($receiving->status !== 'pending') {
-            return redirect()->back()->with('error', 'Hanya rekod berstatus "Menunggu" boleh dipadam.');
+        $assets = $receiving->assets()->withTrashed()->get(['id', 'asset_tag']);
+
+        if ($assets->isNotEmpty()) {
+            $tags = $assets->pluck('asset_tag')->take(3)->implode(', ')
+                . ($assets->count() > 3 ? ', …' : '');
+
+            return redirect()->back()->with('error',
+                "Rekod {$receiving->receive_no} telah menjana aset ({$tags}). "
+                . 'Padam dan hapuskan aset tersebut dahulu sebelum memadam PA-1 ini.');
         }
+
+        $snapshot = [
+            'receive_no' => $receiving->receive_no,
+            'supplier'   => $receiving->supplier_name,
+            'item'       => $receiving->item_description,
+            'status'     => $receiving->status,
+        ];
 
         $receiving->delete(); // soft delete
 
+        activity()
+            ->performedOn($receiving)
+            ->event('deleted')
+            ->withProperties($snapshot)
+            ->log("PA-1 {$receiving->receive_no} dipadam dan dipindahkan ke Tong.");
+
         return redirect()->route('receivings.index')->with('success', 'Rekod penerimaan dipadam dan dipindahkan ke Tong.');
+    }
+
+    /**
+     * Permanently delete a trashed PA-1 — irreversible, superadmin only.
+     */
+    public function forceDeleteReceiving($id)
+    {
+        $receiving = Receiving::withTrashed()->findOrFail($id);
+
+        if (! $receiving->trashed()) {
+            return redirect()->back()->with('error', 'Hanya rekod di dalam Tong boleh dihapuskan secara kekal.');
+        }
+
+        if ($receiving->assets()->withTrashed()->exists()) {
+            return redirect()->back()->with('error',
+                "Rekod {$receiving->receive_no} masih mempunyai aset berkaitan — hapuskan aset tersebut dahulu.");
+        }
+
+        $snapshot = [
+            'receive_no' => $receiving->receive_no,
+            'supplier'   => $receiving->supplier_name,
+            'item'       => $receiving->item_description,
+            'status'     => $receiving->status,
+        ];
+
+        $receiving->forceDelete();
+
+        activity()
+            ->performedOn($receiving)
+            ->event('force_deleted')
+            ->withProperties($snapshot)
+            ->log("PA-1 {$receiving->receive_no} dihapuskan secara KEKAL dari Tong.");
+
+        return redirect()->route('receivings.index')
+            ->with('success', "Rekod penerimaan {$snapshot['receive_no']} telah dihapuskan secara kekal.");
     }
 
     /**
@@ -374,6 +451,74 @@ class AssetController extends Controller
 
         return redirect()->route('assets.index')
             ->with('success', "Aset {$name} ({$tag}) telah dipadam dan dipindahkan ke Tong. ({$relatedCount} rekod berkaitan.)");
+    }
+
+    /**
+     * Permanently delete a trashed asset — irreversible, superadmin only.
+     *
+     * Refused while the asset carries accountability records (disposal, loss
+     * report, damage report, vehicle disposal assessment): erasing those would
+     * destroy the evidence behind them. Routine history (placements, inspections,
+     * maintenances, transfers, upgrades) is removed with the asset; the counts are
+     * recorded in the audit snapshot.
+     */
+    public function forceDelete($id)
+    {
+        $asset = Asset::withTrashed()->findOrFail($id);
+
+        if (! $asset->trashed()) {
+            return redirect()->back()->with('error', 'Hanya rekod di dalam Tong boleh dihapuskan secara kekal.');
+        }
+
+        $blockers = [
+            'rekod pelupusan'          => $asset->disposals()->withTrashed()->count(),
+            'laporan kehilangan'       => $asset->lossReports()->withTrashed()->count(),
+            'laporan kerosakan'        => $asset->damageReports()->withTrashed()->count(),
+            'perakuan pelupusan kenderaan' => $asset->vehicleDisposalAssessment()->withTrashed()->count(),
+        ];
+
+        $blockers = array_filter($blockers);
+
+        if ($blockers !== []) {
+            $parts = collect($blockers)->map(fn ($n, $label) => "{$n} {$label}")->implode(', ');
+
+            return redirect()->back()->with('error',
+                "Aset {$asset->asset_tag} tidak boleh dihapuskan secara kekal — masih ada {$parts}. "
+                . 'Rekod tersebut adalah bukti akauntabiliti dan mesti dikekalkan.');
+        }
+
+        $snapshot = [
+            'asset_tag'        => $asset->asset_tag,
+            'name'             => $asset->name,
+            'category'         => $asset->category,
+            'asset_type'       => $asset->asset_type,
+            'status'           => $asset->status,
+            'purchase_price'   => (float) $asset->purchase_price,
+            'master_item_id'   => $asset->master_item_id,
+            'receiving_id'     => $asset->receiving_id,
+            'related'          => [
+                'placements'   => $asset->placements()->withTrashed()->count(),
+                'inspections'  => $asset->inspections()->withTrashed()->count(),
+                'maintenances' => $asset->maintenances()->withTrashed()->count(),
+                'transfers'    => $asset->transfers()->withTrashed()->count(),
+                'upgrades'     => $asset->upgrades()->withTrashed()->count(),
+            ],
+        ];
+
+        $tag = $asset->asset_tag;
+
+        $asset->forceDelete();
+
+        // Logged after the delete with a snapshot — the row is gone, but the model
+        // instance still carries its key, so the subject is recorded.
+        activity()
+            ->performedOn($asset)
+            ->event('force_deleted')
+            ->withProperties($snapshot)
+            ->log("Aset {$tag} dihapuskan secara KEKAL dari Tong.");
+
+        return redirect()->route('assets.index')
+            ->with('success', "Aset {$tag} telah dihapuskan secara kekal.");
     }
 
     /**

@@ -91,4 +91,34 @@ class CommitteeAppointmentController extends Controller
         $appointment->restore();
         return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
+
+    /**
+     * Permanently delete a trashed committee appointment — irreversible, superadmin only.
+     * Leaf record (nothing references it), so no dependent guard is needed.
+     */
+    public function forceDelete($id)
+    {
+        $appointment = CommitteeAppointment::withTrashed()->findOrFail($id);
+
+        if (! $appointment->trashed()) {
+            return redirect()->back()->with('error', 'Hanya rekod di dalam Tong boleh dihapuskan secara kekal.');
+        }
+
+        $snapshot = [
+            'user'         => $appointment->user?->name,
+            'role'         => $appointment->role,
+            'valid_from'   => optional($appointment->valid_from)->toDateString(),
+            'valid_until'  => optional($appointment->valid_until)->toDateString(),
+        ];
+
+        $appointment->forceDelete();
+
+        activity()
+            ->performedOn($appointment)
+            ->event('force_deleted')
+            ->withProperties($snapshot)
+            ->log('Pelantikan jawatankuasa dihapuskan secara KEKAL dari Tong.');
+
+        return redirect()->back()->with('success', 'Rekod pelantikan telah dihapuskan secara kekal.');
+    }
 }

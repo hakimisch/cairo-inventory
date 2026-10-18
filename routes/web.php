@@ -242,6 +242,10 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/assets/{id}/restore', [AssetController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.restore');
     Route::post('/receivings/{id}/restore', [AssetController::class, 'restoreReceiving'])->middleware('permission:crud_assets')->name('receivings.restore');
 
+    // ── Permanent delete from the Tong — irreversible, superadmin only ──
+    Route::delete('/assets/{id}/force', [AssetController::class, 'forceDelete'])->middleware('permission:force_delete')->name('assets.force-delete');
+    Route::delete('/receivings/{id}/force', [AssetController::class, 'forceDeleteReceiving'])->middleware('permission:force_delete')->name('receivings.force-delete');
+
     // ── Restore for nested resource records
     Route::post('/assets/{asset}/transfers/{transfer}/restore', [AssetTransferController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.transfers.restore');
     Route::post('/assets/{asset}/inspections/{inspection}/restore', [AssetInspectionController::class, 'restore'])->middleware('permission:crud_assets')->name('assets.inspections.restore');
@@ -265,6 +269,7 @@ Route::middleware(['auth', 'verified'])->prefix('disposal-sales')->name('disposa
     Route::put('/{sale}',       [DisposalSaleController::class, 'update'])->name('update');
     Route::delete('/{sale}',    [DisposalSaleController::class, 'destroy'])->middleware('permission:crud_assets')->name('destroy');
     Route::post('/{sale}/restore', [DisposalSaleController::class, 'restore'])->middleware('permission:crud_assets')->name('restore');
+    Route::delete('/{sale}/force', [DisposalSaleController::class, 'forceDelete'])->middleware('permission:force_delete')->name('force-delete');
 
     // Sale Items (nested)
     Route::get('/{sale}/items',             [DisposalSaleItemController::class, 'index'])->name('items.index');
@@ -306,6 +311,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::put('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'update'])->name('committee-appointments.update');
     Route::delete('/committee-appointments/{committeeAppointment}', [CommitteeAppointmentController::class, 'destroy'])->middleware('permission:crud_assets')->name('committee-appointments.destroy');
     Route::post('/committee-appointments/{committeeAppointment}/restore', [CommitteeAppointmentController::class, 'restore'])->middleware('permission:crud_assets')->name('committee-appointments.restore');
+    Route::delete('/committee-appointments/{committeeAppointment}/force', [CommitteeAppointmentController::class, 'forceDelete'])->middleware('permission:force_delete')->name('committee-appointments.force-delete');
 });
 
 Route::middleware('auth')->group(function () {
@@ -336,6 +342,7 @@ Route::middleware(['auth', 'verified'])->prefix('suppliers')->name('suppliers.')
     Route::put('/{supplier}', [SupplierController::class, 'update'])->name('update');
     Route::delete('/{supplier}', [SupplierController::class, 'destroy'])->middleware('permission:crud_assets')->name('destroy');
     Route::post('/{supplier}/restore', [SupplierController::class, 'restore'])->middleware('permission:crud_assets')->name('restore');
+    Route::delete('/{supplier}/force', [SupplierController::class, 'forceDelete'])->middleware('permission:force_delete')->name('force-delete');
 });
 
 // ── Scanner API endpoints (used by Verification ScanPanel) ──────────────────

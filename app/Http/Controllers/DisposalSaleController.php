@@ -150,6 +150,49 @@ class DisposalSaleController extends Controller
         return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
 
+    /**
+     * Permanently delete a trashed disposal sale — irreversible, superadmin only.
+     *
+     * Refused while sale items exist: they carry the item-level tender record and
+     * are deleted with the sale by the FK cascade, so erasing them has to be a
+     * deliberate act on the items first.
+     */
+    public function forceDelete($id)
+    {
+        $sale = DisposalSale::withTrashed()->findOrFail($id);
+
+        if (! $sale->trashed()) {
+            return redirect()->back()->with('error', 'Hanya rekod di dalam Tong boleh dihapuskan secara kekal.');
+        }
+
+        $items = \Illuminate\Support\Facades\DB::table('disposal_sale_items')
+            ->where('disposal_sale_id', $sale->id)
+            ->count();
+
+        if ($items > 0) {
+            return redirect()->back()->with('error',
+                "Jualan pelupusan {$sale->sale_reference} tidak boleh dihapuskan secara kekal — masih ada {$items} item jualan.");
+        }
+
+        $snapshot = [
+            'sale_reference' => $sale->sale_reference,
+            'sale_type'      => $sale->sale_type,
+            'sale_date'      => $sale->sale_date,
+            'status'         => $sale->status,
+        ];
+
+        $sale->forceDelete();
+
+        activity()
+            ->performedOn($sale)
+            ->event('force_deleted')
+            ->withProperties($snapshot)
+            ->log("Jualan pelupusan {$snapshot['sale_reference']} dihapuskan secara KEKAL dari Tong.");
+
+        return redirect()->route('disposal-sales.index')
+            ->with('success', "Jualan pelupusan {$snapshot['sale_reference']} telah dihapuskan secara kekal.");
+    }
+
     // ─── KEW.PA Form Views ────────────────────────────────────────────────────
 
     public function kewpa21(DisposalSale $sale)

@@ -40,6 +40,12 @@ class HandleInertiaRequests extends Middleware
                 'success' => fn () => $request->session()->get('success'),
                 'error'   => fn () => $request->session()->get('error'),
             ],
+            // App-wide permission truth for UI gating. Each `can_*` mirrors a route
+            // gate in routes/web.php, so a button can never outlive its permission.
+            'can' => [
+                'force_delete' => $request->user()?->hasPermission('force_delete') ?? false,
+                'crud_assets'  => $request->user()?->hasPermission('crud_assets') ?? false,
+            ],
         ];
     }
 }

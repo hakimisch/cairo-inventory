@@ -106,4 +106,45 @@ class SupplierController extends Controller
         $supplier->restore();
         return redirect()->back()->with('success', 'Rekod telah dipulihkan.');
     }
+
+    /**
+     * Permanently delete a trashed supplier — irreversible, superadmin only.
+     *
+     * Refused while master items still reference it: the FK is nullOnDelete, so a
+     * hard delete would silently strip the supplier from those items.
+     */
+    public function forceDelete($id)
+    {
+        $supplier = Supplier::withTrashed()->findOrFail($id);
+
+        if (! $supplier->trashed()) {
+            return redirect()->back()->with('error', 'Hanya rekod di dalam Tong boleh dihapuskan secara kekal.');
+        }
+
+        $linked = \Illuminate\Support\Facades\DB::table('master_items')
+            ->where('supplier_id', $supplier->id)
+            ->count();
+
+        if ($linked > 0) {
+            return redirect()->back()->with('error',
+                "Pembekal {$supplier->name} tidak boleh dihapuskan secara kekal — masih terikat pada {$linked} item induk.");
+        }
+
+        $snapshot = [
+            'name'            => $supplier->name,
+            'registration_no' => $supplier->registration_no,
+            'phone'           => $supplier->phone,
+        ];
+
+        $supplier->forceDelete();
+
+        activity()
+            ->performedOn($supplier)
+            ->event('force_deleted')
+            ->withProperties($snapshot)
+            ->log("Pembekal \"{$snapshot['name']}\" dihapuskan secara KEKAL dari Tong.");
+
+        return redirect()->route('suppliers.index')
+            ->with('success', "Pembekal \"{$snapshot['name']}\" telah dihapuskan secara kekal.");
+    }
 }
