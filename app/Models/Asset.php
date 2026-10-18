@@ -52,6 +52,7 @@ class Asset extends Model implements HasMedia
         'unit_price',            // NEW — per-unit cost from PO
         'po_item_code',          // NEW — PO line item number for traceability
         'master_item_id',        // Links to master_items register
+        'receiving_id',          // Links to the PA-1 (receivings) that produced it
     ];
 
     protected $casts = [
@@ -138,6 +139,12 @@ class Asset extends Model implements HasMedia
     public function masterItem()
     {
         return $this->belongsTo(MasterItem::class);
+    }
+
+    /** The PA-1 (receiving) this asset was created from, if any. */
+    public function receiving()
+    {
+        return $this->belongsTo(Receiving::class);
     }
 
     // ─── Accessor: Get primary photo URL ──────────────────────────────────────

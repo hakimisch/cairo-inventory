@@ -315,7 +315,7 @@ class VerificationController extends Controller
             // 2. Create PA-1 Receiving (KEW.PA-1) — atomically with the Asset
             $receiveNo = app(\App\Services\AssetTagGenerator::class)->receiveNo();
 
-            Receiving::create([
+            $receiving = Receiving::create([
                 'master_item_id'            => $masterItem->id,
                 'receive_no'                => $receiveNo,
                 'supplier_name'             => $masterItem->supplier?->name ?? 'N/A',
@@ -361,6 +361,7 @@ class VerificationController extends Controller
 
                         Asset::create([
                             'master_item_id'   => $masterItem->id,
+                            'receiving_id'     => $receiving->id,
                             'asset_tag'        => $assetTag,
                             'name'             => $masterItem->name,
                             'category'         => $masterItem->category,
@@ -392,6 +393,7 @@ class VerificationController extends Controller
 
                     Asset::create([
                         'master_item_id'   => $masterItem->id,
+                        'receiving_id'     => $receiving->id,
                         'asset_tag'        => $assetTag,
                         'name'             => $masterItem->name,
                         'category'         => $masterItem->category,
