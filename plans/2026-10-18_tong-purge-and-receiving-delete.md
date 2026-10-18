@@ -132,3 +132,24 @@ php artisan optimize:clear
 - Docs: README §Soft Delete, HANDOVER Technical Debt #16 (now PARTIAL), HANDOVER
   change log + new "Updating an existing deployment" block.
 - Not done: nothing committed (`git` commands left to the operator).
+
+### 2026-10-18 follow-up (reported from the client machine)
+
+Reported after deploy: (a) the `/receivings` Total and Diterima cards did not
+match the rows shown, and (b) some rows had no Hapus button for no visible reason.
+
+- Cause (a): `stats.total` used `Receiving::withTrashed()->count()`, so the card
+  kept counting rows that had moved to the Tong while the table listed only live
+  rows (same pattern on `/assets`). Fixed: `total` counts live rows only
+  (`/assets` too), and the four `/receivings` cards are now derived in the page
+  from `filteredReceivings`, so they follow the date filter and can never drift
+  from the table.
+- Cause (b): the gate was `!has_asset`, which is correct but silent. `receivingIndex`
+  now also sends `asset_tags`, and the row renders a grey `Ada aset: AST-…` chip
+  (tooltip lists every tag) instead of nothing — in the table *and* in the Tong,
+  where `Padam Kekal` is likewise replaced by the chip.
+- Tests added: `test_receiving_index_stats_exclude_trashed_rows`,
+  `test_receiving_index_names_the_asset_that_blocks_the_delete`,
+  `test_assets_index_total_excludes_trashed_rows` (19 tests / 94 assertions in the
+  file). Full suite re-run, `npm run build` re-run.
+
