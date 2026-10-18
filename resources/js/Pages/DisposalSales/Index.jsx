@@ -314,6 +314,18 @@ function FormDropdown({ saleId, open, onToggle }) {
 
 export default function Index({ sales, filters, typeCounts, disposals, trashed }) {
     const user = usePage().props.auth.user;
+    const canForceDelete = usePage().props.can?.force_delete ?? false;
+
+    const handleForceDeleteSale = (record) => {
+        const typed = window.prompt(
+            `PADAM KEKAL jualan pelupusan ${record.sale_reference || '(tanpa rujukan)'}?\n\n`
+            + 'Tindakan ini TIDAK BOLEH DIBATALKAN — rekod akan hilang sepenuhnya.\n'
+            + 'Jualan yang masih mempunyai item jualan tidak akan dihapuskan.\n\n'
+            + 'Taip PADAM untuk mengesahkan:'
+        );
+        if (typed !== 'PADAM') return;
+        router.delete(route('disposal-sales.force-delete', record.id), { preserveScroll: true });
+    };
     const [search, setSearch]           = useState(filters?.search || '');
     const [saleTypeFilter, setSaleTypeFilter] = useState(filters?.sale_type || '');
     const [openFormId, setOpenFormId]   = useState(null);
@@ -538,6 +550,7 @@ export default function Index({ sales, filters, typeCounts, disposals, trashed }
                                                 {fmtDT(record.deleted_at)}
                                             </td>
                                             <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
+                                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                                                 <button onClick={() => {
                                                     if (window.confirm(`Pulihkan rekod ini?`)) {
                                                         router.post(route('disposal-sales.restore', record.id), {}, { preserveScroll: true });
@@ -545,6 +558,14 @@ export default function Index({ sales, filters, typeCounts, disposals, trashed }
                                                 }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer' }}>
                                                     Pulihkan
                                                 </button>
+                                                {canForceDelete && (
+                                                    <button onClick={() => handleForceDeleteSale(record)}
+                                                        title="Hapuskan secara kekal — tidak boleh dibatalkan (superadmin)"
+                                                        style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#7F1D1D', color: UTM.white, border: '1px solid #7F1D1D', cursor: 'pointer' }}>
+                                                        Padam Kekal
+                                                    </button>
+                                                )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}

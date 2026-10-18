@@ -292,7 +292,7 @@ function EditReceivingForm({ record, onDone }) {
 
 // ── Main Page ────────────────────────────────────────────────────────────────
 
-export default function ReceivingIndex({ receivings, trashed, stats }) {
+export default function ReceivingIndex({ receivings, trashed, stats, can_delete, can_force_delete }) {
     const user = usePage().props.auth.user;
     const [selectedItem, setSelectedItem] = useState(null);
     const [expandedId, setExpandedId]     = useState(null);
@@ -350,6 +350,16 @@ export default function ReceivingIndex({ receivings, trashed, stats }) {
         if (window.confirm(`Padam penerimaan ${item.receive_no} (${item.supplier_name})? Rekod akan dipindahkan ke Tong. Boleh dipulihkan dalam masa 30 hari.`)) {
             router.delete(route('receivings.destroy', item.id), { preserveScroll: true });
         }
+    };
+
+    const handleForceDelete = (item) => {
+        const typed = window.prompt(
+            `PADAM KEKAL penerimaan ${item.receive_no} (${item.supplier_name})?\n\n`
+            + 'Tindakan ini TIDAK BOLEH DIBATALKAN — rekod akan hilang sepenuhnya dari sistem.\n\n'
+            + 'Taip PADAM untuk mengesahkan:'
+        );
+        if (typed !== 'PADAM') return;
+        router.delete(route('receivings.force-delete', item.id), { preserveScroll: true });
     };
 
     const thStyle = {
@@ -595,24 +605,29 @@ export default function ReceivingIndex({ receivings, trashed, stats }) {
                                                            >
                                                                {editingId === item.id ? 'Batal' : 'Edit'}
                                                            </button>
-                                                           {['admin', 'superadmin'].includes(user.role) && (
-                                                           <button
-                                                               onClick={() => handleDelete(item)}
-                                                               style={{
-                                                                   padding     : '5px 12px',
-                                                                   borderRadius: 6,
-                                                                   fontSize    : '12px',
-                                                                   fontWeight  : 700,
-                                                                   background  : '#FEE2E2',
-                                                                   color       : '#991B1B',
-                                                                   border      : 'none',
-                                                                   cursor      : 'pointer',
-                                                               }}
-                                                           >
-                                                               Hapus
-                                                           </button>
-                                                           )}
                                                         </>
+                                                    )}
+
+                                                    {/* PA-1 Hapus — any status, but only while it has
+                                                        produced no asset (the PA-1 is that asset's
+                                                        acquisition evidence). */}
+                                                    {can_delete && !item.has_asset && (
+                                                    <button
+                                                        onClick={() => handleDelete(item)}
+                                                        title="Pindahkan rekod PA-1 ini ke Tong"
+                                                        style={{
+                                                            padding     : '5px 12px',
+                                                            borderRadius: 6,
+                                                            fontSize    : '12px',
+                                                            fontWeight  : 700,
+                                                            background  : '#FEE2E2',
+                                                            color       : '#991B1B',
+                                                            border      : 'none',
+                                                            cursor      : 'pointer',
+                                                        }}
+                                                    >
+                                                        Hapus
+                                                    </button>
                                                     )}
                                                 </td>
                                             </tr>
@@ -984,7 +999,7 @@ export default function ReceivingIndex({ receivings, trashed, stats }) {
                 </div>
             )}
 
-            {['admin', 'superadmin'].includes(user.role) && (trashed ?? []).length > 0 && (
+            {can_delete && (trashed ?? []).length > 0 && (
                 <div style={{ marginTop: 24, background: UTM.white, borderRadius: 12,
                               border: '1.5px solid #FECACA', overflow: 'hidden' }}>
                     <div style={{ padding: '12px 20px', background: '#FEF2F2',
@@ -1010,19 +1025,33 @@ export default function ReceivingIndex({ receivings, trashed, stats }) {
                                             {new Date(item.deleted_at).toLocaleString('ms-MY')}
                                         </td>
                                         <td style={{ padding: '8px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
-                                            <button
-                                                onClick={() => {
-                                                    if (window.confirm('Pulihkan penerimaan ' + item.receive_no + '?')) {
-                                                        router.post(route('receivings.restore', item.id), {}, { preserveScroll: true });
-                                                    }
-                                                }}
-                                                style={{
-                                                    padding: '4px 12px', borderRadius: 5, fontSize: 11, fontWeight: 700,
-                                                    background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer',
-                                                }}
-                                            >
-                                                Pulihkan
-                                            </button>
+                                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm('Pulihkan penerimaan ' + item.receive_no + '?')) {
+                                                            router.post(route('receivings.restore', item.id), {}, { preserveScroll: true });
+                                                        }
+                                                    }}
+                                                    style={{
+                                                        padding: '4px 12px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+                                                        background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer',
+                                                    }}
+                                                >
+                                                    Pulihkan
+                                                </button>
+                                                {can_force_delete && (
+                                                    <button
+                                                        onClick={() => handleForceDelete(item)}
+                                                        title="Hapuskan secara kekal — tidak boleh dibatalkan (superadmin)"
+                                                        style={{
+                                                            padding: '4px 12px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+                                                            background: '#7F1D1D', color: UTM.white, border: '1px solid #7F1D1D', cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        Padam Kekal
+                                                    </button>
+                                                )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

@@ -162,7 +162,7 @@ function StatCard({ label, count, color }) {
     );
 }
 
-export default function Index({ assets, trashed, totalValue, stats }) {
+export default function Index({ assets, trashed, totalValue, stats, can_delete, can_force_delete }) {
     const user = usePage().props.auth.user;
     const [search, setSearch]         = useState('');
     const [typeFilter, setTypeFilter] = useState('all');
@@ -174,6 +174,17 @@ export default function Index({ assets, trashed, totalValue, stats }) {
         if (!iso) return '—';
         const d = new Date(iso);
         return d.toLocaleString('ms-MY', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    };
+
+    const handleForceDelete = (asset) => {
+        const typed = window.prompt(
+            `PADAM KEKAL aset ${asset.asset_tag} (${asset.name})?\n\n`
+            + 'Tindakan ini TIDAK BOLEH DIBATALKAN — aset dan rekod berkaitan akan hilang sepenuhnya.\n'
+            + 'Aset yang mempunyai rekod pelupusan / kehilangan / kerosakan tidak akan dihapuskan.\n\n'
+            + 'Taip PADAM untuk mengesahkan:'
+        );
+        if (typed !== 'PADAM') return;
+        router.delete(route('assets.force-delete', asset.id), { preserveScroll: true });
     };
 
     const filtered = assets.filter(a => {
@@ -285,7 +296,7 @@ export default function Index({ assets, trashed, totalValue, stats }) {
                             label="Inventori" count={inventoryCount}
                             active={typeFilter === 'inventory'} onClick={() => setTypeFilter('inventory')}
                         />
-                        {['admin', 'superadmin'].includes(user.role) && (
+                        {can_delete && (
                             <FilterTab
                                 label={"🚮 Tong"} count={trashed?.length ?? 0}
                                 active={typeFilter === 'trashed'} onClick={() => setTypeFilter('trashed')}
@@ -362,19 +373,33 @@ export default function Index({ assets, trashed, totalValue, stats }) {
                                                 {fmtDT(asset.deleted_at)}
                                             </td>
                                             <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
-                                                <button
-                                                    onClick={() => {
-                                                        if (window.confirm(`Pulihkan aset "${asset.name}" (${asset.asset_tag})?`)) {
-                                                            router.post(route('assets.restore', asset.id), {}, { preserveScroll: true });
-                                                        }
-                                                    }}
-                                                    style={{
-                                                        padding: '5px 14px', borderRadius: 6, fontSize: '12px', fontWeight: 700,
-                                                        background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer',
-                                                    }}
-                                                >
-                                                    Pulihkan
-                                                </button>
+                                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm(`Pulihkan aset "${asset.name}" (${asset.asset_tag})?`)) {
+                                                                router.post(route('assets.restore', asset.id), {}, { preserveScroll: true });
+                                                            }
+                                                        }}
+                                                        style={{
+                                                            padding: '5px 14px', borderRadius: 6, fontSize: '12px', fontWeight: 700,
+                                                            background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer',
+                                                        }}
+                                                    >
+                                                        Pulihkan
+                                                    </button>
+                                                    {can_force_delete && (
+                                                        <button
+                                                            onClick={() => handleForceDelete(asset)}
+                                                            title="Hapuskan secara kekal — tidak boleh dibatalkan (superadmin)"
+                                                            style={{
+                                                                padding: '5px 14px', borderRadius: 6, fontSize: '12px', fontWeight: 700,
+                                                                background: '#7F1D1D', color: UTM.white, border: '1px solid #7F1D1D', cursor: 'pointer',
+                                                            }}
+                                                        >
+                                                            Padam Kekal
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
@@ -558,8 +583,8 @@ export default function Index({ assets, trashed, totalValue, stats }) {
                                                         Edit
                                                     </Link>
 
-                                                    {/* Delete Button — admin/superadmin only */}
-                                                    {['admin', 'superadmin'].includes(user.role) && (
+                                                    {/* Delete Button — crud_assets (admin/superadmin) */}
+                                                    {can_delete && (
                                                     <button
                                                         onClick={() => {
                                                             if (window.confirm(`Padam aset "${asset.name}" (${asset.asset_tag})?\nAset akan dipindahkan ke Tong. Boleh dipulihkan dalam masa 30 hari.`)) {

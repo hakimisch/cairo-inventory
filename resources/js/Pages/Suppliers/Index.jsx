@@ -5,6 +5,18 @@ import { pinnedCell, pinnedHead } from '@/utils/stickyColumn';
 
 export default function Index({ suppliers, filters, trashed }) {
     const user = usePage().props.auth.user;
+    const canForceDelete = usePage().props.can?.force_delete ?? false;
+
+    const handleForceDelete = (record) => {
+        const typed = window.prompt(
+            `PADAM KEKAL pembekal "${record.name}"?\n\n`
+            + 'Tindakan ini TIDAK BOLEH DIBATALKAN — rekod akan hilang sepenuhnya.\n'
+            + 'Pembekal yang masih terikat pada item induk tidak akan dihapuskan.\n\n'
+            + 'Taip PADAM untuk mengesahkan:'
+        );
+        if (typed !== 'PADAM') return;
+        router.delete(route('suppliers.force-delete', record.id), { preserveScroll: true });
+    };
     const [search, setSearch] = useState(filters?.search || '');
     const [showForm, setShowForm] = useState(false);
     const [editingId, setEditingId] = useState(null);
@@ -178,6 +190,7 @@ export default function Index({ suppliers, filters, trashed }) {
                                             {fmtDT(record.deleted_at)}
                                         </td>
                                         <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell('#FFFFFF') }}>
+                                            <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                                             <button onClick={() => {
                                                 if (window.confirm(`Pulihkan rekod ini?`)) {
                                                     router.post(route('suppliers.restore', record.id), {}, { preserveScroll: true });
@@ -185,6 +198,14 @@ export default function Index({ suppliers, filters, trashed }) {
                                             }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer' }}>
                                                 Pulihkan
                                             </button>
+                                            {canForceDelete && (
+                                                <button onClick={() => handleForceDelete(record)}
+                                                    title="Hapuskan secara kekal — tidak boleh dibatalkan (superadmin)"
+                                                    style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#7F1D1D', color: '#FFFFFF', border: '1px solid #7F1D1D', cursor: 'pointer' }}>
+                                                    Padam Kekal
+                                                </button>
+                                            )}
+                                            </div>
                                         </td>
                                     </tr>
                                 ))}

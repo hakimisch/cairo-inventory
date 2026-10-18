@@ -247,6 +247,17 @@ function EditAppointmentForm({ record, users, onDone }) {
 
 export default function Index({ appointments, filters, users, trashed }) {
     const user = usePage().props.auth.user;
+    const canForceDelete = usePage().props.can?.force_delete ?? false;
+
+    const handleForceDelete = (record) => {
+        const typed = window.prompt(
+            `PADAM KEKAL pelantikan ${record.user?.name || '—'} (${record.role || '—'})?\n\n`
+            + 'Tindakan ini TIDAK BOLEH DIBATALKAN — rekod akan hilang sepenuhnya.\n\n'
+            + 'Taip PADAM untuk mengesahkan:'
+        );
+        if (typed !== 'PADAM') return;
+        router.delete(route('committee-appointments.force-delete', record.id), { preserveScroll: true });
+    };
     const [search, setSearch]       = useState(filters?.search || '');
     const [expandedId, setExpandedId] = useState(null);
     const [showAdd, setShowAdd]     = useState(false);
@@ -426,6 +437,7 @@ export default function Index({ appointments, filters, users, trashed }) {
                                                 {fmtDT(record.deleted_at)}
                                             </td>
                                             <td style={{ padding: '10px 12px', textAlign: 'right' , ...pinnedCell(UTM.white) }}>
+                                                <div style={{ display: 'flex', gap: 6, justifyContent: 'flex-end' }}>
                                                 <button onClick={() => {
                                                     if (window.confirm(`Pulihkan rekod ini?`)) {
                                                         router.post(route('committee-appointments.restore', record.id), {}, { preserveScroll: true });
@@ -433,6 +445,14 @@ export default function Index({ appointments, filters, users, trashed }) {
                                                 }} style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#E6F4EC', color: '#1A7A3C', border: '1px solid #B2DFC2', cursor: 'pointer' }}>
                                                     Pulihkan
                                                 </button>
+                                                {canForceDelete && (
+                                                    <button onClick={() => handleForceDelete(record)}
+                                                        title="Hapuskan secara kekal — tidak boleh dibatalkan (superadmin)"
+                                                        style={{ padding: '5px 14px', borderRadius: 6, fontSize: 12, fontWeight: 700, background: '#7F1D1D', color: UTM.white, border: '1px solid #7F1D1D', cursor: 'pointer' }}>
+                                                        Padam Kekal
+                                                    </button>
+                                                )}
+                                                </div>
                                             </td>
                                         </tr>
                                     ))}
