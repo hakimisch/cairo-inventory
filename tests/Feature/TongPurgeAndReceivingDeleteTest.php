@@ -281,6 +281,61 @@ class TongPurgeAndReceivingDeleteTest extends TestCase
     }
 
     // ═══════════════════════════════════════════════════════════════════
+    //  Register counts must describe the rows the table actually shows
+    // ═══════════════════════════════════════════════════════════════════
+
+    public function test_receiving_index_stats_exclude_trashed_rows(): void
+    {
+        $this->makeReceiving(['status' => 'accepted']);
+        $this->makeReceiving(['status' => 'pending']);
+
+        $binned = $this->makeReceiving(['status' => 'accepted']);
+        $binned->delete();
+
+        $this->actingAs($this->admin())
+            ->get('/receivings')
+            ->assertInertia(fn ($page) => $page
+                ->component('Assets/ReceivingIndex')
+                ->where('stats.total', 2)      // was 3 before: total counted the Tong
+                ->where('stats.accepted', 1)
+                ->where('stats.pending', 1)
+                ->where('stats.trashed', 1)
+                ->has('receivings', 2)
+                ->has('trashed', 1)
+            );
+    }
+
+    public function test_receiving_index_names_the_asset_that_blocks_the_delete(): void
+    {
+        $receiving = $this->makeReceiving(['status' => 'accepted']);
+        $asset     = $this->makeAsset(['receiving_id' => $receiving->id]);
+
+        $this->actingAs($this->admin())
+            ->get('/receivings')
+            ->assertInertia(fn ($page) => $page
+                ->where('receivings.0.has_asset', true)
+                ->where('receivings.0.asset_tags.0', $asset->asset_tag)
+            );
+    }
+
+    public function test_assets_index_total_excludes_trashed_rows(): void
+    {
+        $this->makeAsset();
+
+        $binned = $this->makeAsset();
+        $binned->delete();
+
+        $this->actingAs($this->admin())
+            ->get('/assets')
+            ->assertInertia(fn ($page) => $page
+                ->component('Assets/Index')
+                ->where('stats.total', 1)
+                ->has('assets', 1)
+                ->has('trashed', 1)
+            );
+    }
+
+    // ═══════════════════════════════════════════════════════════════════
     //  P3 — suppliers, committee appointments, disposal sales
     // ═══════════════════════════════════════════════════════════════════
 
