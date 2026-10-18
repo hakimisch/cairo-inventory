@@ -20,7 +20,7 @@ class AssetController extends Controller
             'can_delete'       => $request->user()?->hasPermission('crud_assets') ?? false,
             'can_force_delete' => $request->user()?->hasPermission('force_delete') ?? false,
             'stats'      => [
-                'total'       => Asset::withTrashed()->count(),
+                'total'       => Asset::count(), // live rows only — the Tong is its own tab
                 'active'      => Asset::where('status', 'active')->count(),
                 'repair'      => Asset::where('status', 'repair')->count(),
                 'disposed'    => Asset::where('status', 'disposed')->count(),
@@ -124,21 +124,31 @@ class AssetController extends Controller
 
     public function receivingIndex(Request $request)
     {
-        // `has_asset` tells the page whether this PA-1 already produced an asset:
-        // a PA-1 with a live asset cannot be deleted (the asset would be left in
-        // the register without its acquisition evidence).
-        $decorate = fn ($rows) => $rows->map(fn (Receiving $r) => [
-            ...$r->toArray(),
-            'has_asset' => ($r->assets_count ?? 0) > 0,
-        ]);
+        // `has_asset` + `asset_tags` tell the page whether this PA-1 already
+        // produced an asset: a PA-1 with an asset cannot be deleted (the asset
+        // would be left in the register without its acquisition evidence), so the
+        // table shows the tag instead of a Hapus button.
+        $withAssets = ['assets' => fn ($q) => $q->withTrashed()->select('id', 'receiving_id', 'asset_tag')];
+
+        $decorate = fn ($rows) => $rows->map(function (Receiving $r) {
+            $data = $r->toArray();
+            unset($data['assets']);
+
+            $data['has_asset']  = $r->assets->isNotEmpty();
+            $data['asset_tags'] = $r->assets->pluck('asset_tag')->values()->all();
+
+            return $data;
+        });
 
         return Inertia::render('Assets/ReceivingIndex', [
-            'receivings' => $decorate(Receiving::withCount(['assets' => fn ($q) => $q->withTrashed()])->latest()->get()),
-            'trashed'    => $decorate(Receiving::onlyTrashed()->withCount(['assets' => fn ($q) => $q->withTrashed()])->latest()->get()),
+            'receivings' => $decorate(Receiving::with($withAssets)->latest()->get()),
+            'trashed'    => $decorate(Receiving::onlyTrashed()->with($withAssets)->latest()->get()),
             'can_delete'       => $request->user()?->hasPermission('crud_assets') ?? false,
             'can_force_delete' => $request->user()?->hasPermission('force_delete') ?? false,
             'stats'      => [
-                'total'    => Receiving::withTrashed()->count(),
+                // Counts follow the table (live rows only); trashed rows belong to
+                // the Tong and are counted there.
+                'total'    => Receiving::count(),
                 'pending'  => Receiving::where('status', 'pending')->count(),
                 'accepted' => Receiving::where('status', 'accepted')->count(),
                 'rejected' => Receiving::where('status', 'rejected')->count(),

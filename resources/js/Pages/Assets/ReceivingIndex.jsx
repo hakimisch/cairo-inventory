@@ -318,6 +318,15 @@ export default function ReceivingIndex({ receivings, trashed, stats, can_delete,
         });
     }, [receivings, dateFrom, dateTo]);
 
+    // Card counts come from the same rows the table renders (date filter included),
+    // so the two can never drift apart.
+    const cardCounts = React.useMemo(() => ({
+        total:    filteredReceivings.length,
+        pending:  filteredReceivings.filter(r => r.status === 'pending').length,
+        accepted: filteredReceivings.filter(r => r.status === 'accepted').length,
+        rejected: filteredReceivings.filter(r => r.status === 'rejected').length,
+    }), [filteredReceivings]);
+
     const { data, setData, post, processing, errors, reset } = useForm({
         unit_price : '',
         category   : '',
@@ -418,10 +427,10 @@ export default function ReceivingIndex({ receivings, trashed, stats, can_delete,
 
                     {/* ── Stats row ── */}
                     <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap' }}>
-                        <StatCard label="Total" count={stats?.total ?? receivings.length} color={UTM.maroon} />
-                        <StatCard label="Menunggu" count={stats?.pending ?? 0} color={UTM.goldDark} />
-                        <StatCard label="Diterima" count={stats?.accepted ?? 0} color="#1A7A3C" />
-                        <StatCard label="Ditolak" count={stats?.rejected ?? 0} color={UTM.maroon} />
+                        <StatCard label="Total" count={cardCounts.total} color={UTM.maroon} />
+                        <StatCard label="Menunggu" count={cardCounts.pending} color={UTM.goldDark} />
+                        <StatCard label="Diterima" count={cardCounts.accepted} color="#1A7A3C" />
+                        <StatCard label="Ditolak" count={cardCounts.rejected} color={UTM.maroon} />
                     </div>
 
                     {/* ── Date range filter ── */}
@@ -609,9 +618,28 @@ export default function ReceivingIndex({ receivings, trashed, stats, can_delete,
                                                     )}
 
                                                     {/* PA-1 Hapus — any status, but only while it has
-                                                        produced no asset (the PA-1 is that asset's
-                                                        acquisition evidence). */}
-                                                    {can_delete && !item.has_asset && (
+                                                        produced no asset. When it has, show which asset
+                                                        blocks the delete instead of silently hiding it. */}
+                                                    {can_delete && (item.has_asset ? (
+                                                        <span
+                                                            title={`Tidak boleh dipadam — PA-1 ini telah menjana aset: ${(item.asset_tags ?? []).join(', ')}. Padam aset tersebut dahulu.`}
+                                                            style={{
+                                                                display     : 'inline-block',
+                                                                padding     : '5px 12px',
+                                                                borderRadius: 6,
+                                                                fontSize    : '12px',
+                                                                fontWeight  : 700,
+                                                                background  : '#F1EFEC',
+                                                                color       : UTM.gray500,
+                                                                border      : '1px solid #DDD6D0',
+                                                                cursor      : 'help',
+                                                            }}
+                                                        >
+                                                            Ada aset
+                                                            {item.asset_tags?.length ? `: ${item.asset_tags[0]}` : ''}
+                                                            {item.asset_tags?.length > 1 ? ` +${item.asset_tags.length - 1}` : ''}
+                                                        </span>
+                                                    ) : (
                                                     <button
                                                         onClick={() => handleDelete(item)}
                                                         title="Pindahkan rekod PA-1 ini ke Tong"
@@ -628,7 +656,7 @@ export default function ReceivingIndex({ receivings, trashed, stats, can_delete,
                                                     >
                                                         Hapus
                                                     </button>
-                                                    )}
+                                                    ))}
                                                 </td>
                                             </tr>
 
@@ -1039,7 +1067,17 @@ export default function ReceivingIndex({ receivings, trashed, stats, can_delete,
                                                 >
                                                     Pulihkan
                                                 </button>
-                                                {can_force_delete && (
+                                                {can_force_delete && (item.has_asset ? (
+                                                    <span
+                                                        title={`Tidak boleh dihapuskan kekal — PA-1 ini masih mempunyai aset: ${(item.asset_tags ?? []).join(', ')}`}
+                                                        style={{
+                                                            padding: '4px 12px', borderRadius: 5, fontSize: 11, fontWeight: 700,
+                                                            background: '#F1EFEC', color: UTM.gray500, border: '1px solid #DDD6D0', cursor: 'help',
+                                                        }}
+                                                    >
+                                                        Ada aset
+                                                    </span>
+                                                ) : (
                                                     <button
                                                         onClick={() => handleForceDelete(item)}
                                                         title="Hapuskan secara kekal — tidak boleh dibatalkan (superadmin)"
@@ -1050,7 +1088,7 @@ export default function ReceivingIndex({ receivings, trashed, stats, can_delete,
                                                     >
                                                         Padam Kekal
                                                     </button>
-                                                )}
+                                                ))}
                                             </div>
                                         </td>
                                     </tr>
