@@ -36,5 +36,6 @@ __pycache__/
 !/plans/2026-07-31_current-system-state.md
 !/plans/2026-07-31_future-work-backlog.md
 !/plans/2026-10-08_verification-items-findings.md
+!/plans/2026-10-18_tong-purge-and-receiving-delete.md
 table_name.php
 item_documents/

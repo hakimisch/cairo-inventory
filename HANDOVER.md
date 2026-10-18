@@ -77,6 +77,18 @@ php artisan serve
 # Or use Laravel Herd / Valet for production-like setup
 ```
 
+### Updating an existing deployment (order matters)
+
+```bash
+git pull
+php artisan migrate        # runs any new migration — e.g. assets.receiving_id (2026-10-18)
+npm run build              # JSX changes do NOT arrive via git: public/build is gitignored
+php artisan optimize:clear # stale config/roles.php or route cache hides new permissions/routes
+```
+
+Building **before** pulling leaves a stale bundle (`public/build` is gitignored), and skipping
+`migrate` leaves the schema behind the code.
+
 ### What to verify after setup
 
 | Check | Command | Expected |
@@ -311,7 +323,7 @@ master_items.status:
 | `database/migrations/2026_07_24_000001_add_soft_deletes_to_all_tables.php` | Adds `deleted_at` to 19 tables in one migration. |
 | All 19 models in `app/Models/` | `use SoftDeletes;` trait. |
 | `app/Http/Controllers/*.php` (11 controllers) | `destroy()` soft-deletes. `restore()` methods + trashed data for 13 modules (Assets, Receivings, Transfers, Damage Reports, Placements, Inspections, Maintenances, Disposals, Loss Reports, Vehicle Disposals, Disposal Sales, Suppliers, Committees) — with activity logging. |
-| `routes/web.php` | All DELETE routes gated with `permission:crud_assets`. Restore routes: `POST /{resource}/{id}/restore` per module. Permanent-delete routes use the stricter `permission:force_delete` (superadmin only). |
+| `routes/web.php` | All DELETE routes gated with `permission:crud_assets`. Restore routes: `POST /{resource}/{id}/restore` per module. Permanent-delete routes use the stricter `permission:force_delete` (superadmin only) and only accept a row that is already in the Tong. |
 | `resources/js/Pages/*/Index.jsx` (11 pages) | "Tong (N)" toggle (admin/superadmin only) revealing trashed table with "Pulihkan" button. Hapus button gated to admin/superadmin. |
 
 ### Pages & Components (Frontend)
@@ -482,7 +494,7 @@ git diff HEAD --stat
 | 13 | SNS Network DO PDFs have ~61% extraction accuracy | `bin/cairo-ocr` | Harder format — the SNS PDF has less tabular structure |
 | 14 | **Dead code**: ~~`ItemsController` + `Items/Index.jsx` (zero routes)~~ (removed 2026-10-08), orphaned `Scanner/Index.jsx` + `History.jsx`, `Adminmiddleware.php` (no alias registered), `DummyKewpaSeeder` + `DashboardTestSeeder` unreferenced | Various | Remaining: `git grep` each name → zero references (backlog item 20) |
 | 15 | `orWhereYear` ungrouped in kewpa12/kewpa20 | `ReportController.php:196-199` | Wrap in `where(fn ($q) => ...)` (backlog item 22) |
-| 16 | **No permanent delete outside Master Items** — only `DELETE /verification/{id}/force` exists. The other 13 trash bins (Assets, Receivings, Transfers, Damage Reports, Placements, Inspections, Maintenances, Disposals, Loss Reports, Vehicle Disposals, Disposal Sales, Suppliers, Committee Appointments) can restore but never purge, so soft-deleted rows accumulate forever | `routes/web.php` + each controller's `restore()` area | Mirror the Master Items pattern: `DELETE /{resource}/{id}/force` + `forceDelete($id)` + a `Padam Kekal` button in each trash table, all gated `permission:force_delete` |
+| 16 | ~~**No permanent delete outside Master Items** — only `DELETE /verification/{id}/force` exists. The other 13 trash bins can restore but never purge, so soft-deleted rows accumulate forever~~ **PARTIAL (2026-10-18)**: purge added for Assets, Receivings, Suppliers, Committee Appointments and Disposal Sales. **Still open:** Transfers, Damage Reports, Placements, Inspections, Maintenances, Disposals, Loss Reports, Vehicle Disposals — deliberately left restore-only as audit entries under an asset (the asset purge is where their fate is decided) | `routes/web.php` + each controller's `restore()` area | For any remaining register that needs it: mirror `AssetController::forceDelete()` — `DELETE /{resource}/{id}/force` + `forceDelete($id)` + a `Padam Kekal` button, all gated `permission:force_delete` |
 | 17 | `MasterItem` has no `LogsActivity` trait (unlike the other 17 models), so master-item edits/imports are only logged where `VerificationController` logs explicitly | `app/Models/MasterItem.php` | Deliberate: adding it would write one `created` entry per imported row (156 per import). Revisit if import provenance needs auditing |
 | 18 | **User account deletions are not audited** — the `User` model has no `LogsActivity` and neither `ProfileController::destroy()` (self-delete) nor `Admin\UserController::destroy()` (superadmin delete) writes an activity entry, so a deleted account leaves no trace | `app/Models/User.php`, `ProfileController.php`, `Admin/UserController.php` | Add `LogsActivity` to `User` (low volume — a handful of accounts) or log explicitly in both destroy methods |
 
@@ -515,7 +527,7 @@ git diff HEAD --stat
 | Dead code removed | `ItemsController.php` + `resources/js/Pages/Items/Index.jsx` (zero routes, unreachable `/items` page) and `ScanController::verifyFromScan()` / `receiveFromScan()` (unrouted, and they disagreed with the pipeline on when PA-1 is created — scanner-receive + pipeline-verify would have produced two PA-1s) |
 | 2 stale tests fixed | `EndToEndPipelineTest` asserts PA-1 is created at **verify**, not receive; `RbacTest::test_staff_cannot_verify_items` → `test_staff_can_verify_items`. 6 new tests in `VerificationPipelineTest` (T13–T18) — Tong delete/restore/guard, permission props, and the rejection-reaches-the-page regression guard |
 | Stale pipeline copy corrected | The Verification page still told the user PA-1 is created at **Receive** in three places: the header sentence, the Receive modal's submit button ("Confirm Receive & Create PA-1"), and the legend ("Verify button = diterima (PA-1 exists)"). The same legend also had the PA-2/PA-3 threshold backwards. All now read: orange **Receive** → diterima (no PA-1 yet); blue **Verify** → creates PA-1 + the PA-2/PA-3 asset; below RM 2,000 = PA-3 Inventori, RM 2,000+ = PA-2 Harta Tetap |
-| Permanent delete from the Tong | New `force_delete` permission (**superadmin only**) + `DELETE /verification/{id}/force` → `VerificationController::forceDelete()`, with a `Padam Kekal` button in the Tong (the UI asks you to type `PADAM` to confirm) gated by a `can_force_delete` prop. ⚠️ **Master Items only so far — the other 13 trash bins are still restore-only.** See Technical Debt #16. |
+| Permanent delete from the Tong | New `force_delete` permission (**superadmin only**) + `DELETE /{resource}/{id}/force` → `forceDelete()` per module, with a `Padam Kekal` button in the Tong (the UI asks you to type `PADAM` to confirm). Master Items (2026-10-08) plus **Assets, Receivings, Suppliers, Committee Appointments, Disposal Sales (2026-10-18)**; the remaining trash bins stay restore-only by design. See Technical Debt #16. |
 | Audit trail completed for the pipeline | `VerificationController` now writes explicit, named events: `received`, `verified`, `deleted`, `restored`, `force_deleted`. Previously `deleted`/`restored` were written with a **null `event`**, so the audit page showed an unnamed badge and the filter couldn't find them. `AuditLogController` now derives the event filter from the data instead of a hardcoded 4-item list, and the audit page labels/badges every event type — new event names become filterable with no code change |
 
 > Verification (2026-10-08): `php -l` clean on every edited PHP file; real `vite build` succeeded (all page chunks). Full suite: **127 passed / 593 assertions / 0 failed** (`php artisan test`, 202s). Note for a fresh clone: `public/build/manifest.json` (gitignored) must exist — `resources/views/app.blade.php` uses `@vite(...)` with a per-page entry, so any test rendering the Inertia root view fails with "Vite manifest not found" until `npm run build` has been run once. Tests need no database: `phpunit.xml` pins sqlite `:memory:`.
